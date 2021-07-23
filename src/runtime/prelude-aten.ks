@@ -338,6 +338,15 @@
 (gdef sufrevpass [aten::prod (Tuple Integer Integer)])
 (gdef sufrev [aten::prod (Tuple Integer Integer)])
 
+(def aten::sum Float ((a : Tensor 2 Float) (opt_dtype : Tuple))
+    (sumbuild (size a) (lam (ij : Tuple Integer Integer)
+            (index ij a))))
+(gdef rev [aten::sum (Tuple (Tensor 2 Float) (Tuple))])
+(gdef fwd [aten::sum (Tuple (Tensor 2 Float) (Tuple))])
+(gdef suffwdpass [aten::sum (Tuple (Tensor 2 Float) (Tuple))])
+(gdef sufrevpass [aten::sum (Tuple (Tensor 2 Float) (Tuple))])
+(gdef sufrev [aten::sum (Tuple (Tensor 2 Float) (Tuple))])
+
 (def aten::sum Float (a : Tensor 2 Float)
     (sumbuild (size a) (lam (ij : Tuple Integer Integer)
             (index ij a))))
