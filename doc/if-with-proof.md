@@ -124,30 +124,16 @@ here it is safe to lift `let y` outside the inner `if` to:
 ```
 allowing another lifting step and cse step to produce `(let (x (index i arr)) (add x (if fred e[x] e2)))`.
 
-# Dataflow
-On #953 @simonpj proposed expressing the safety requirement, that a certain `index` cannot be executed outside of a certain `if`, as dataflow of a "proof" from the `if` to the `index`. @awf would like to express this *without* discriminated union types in the ks-language, which is possible by adding only new ASTNode types, as follows:
-
-`(if-with-proof var cond t_body f_body)` is an Expr, where `var#t : Proof` is bound only within t_body, and `var#f : Proof` only within f_body.  That is, this "program" does not compile: `(let (x (indexWithProof aok#t i arr)) (if-with-proof aok (inRange i arr) x 0))`
-
-At runtime a Proof requires no storage (like an empty tuple) but the binding by `if-with-proof` cannot be inlined (like binding by `lam`, unlike binding by `let`).
-
-Then suppose a primitive function "indexWithProof" which is like "index" but takes a Proof as an extra argument: `edef indexWithProof ElemType ((p : Proof) (i : Integer) (ar : Vec ElemType))`. The rule for lifting is that `index` can never be lifted out of *any* `if` or `if-with-proof`, whereas `indexWithProof` can be lifted so long as it does not escape the binder of its proof argument. 
-
-## Manually specifying proofs
-We can allow the programmer to specify which proof relates to which index by hand; this may be error-prone (where an error means the programmer has *allowed* the compiler to lift an `index` to a position where the program throws an exception it didn't before - of course up to the compiler whether it does), and the programmer will have to work quite hard, perhaps writing this example:
-```
-(if-with-proof proof1 (inRange i arr)
-   (let (x (indexWithProof proof1#t i arr))
-      (add x
-         (let (y (indexWithProof proof1#t i arr))
-          (if fred e[y] e2)))))
-```
-Q. is this any better than getting the programmer to CSE the two 'index's manually?
-
 
 ## Rewrites specifying proofs
 We should be able to get the rewriter to introduce the data dependencies automatically:
-```(index i arr) ==> (if-with-proof proof1 (inRange i arr) (indexWithProof proof1#t i arr) (throw OutOfBounds))```
+```clojure
+(index i arr)
+; ==>
+(if-with-proof proof1 (inRange i arr)
+  (index-with-proof proof1#t i arr)
+  (throw-with-proof proof1#f OutOfBounds))
+```
 and then it should be possible to push (sink) the proofs *downwards* (rather than lifting upwards) and CSE identical proofs. One can also imagine a language construct `let-with-proof ((x proof) e) body` which binds both x and proof within body, where the "proof" guarantees that "e" did not throw an exception; again it should be possible to sink `proof` down and CSE with other identical proofs.
 
 
