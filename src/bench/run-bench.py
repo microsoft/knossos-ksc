@@ -1,9 +1,5 @@
 import time
-from ksc import torch_frontend
 import torch
-
-import ksc.torch_frontend
-from ksc.torch_frontend import tsmod2ksmod
 
 
 class time_sampler:
@@ -120,14 +116,9 @@ def bench(module_file, bench_name):
         else:
             print(f"Ignoring {fn_name}")
 
-    # TODO: elementwise_apply
-    torch_extension_name = "ksc_run_bench_" + bench_name
-    ks_compiled = tsmod2ksmod(
-        mod,
-        bench_name,
-        torch_extension_name,
+    ks_compiled = ks_raw.compile(
+        torch_extension_name="ksc_run_bench_" + bench_name,
         example_inputs=(configs[0],),
-        generate_lm=False,
     )
 
     for arg in configs:

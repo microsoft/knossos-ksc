@@ -1,8 +1,10 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
+from types import ModuleType
+from dataclasses import dataclass
 from contextlib import contextmanager
-
 import functools
 import numpy
+import inspect
 import torch
 import torch.onnx
 
@@ -464,6 +466,10 @@ def backward_template(py_mod, ctx, *args):
     return torch_from_ks(outputs)
 
 
+class KscAutogradFunction(torch.autograd.Function):
+    pass
+
+
 def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
@@ -471,7 +477,7 @@ def make_KscAutogradFunction(py_mod):
     backward = lambda ctx, args: backward_template(py_mod, ctx, args)
     return type(
         "KscAutogradFunction_" + py_mod.__name__,
-        (torch.autograd.Function,),
+        (KscAutogradFunction,),
         {
             "py_mod": py_mod,
             "forward": staticmethod(forward),
@@ -602,53 +608,6 @@ def cpp_string_to_autograd_function(
     return make_KscAutogradFunction(mod)
 
 
-import inspect
-
-
-def tsmod2ksmod(
-    module, function_name, torch_extension_name, example_inputs, generate_lm=True
-):
-    global todo_stack
-    todo_stack = {function_name}
-    ksc_defs = []
-    while len(todo_stack) > 0:
-        print(f"tsmod2ksmod: Remaining: {todo_stack}")
-        for fn in inspect.getmembers(module, inspect.isfunction):
-            fn_name, fn_obj = fn
-            if fn_name in todo_stack:
-                todo_stack.remove(fn_name)
-                print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
-                ts_fn = torch.jit.script(fn_obj)
-                ts_graph = ts_fn.graph
-                ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
-                ksc_defs.insert(0, ksc_def)
-
-    elementwise = is_elementwise_operation(ksc_defs[-1])
-    if elementwise:
-        ksc_defs.pop()
-
-    entry_def = ksc_defs[-1]
-    return ksc_defs_to_autograd_function(
-        ksc_defs,
-        entry_def,
-        torch_extension_name,
-        elementwise=elementwise,
-        generate_lm=generate_lm,
-    )
-
-
-def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
-    fn = torch.jit.script(function)
-    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
-    return ksc_defs_to_autograd_function(
-        [ksc_def],
-        ksc_def,
-        torch_extension_name,
-        elementwise=False,
-        generate_lm=generate_lm,
-    )
-
-
 def is_elementwise_operation(ksc_def):
     """
     Inspect the body of a def to determine whether it is a
@@ -691,3 +650,159 @@ def is_elementwise_operation(ksc_def):
         print(f"Num args {len(ksc_def.args)}")
         return False
     return is_map(ksc_def.body, ksc_def.args[0].name)
+
+
+def _tsmod2ksmod(
+    module, function_obj, torch_extension_name, example_inputs, generate_lm=True
+):
+    global todo_stack
+    todo_stack = {function_obj}
+    ksc_defs = []
+    while len(todo_stack) > 0:
+        print(f"tsmod2ksmod: Remaining: {todo_stack}")
+        todo = next(iter(todo_stack))
+        if isinstance(todo, str):
+            # String function name, try to find it in the caller's module
+            todo_fn = None
+            for module_fn_name, module_fn_obj in inspect.getmembers(module):
+                if module_fn_name == todo:
+                    print(f"tsmod2ksmod: converting {todo}, remaining: {todo_stack}")
+                    if isinstance(module_fn_obj, KscStub):
+                        todo_fn = module_fn_obj.raw_f
+                    else:
+                        todo_fn = module_fn_obj
+                    break
+            # Check we found it
+            if not todo_fn:
+                raise ValueError(f"Did not find string-named function {todo}")
+        else:
+            todo_fn = todo
+
+        todo_stack.remove(todo)
+
+        ts_fn = torch.jit.script(todo_fn)
+        ts_graph = ts_fn.graph
+        ksc_def = ts2ks_fromgraph(False, todo_fn.__name__, ts_graph, example_inputs)
+        ksc_defs.insert(0, ksc_def)
+
+    elementwise = is_elementwise_operation(ksc_defs[-1])
+    if elementwise:
+        ksc_defs.pop()
+
+    entry_def = ksc_defs[-1]
+    return ksc_defs_to_autograd_function(
+        ksc_defs,
+        entry_def,
+        torch_extension_name,
+        elementwise=elementwise,
+        generate_lm=generate_lm,
+    )
+
+
+def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
+    fn = torch.jit.script(function)
+    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
+    return ksc_defs_to_autograd_function(
+        [ksc_def],
+        ksc_def,
+        torch_extension_name,
+        elementwise=False,
+        generate_lm=generate_lm,
+    )
+
+
+@dataclass
+class KscStub:
+    raw_f: Callable
+    generate_lm: bool
+    f_module: ModuleType
+    compiled: Optional[KscAutogradFunction]
+
+    def __call__(self, *args):
+        """
+        Call with pytorch tensors.
+        This calls the KscAutoGradFunction apply method, so is suitable 
+        for use in the "forward/backward" pattern for gradient computation. 
+        """
+        self.ensure_compiled(args)
+        return self.compiled.apply(*args)
+
+    def _entry(self, *args):
+        """
+        Directly call the Knossos compiled function.
+        Does not wrap torch tensors, or reset memory allocator.
+        For test use only
+        """
+        self.ensure_compiled(args)
+        return self.compiled.py_mod.entry(*args)
+
+    def _entry_vjp(self, *args):
+        """
+        Directly call the Knossos vjp function.
+        Does not wrap torch tensors, or reset memory allocator.
+        For test use only
+        """
+        assert self.compiled  # TODO: infer call args from vjp args
+        return self.compiled.py_mod.entry_vjp(*args)
+
+    def compile(self, example_inputs, torch_extension_name):
+        self.compiled = _tsmod2ksmod(
+            self.f_module,
+            self.raw_f,
+            torch_extension_name=torch_extension_name,
+            example_inputs=example_inputs,
+            generate_lm=self.generate_lm,
+        )
+
+        return self.compiled
+
+    def ensure_compiled(self, example_inputs):
+        if not self.compiled:
+            print(f"knossos.register: Compiling {self.raw_f.__name__}")
+            torch_extension_name = (
+                "KscStub_" + self.f_module.__name__ + "_" + self.raw_f.__name__
+            )
+            self.compile(example_inputs, torch_extension_name)
+
+
+def optional_arg_decorator(register):
+    # https://stackoverflow.com/a/20966822
+    def wrapped_decorator(*args, **kwargs):
+        # Grab the caller's module here, as wrapped_decorator may be 1 or 2 deeper
+        module = inspect.getmodule(inspect.currentframe().f_back)
+
+        if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+            return register(args[0], module)
+
+        # we have optional args
+        def real_decorator(f):
+            return register(f, module, *args, **kwargs)
+
+        return real_decorator
+
+    return wrapped_decorator
+
+
+@optional_arg_decorator
+def register(f: Callable, module: ModuleType, generate_lm=False) -> KscStub:
+    """
+    Main Knossos entry point.
+
+    The @register decorator transforms a TorchScript function into a
+    KscAutogradFunction which implements the function and its 
+    derivatives.
+    ```
+       @knossos.register
+       def f(x : torch.Tensor) -> torch.Tensor:
+           return x * sin(x)
+    ```
+    Endows f with the following behaviours
+    ```
+        y = f(x)       # Fast (C++/CUDA/...) computation of f(x)
+        vjp(f, x, dy)  # Fast computation of dot(dy, [df_i/dx_j])
+    ```
+    The implementation delays compilation until the first call, or 
+    when "f.compile()" is explicitly called.
+    """
+
+    return KscStub(f, generate_lm, module, None)

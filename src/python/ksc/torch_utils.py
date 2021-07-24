@@ -39,4 +39,12 @@ def elementwise_apply(f: Callable[[float], float], x: torch.Tensor):
 
 @torch.jit.ignore
 def elementwise_apply_hack(f: str, x: torch.Tensor):
-    pass
+    # Convert string function name to callable
+    import inspect
+
+    module = inspect.getmodule(inspect.currentframe().f_back)
+    for fn_name, fn_obj in inspect.getmembers(module):
+        if fn_name == f:
+            return elementwise_apply_pt18(fn_obj, x)
+
+    assert False
