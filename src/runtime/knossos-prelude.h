@@ -1,4 +1,5 @@
 // Defines everything in Knossos.ks
+#pragma once
 
 namespace ks {
 // ===============================  Test edef  ========================
@@ -6,19 +7,19 @@ namespace ks {
 // We should probably come up with a better story for the
 // tests but at the time of writing I didn't want to hold back
 // edef support any longer.
-Float edef_example$af(allocator *, Float x) { return x; }
-Float fwd$edef_example$af(allocator *, Float x, Float dx) { return dx; }
-Float rev$edef_example$af(allocator *, Float x, Float ddr) { return ddr; }
-ks::Tuple<Float,ks::Tuple<>> suffwdpass$edef_example$af(allocator *, Float x) { return ks::make_Tuple(x, ks::make_Tuple()); }
-Float sufrevpass$edef_example$af(allocator *, Float ddr, ks::Tuple<>) { return ddr; }
+inline Float edef_example$af(allocator *, Float x) { return x; }
+inline Float fwd$edef_example$af(allocator *, Float x, Float dx) { return dx; }
+inline Float rev$edef_example$af(allocator *, Float x, Float ddr) { return ddr; }
+inline ks::Tuple<Float,ks::Tuple<>> suffwdpass$edef_example$af(allocator *, Float x) { return ks::make_Tuple(x, ks::make_Tuple()); }
+inline Float sufrevpass$edef_example$af(allocator *, Float ddr, ks::Tuple<>) { return ddr; }
 
-Float dot$aT1fT1f(allocator *, tensor<1, Float> const& a, tensor<1, Float> const& b)
+inline Float dot$aT1fT1f(allocator *, tensor<1, Float> const& a, tensor<1, Float> const& b)
 {
 	return ts_dot(a,b);
 }
 
 tensor<1, Float>
-mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const& v)
+inline mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const& v)
 {
 	int r = M.outer_dimension();
 	tensor<1, Float> ret(alloc, r);
@@ -28,7 +29,7 @@ mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const
 }
 
 Tuple<tensor<2, Float>,tensor<1, Float>>
-rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Float>> const& M_v, tensor<1, Float> const& dr)
+inline rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Float>> const& M_v, tensor<1, Float> const& dr)
 {
 	auto [M, v] = M_v;
 	int r = M.outer_dimension();
@@ -52,7 +53,7 @@ rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Float>> con
 	return ks::make_Tuple(retM,retv);
 }
 
-size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
+inline size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
 {
     KS_ASSERT(size(v) > 0);
     size_t imax = 0;
@@ -66,17 +67,17 @@ size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
     return imax;
 }
 
-Float max$aT1f(allocator * alloc, tensor<1, Float> const& v)
+inline Float max$aT1f(allocator * alloc, tensor<1, Float> const& v)
 {
     return v[imax$aT1f(alloc, v)];
 }
 
-Float rev$lgamma$af(allocator *, Float x, Float dr)
+inline Float rev$lgamma$af(allocator *, Float x, Float dr)
 {
 	std::cerr << "rev$lgamma unimp!\n" << std::endl;
 	throw "rev$gamma unimp!\n";
 }
-Float fwd$lgamma$af(allocator *, Float x, Float dx)
+inline Float fwd$lgamma$af(allocator *, Float x, Float dx)
 {
   if (dx == 0.0) {
     return 0.0;
@@ -86,17 +87,17 @@ Float fwd$lgamma$af(allocator *, Float x, Float dx)
   }
 }
 
-Float pow$afi(allocator *, Float x, Integer e)
+inline Float pow$afi(allocator *, Float x, Integer e)
 {
     return std::pow(x,e);
 }
 
-Tuple<> fwd$gt(allocator *, Float a,Float b,Float d$a,Float d$b)
+inline Tuple<> fwd$gt(allocator *, Float a,Float b,Float d$a,Float d$b)
 {
     return Tuple<>();
 }
 
-Tuple<Float,Float> rev$gt(allocator *, Float a,Float b, Tuple<> d$r)
+inline Tuple<Float,Float> rev$gt(allocator *, Float a,Float b, Tuple<> d$r)
 {
 	std::cerr << "rev$gt unimp!\n" << std::endl;
 	throw "rev$gt unimp!\n";

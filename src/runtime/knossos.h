@@ -663,10 +663,10 @@ namespace ks {
 
 	// ===============================  Shape  ==================================
 
-	Tuple<> shape(allocator_base *, Bool const&) { return {}; }
-	Tuple<> shape(allocator_base *, Integer const&) { return {}; }
-	Tuple<> shape(allocator_base *, Float const&) { return {}; }
-	Tuple<> shape(allocator_base *, String const&) { return {}; }
+	inline Tuple<> shape(allocator_base *, Bool const&) { return {}; }
+	inline Tuple<> shape(allocator_base *, Integer const&) { return {}; }
+	inline Tuple<> shape(allocator_base *, Float const&) { return {}; }
+	inline Tuple<> shape(allocator_base *, String const&) { return {}; }
 
 	template<size_t Dim, class T>
 	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
@@ -689,7 +689,7 @@ namespace ks {
 		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
 	}
 
-	auto shape(allocator_base *) { return Tuple<>{}; }
+	inline auto shape(allocator_base *) { return Tuple<>{}; }
 
 	template<class T1, class T2, class... Ts>
 	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
@@ -955,13 +955,13 @@ namespace ks {
 	}
 
 	template <>
-	Float zero(allocator *, Float const& val)
+	inline Float zero(allocator *, Float const& val)
 	{
 		return 0.0;
 	}
 
 	template <>
-	Integer zero(allocator *, Integer const& val)
+	inline Integer zero(allocator *, Integer const& val)
 	{
 		return 0;
 	}
