@@ -44,11 +44,12 @@ cpp_inlined_map = """
             auto ret = tensor<1, ks::Float>::create($alloc, t.size());
             auto retdata = ret.data();
             auto sqrt_2_div_pi = sqrt(2.0 / 3.14159);
+            auto sqrt_2 = sqrt(2.0);
             for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
                 ks::Float c$1;
                 ks::Float x = tdata[i];
                 ks::Float dreti = dretdata[i];
-                c$1 = 0.5 * (1.0 + erf(x / sqrt(2.0)) + x * sqrt_2_div_pi * exp(-x*x/2.0));
+                c$1 = 0.5 * (1.0 + erf(x / sqrt_2) + x * sqrt_2_div_pi * exp(-x*x/2.0));
                 retdata[i] = c$1 * dreti;
             }
             return ret;
