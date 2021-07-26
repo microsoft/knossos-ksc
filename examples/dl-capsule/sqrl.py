@@ -1,7 +1,9 @@
 import torch
+import ksc.torch_frontend as knossos
 
 # run-bench: Knossos source, and "nice" PyTorch implementation
 # BEGINDOC
+@knossos.register
 def sqrl(x: torch.Tensor):
     """
     sqrl: Squared Leaky Relu
@@ -9,7 +11,7 @@ def sqrl(x: torch.Tensor):
     Typically x is a 4x4 tensor, possibly
     packed in a 4n x 4m array
     """
-    y = torch.mean(x)
+    y = torch.sum(x)
     if y < 0.0:
         t = -0.125 * x
     else:

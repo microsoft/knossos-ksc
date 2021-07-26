@@ -10,11 +10,13 @@ from ksc.torch_frontend import (
     ksc_string_to_autograd_function,
     cpp_string_to_autograd_function,
 )
+import ksc.torch_frontend as knossos
 from ksc.torch_utils import elementwise_apply_hack
 
 import torch._vmap_internals
 
 # BEGINDOC
+@knossos.register
 def relu3(x: float) -> float:
     """
     Like ReLu, but smoother
@@ -42,16 +44,25 @@ def vrelu3_pytorch(x: torch.Tensor):
 
 
 # run-bench: PyTorch "nice" implementation
-def relu3_pytorch_nice(x: float) -> float:
-    if x < 0.0:
-        return torch.zeros_like(x)  # Needed for PyTorch, not for Knossos [Note: zeros]
-    elif x < 1.0:
-        return 1 / 3 * x ** 3
-    else:
-        return x - 2 / 3
+# TODO: With torch 1.9.0 this leads to
+# RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
+# See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
+if False:
 
+    def relu3_pytorch_nice(x: float) -> float:
+        if x < 0.0:
+            return torch.zeros_like(
+                x
+            )  # Needed for PyTorch, not for Knossos [Note: zeros]
+        elif x < 1.0:
+            return 1 / 3 * x ** 3
+        else:
+            return x - 2 / 3
+
+    vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
 
 # run-bench: Knossos implementation
+@knossos.register
 def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
@@ -478,12 +489,6 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
     )
 
 
-# With torch 1.9.0 this leads to
-# RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
-# See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
-# vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
-
-
 def vrelu3_cuda_init():
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
     this_dir = os.path.dirname(__file__)
@@ -604,3 +609,10 @@ def relu3_in_fcdnn():
 
     # Run training
     # train_model(model)
+
+
+if __name__ == "__main__":
+    y = relu3(0.3)
+    xs = next(vrelu3_bench_configs())
+    ys = vrelu3(xs)
+    print(ys.sum())

@@ -6,6 +6,7 @@ import numpy
 
 from ksc import utils
 from ksc.type import Type
+import ksc.torch_frontend as knossos
 from ksc.torch_frontend import ts2mod
 
 
@@ -30,6 +31,7 @@ def grad_bar1(a: int, x: float, b: str):
     return torch.sin(t) + t * torch.cos(t)
 
 
+@knossos.register
 def relux(x: float):
     if x < 0.0:
         return 0.1 * x
@@ -53,31 +55,19 @@ def f(x: float):
     return r2
 
 
-ks_relux = None
-
-
-def compile_relux():
-    global ks_relux
-    if ks_relux is None:
-        print("Compiling relux")
-        torch_extension_name = "ksc_test_ts2k_relux"
-        ks_relux = ts2mod(relux, (1.0,), torch_extension_name)
-
-
-def test_relux():
-    compile_relux()
-    ks_ans = ks_relux.py_mod.entry(2.0)
-    ans = relux(2.0)
+def test_ts2k_relux():
+    ks_ans = relux._entry(2.0)
+    ans = relux.raw_f(2.0)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
-def test_relux_grad():
-    compile_relux()
-    ks_ans = ks_relux.py_mod.entry_vjp(1.3, 1.0)
+def test_ts2k_relux_grad():
+    ks_ans = relux._entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
+@knossos.register(generate_lm=True)
 def bar(a: int, x: float):
     y = torch.tensor([[1.1, -1.2], [2.1, 2.2]])
 
@@ -107,20 +97,19 @@ def grad_bar(a: int, x: float):
 
 def test_bar():
     a, x = 1, 12.34
-    torch_extension_name = "ksc_test_ts2k_bar"
-    ks_bar = ts2mod(bar, (a, x), torch_extension_name)
 
     # Check primal
-    ks_ans = ks_bar.py_mod.entry(a, x)
-    ans = bar(a, x)
+    ks_ans = bar._entry(a, x)
+    ans = bar.raw_f(a, x)
     assert pytest.approx(ks_ans, 1e-5) == ans
 
     # Check grad
-    ks_ans = ks_bar.py_mod.entry_vjp((a, x), 1.0)
+    ks_ans = bar._entry_vjp((a, x), 1.0)
     ans = grad_bar(a, x)
     assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
 
 
+@knossos.register(generate_lm=True)
 def far(x: torch.Tensor, y: torch.Tensor):
     xx = torch.cat([x, y], dim=1)
     xbar = torch.mean(xx)
@@ -134,25 +123,23 @@ def far(x: torch.Tensor, y: torch.Tensor):
 def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
-    torch_extension_name = "ksc_test_ts2k_far"
-    ks_far = ts2mod(far, (x, y), torch_extension_name)
 
-    ks_ans = ks_far.py_mod.entry(ks_far.adapt(x), ks_far.adapt(y))
-    ans = far(x, y)
+    ks_ans = far._entry(x, y)
+    ans = far.raw_f(x, y)
     assert pytest.approx(ks_ans, 1e-5) == ans.item()
 
 
 def test_cat():
+    @knossos.register(generate_lm=True)
     def f(x: torch.Tensor, y: torch.Tensor):
         return torch.cat([x, y], dim=1)
 
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
-    torch_extension_name = "ksc_test_ts2k_cat"
-    ks_f = ts2mod(f, (x, y), torch_extension_name)
-    ks_ans = ks_f.py_mod.entry(ks_f.adapt(x), ks_f.adapt(y))
+
+    ks_ans = f._entry(x, y)
     ks_ans_np = numpy.array(ks_ans, copy=True)
-    py_ans = f(x, y)
+    py_ans = f.raw_f(x, y)
     assert (ks_ans_np == py_ans.numpy()).all()  # non-approx
 
 

@@ -12,7 +12,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from typing import Callable
 
-from ksc.torch_frontend import tsmod2ksmod
+from ksc.torch_frontend import KscStub
 from ksc import utils
 
 
@@ -97,7 +97,7 @@ def function_to_manual_cuda_benchmarks(func):
 def functions_to_benchmark(
     mod, benchmark_name, example_inputs, torch_extension_name_base
 ):
-    for fn_name, fn_obj in inspect.getmembers(mod, lambda m: inspect.isfunction(m)):
+    for fn_name, fn_obj in inspect.getmembers(mod):
         if fn_name.startswith(benchmark_name):
             if fn_name == benchmark_name + "_bench_configs":
                 continue
@@ -106,17 +106,15 @@ def functions_to_benchmark(
             elif fn_name == benchmark_name + "_pytorch_nice":
                 yield BenchmarkFunction("PyTorch Nice", fn_obj)
             elif fn_name == benchmark_name:
+                assert isinstance(fn_obj, KscStub)
                 torch_extension_name = (
                     "ksc_src_bench_" + torch_extension_name_base + "_" + benchmark_name
                 )
-                ks_mod = tsmod2ksmod(
-                    mod,
-                    benchmark_name,
-                    torch_extension_name,
-                    example_inputs,
-                    generate_lm=False,
+                ks_compiled = fn_obj.compile(
+                    torch_extension_name=torch_extension_name,
+                    example_inputs=example_inputs,
                 )
-                yield BenchmarkFunction("Knossos", ks_mod.apply)
+                yield BenchmarkFunction("Knossos", ks_compiled.apply)
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)

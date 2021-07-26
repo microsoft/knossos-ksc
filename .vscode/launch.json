@@ -11,7 +11,7 @@
 			"name": "(gdb) Launch python for relu3",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "/usr/bin/python",
+			"program": "/anaconda/envs/knossos/bin/python",
 			"args": [
 				"src/bench/run-bench.py",
 				"examples/dl-activations/relu3",
@@ -20,6 +20,33 @@
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
+		{
+			"name": "(gdb) pytest",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "/anaconda/envs/knossos/bin/python",
+			"args": [
+				"-m",
+				"pytest",
+				"src/bench/",
+				"--modulepath=examples/dl-capsule/sqrl",
+				"--benchmarkname=sqrl",
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [
+				{"name":"PYTHONPATH", "value":"./src/python"}
+			],
 			"externalConsole": false,
 			"MIMode": "gdb",
 			"setupCommands": [

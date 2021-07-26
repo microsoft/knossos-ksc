@@ -1,7 +1,81 @@
 from math import sqrt, tanh, erf, exp
 import torch
 
+import ksc.torch_frontend as knossos
+
 from ksc.torch_utils import elementwise_apply_hack
+import ksc.compile
+from ksc.torch_frontend import cpp_string_to_autograd_function
+
+
+embedded_cflags = ksc.compile.default_cflags
+
+
+embedded_cflags_opts = ksc.compile.CFlags.GCCOnly(
+    ["-march=native", "-funroll-loops", "-ffast-math", "-mprefer-vector-width=512"]
+)
+
+
+embedded_cflags_opts_extra = ksc.compile.CFlags.GCCOnly(
+    ["-ffp-contract=fast", "-flto", "-fno-semantic-interposition"]
+)
+
+
+cpp_inlined_map = """
+        #include "knossos.h"
+
+        namespace ks{
+        tensor<1, ks::Float> vgelu(ks::allocator * $alloc, tensor<1, ks::Float> t) {
+            auto tdata = t.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            auto sqrt_2 = sqrt(2.0);
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float c$1;
+                ks::Float x = tdata[i];
+                c$1 = 0.5 * x * (1.0 + erf(x / sqrt_2));
+                retdata[i] = c$1;
+            }
+            return ret;
+        }
+
+        tensor<1, ks::Float> sufrev_vgelu(ks::allocator * $alloc, tensor<1, ks::Float> t, tensor<1, ks::Float> dret) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            auto sqrt_2_div_pi = sqrt(2.0 / 3.14159);
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float c$1;
+                ks::Float x = tdata[i];
+                ks::Float dreti = dretdata[i];
+                c$1 = 0.5 * (1.0 + erf(x / sqrt(2.0)) + x * sqrt_2_div_pi * exp(-x*x/2.0));
+                retdata[i] = c$1 * dreti;
+            }
+            return ret;
+        }
+        }
+        """
+
+
+embedded_cpp_entry_points = """
+#include "knossos-entry-points-torch.h"
+
+torch::Tensor entry(torch::Tensor t) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_ret = ks::vgelu(&g_alloc, ks_t);
+    return convert_return_value<torch::Tensor>(ks_ret);
+}
+
+torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_dret = convert_argument<ks::tensor<1, ks::Float>>(dret);
+    auto ks_ret = ks::sufrev_vgelu(&g_alloc, ks_t, ks_dret);
+    return convert_return_value<torch::Tensor>(ks_ret);
+}
+"""
 
 
 def sigmoid(x):
@@ -9,8 +83,35 @@ def sigmoid(x):
 
 
 # Gelu and activations
+@knossos.register
 def gelu(x: float) -> float:
     return 0.5 * x * (1.0 + erf(x / sqrt(2)))
+
+
+def vgelu_embedded_cpp_inlined_map():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map",
+        extra_cflags=embedded_cflags,
+    )
+
+
+def vgelu_embedded_cpp_inlined_map_flags():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map_flags",
+        extra_cflags=embedded_cflags + embedded_cflags_opts,
+    )
+
+
+def vgelu_embedded_cpp_inlined_map_flags_extra():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map_flags_extra",
+        extra_cflags=embedded_cflags
+        + embedded_cflags_opts
+        + embedded_cflags_opts_extra,
+    )
 
 
 def gelu_approx_sigmoid(x: float) -> float:
@@ -26,6 +127,7 @@ def gelu_approx_tanh(x: float) -> float:
     return 0.5 * (1 + tanh(x * (C * x * x + B))) * x
 
 
+@knossos.register
 def vgelu(x: torch.Tensor):
     return elementwise_apply_hack("gelu", x)
 
@@ -35,5 +137,6 @@ def vgelu_pytorch(x: torch.Tensor):
 
 
 def vgelu_bench_configs():
-    yield torch.randn((4,))
     yield torch.randn((16,))
+    yield torch.randn((255 * 255,))
+    yield torch.randn((1024 * 1024,))

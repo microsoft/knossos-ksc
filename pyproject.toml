@@ -5,4 +5,4 @@ exclude = '/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|\.svn|_b
 [tool.mypy]
 python_version=3.8
 ignore_missing_imports=true
-files="src/python/ksc/torch_frontend.py, src/python/ksc/type.py, src/python/ksc/expr.py, src/python/ksc/filter_term.py"
+files="src/python/ksc/torch_frontend.py, src/python/ksc/type.py, src/python/ksc/expr.py, src/python/ksc/filter_term.py, src/python/ksc/cgen.py, src/python/ksc/compile.py, src/python/ksc/interpreter.py, src/python/ksc/prim.py"
