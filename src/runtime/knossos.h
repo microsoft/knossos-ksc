@@ -413,14 +413,23 @@ namespace ks {
 	}
 
 	// ===============================  Tensor class ==================================
-	template<size_t Dummy> using int_t = int;
+
+	/* Helper struct used to create the type Tuple<int, int, ...>
+	   Note the following alternative is rejected by nvcc:
+	      template<size_t Dummy> using Int_t = int;
+	*/
+	template<size_t Dummy>
+	struct Int_t
+	{
+		using type = int;
+	};
 
 	template<typename T> struct tensor_dimension_base;
 
 	template<size_t... Indices>
 	struct tensor_dimension_base<std::index_sequence<Indices...>>
 	{
-		using index_type = ks::Tuple<int_t<Indices>...>;
+		using index_type = ks::Tuple<typename Int_t<Indices>::type...>;
 
 		static int num_elements(index_type const& size) {
 			return (1 * ... * ks::get<Indices>(size));
