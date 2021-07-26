@@ -113,6 +113,23 @@ def vgelu_embedded_cpp_inlined_map_flags_extra():
     )
 
 
+def vgelu_embedded_cpp_aten():
+    return cpp_string_to_autograd_function(
+        """
+    torch::Tensor entry(torch::Tensor x) {
+        return 0.5 * x * (1.0 + erf(x / sqrt(2.0)));
+    }
+
+    torch::Tensor entry_vjp(torch::Tensor x, torch::Tensor dret) {
+        auto sqrt_2_div_pi = sqrt(2.0 / 3.14159);
+        return 0.5 * (1.0 + erf(x / sqrt(2.0)) + x * sqrt_2_div_pi * exp(-x*x/2.0)) * dret;
+    }
+    """,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_aten",
+        extra_cflags=embedded_cflags_opts + embedded_cflags,
+    )
+
+
 def gelu_approx_sigmoid(x: float) -> float:
     # From https://github.com/hendrycks/GELUs: fast but somewhat inaccurate
     return sigmoid(1.702 * x) * x
