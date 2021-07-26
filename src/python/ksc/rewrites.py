@@ -215,13 +215,13 @@ class inline_var(RuleMatcher):
 
 @singleton
 class inline_call(RuleMatcher):
-    possible_filter_terms: FrozenSet[typing.Type[Any]] = frozenset()
+    possible_filter_terms: FrozenSet[typing.Type[Expr]] = frozenset()
     may_match_any_call = True
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
-        assert isinstance(ewp.expr, Call)  # TODO: Check this is correct
+        assert isinstance(ewp.expr, Call)
         if ewp.expr.name not in env.defs:
             return
         func_def: Def = env.defs[ewp.expr.name]
