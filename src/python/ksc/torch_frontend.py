@@ -253,7 +253,7 @@ class TorchScriptVisitor:
             body = Let(v, rhs, body)
         return body
 
-    def make_loop(self, make_binds, node):
+    def make_loop(self, node):
         # def foofilter_comp(xs: Tensor) -> Tensor:
         #     _0 = annotate(List[Tensor], [])
         #     _1 = ops.prim.min([9223372036854775807, torch.len(xs)])
@@ -295,7 +295,7 @@ class TorchScriptVisitor:
             l, item = last.inputs()
             assert l.node().kind() == "prim::ListConstruct"
 
-            binds = make_binds(body_nodes[:-1])
+            binds = self.make_binds(body_nodes[:-1])
             lam_body = self.make_lets(binds, var_or_constant(item))
 
             lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
@@ -308,9 +308,9 @@ class TorchScriptVisitor:
         print(node)
         assert False
 
-    def make_if(self, make_binds, node):
+    def make_if(self, node):
         def make_branch(block):
-            binds = make_binds(block.nodes())
+            binds = self.make_binds(block.nodes())
             body = self.make_return(block.returnNode())
             return self.make_lets(binds, body)
 
@@ -339,7 +339,7 @@ class TorchScriptVisitor:
 
         return Var(identifier), If(Var(conditional), success_branch, failure_branch)
 
-    def translate_node(self, make_binds, node) -> Tuple[Var, Expr]:
+    def translate_node(self, node) -> Tuple[Var, Expr]:
         lookups: typing.Dict[str, Callable] = {
             "prim::Constant": self.make_constant,
             "prim::ListConstruct": self.make_list,
@@ -347,8 +347,8 @@ class TorchScriptVisitor:
             "prim::Return": self.make_return,
             "prim::CallFunction": self.make_callfunction,
             "prim::PythonOp": self.make_PythonOp,
-            "prim::Loop": functools.partial(self.make_loop, make_binds=make_binds),
-            "prim::If": functools.partial(self.make_if, make_binds=make_binds),
+            "prim::Loop": functools.partial(self.make_loop),
+            "prim::If": functools.partial(self.make_if),
         }
 
         kind = node.kind()
@@ -363,7 +363,7 @@ class TorchScriptVisitor:
         return Var("ERR"), Var(node.kind())
 
     def make_binds(self, nodes) -> List[Tuple[Var, Expr]]:
-        return [self.translate_node(self.make_binds, node) for node in nodes]
+        return [self.translate_node(node) for node in nodes]
 
     def generate_def(self, name, graph, example_inputs):
 
@@ -386,7 +386,7 @@ class TorchScriptVisitor:
                 print(
                     "WARNING: multiple print statements used, only final one currently translated"
                 )
-            op = self.translate_node(self.make_binds, all_nodes[-1])
+            op = self.translate_node(all_nodes[-1])
             return_type = Type.Integer
         else:
             if print_count > 0:
@@ -394,7 +394,7 @@ class TorchScriptVisitor:
                     "WARNING: print statement currently only supported as final operation"
                 )
             return_node = graph.return_node()
-            op = self.translate_node(self.make_binds, return_node)
+            op = self.translate_node(return_node)
             return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
 
         body = self.make_lets(binds, op)
