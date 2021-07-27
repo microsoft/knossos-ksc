@@ -165,13 +165,14 @@ def grad_relu3(x: float) -> float:
 def test_relu3(generate_lm):
     x = 0.5
 
-    torch_extension_name = "ksc_test_ts2k_relu3" + ("_lm" if generate_lm else "")
-    ks_relu3 = ts2mod(relu3, (x,), torch_extension_name, generate_lm)
+    @knossos.register(generate_lm=generate_lm)
+    def ks_relu3(x: float):
+        return relu3(x)
 
     for x in [-0.1, 0.31221, 2.27160]:
         # Test function: ks == py
         py_ans = relu3(x)
-        ks_ans = ks_relu3.py_mod.entry(x)
+        ks_ans = ks_relu3._entry(x)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
@@ -182,7 +183,7 @@ def test_relu3(generate_lm):
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
-        ks_ans = ks_relu3.py_mod.entry_vjp(x, 1.0)
+        ks_ans = ks_relu3._entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
