@@ -4,10 +4,9 @@ import math
 import torch
 import numpy
 
-from ksc import utils
-from ksc.type import Type
 import ksc.torch_frontend as knossos
 from ksc.torch_frontend import ts2mod
+from ksc.torch_utils import elementwise_apply
 
 
 def bar1(a: int, x: float, b: str):
@@ -65,6 +64,21 @@ def test_ts2k_relux_grad():
     ks_ans = relux._entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
+
+
+def relux_pt(x: float):
+    return (x < 0) * (0.1 * x) + (x > 0) * (x * x)
+
+
+vrelux = knossos.vmap(relux)
+
+
+def test_ts2k_vrelux():
+    y = torch.tensor([[1.1, -1.2], [2.1, 2.2]])
+    ks_ans = vrelux(y)
+    pt_ans = elementwise_apply(relux_pt, y)
+
+    assert torch.isclose(pt_ans, ks_ans, rtol=1e-05, atol=1e-06, equal_nan=False).all()
 
 
 @knossos.register(generate_lm=True)

@@ -11,13 +11,12 @@ from ksc.torch_frontend import (
     cpp_string_to_autograd_function,
 )
 import ksc.torch_frontend as knossos
-from ksc.torch_utils import elementwise_apply_hack
 
 import torch._vmap_internals
 
 # BEGINDOC
-@knossos.register
-def relu3(x: float) -> float:
+@knossos.vmap
+def vrelu3(x: float) -> float:
     """
     Like ReLu, but smoother
     Like GeLu, but cheaper
@@ -60,11 +59,6 @@ if False:
             return x - 2 / 3
 
     vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
-
-# run-bench: Knossos implementation
-@knossos.register
-def vrelu3(x: torch.Tensor):
-    return elementwise_apply_hack("relu3", x)
 
 
 embedded_cflags = ksc.compile.default_cflags
