@@ -319,36 +319,37 @@ class TorchScriptVisitor:
 
         return Var(identifier), If(Var(conditional), success_branch, failure_branch)
 
+    def translate_node(self, make_binds, node) -> Tuple[Var, Expr]:
+        lookups: typing.Dict[str, Callable] = {
+            "prim::Constant": self.make_constant,
+            "prim::ListConstruct": self.make_list,
+            "prim::TupleConstruct": self.make_tuple,
+            "prim::Return": self.make_return,
+            "prim::CallFunction": self.make_callfunction,
+            "prim::PythonOp": self.make_PythonOp,
+            "prim::Loop": functools.partial(self.make_loop, make_binds=make_binds),
+            "prim::If": functools.partial(self.make_if, make_binds=make_binds),
+        }
+
+        kind = node.kind()
+        if kind in lookups:
+            return lookups[kind](node=node)
+
+        primfuns = ["prim::min"]
+        if kind.startswith("aten::") or kind in primfuns:
+            return self.make_aten_function(node, node.outputsAt(0), kind)
+
+        print("WARNING, unimplmented node kind: " + node.kind())
+        return Var("ERR"), Var(node.kind())
+
+    def make_binds(self, nodes) -> List[Tuple[Var, Expr]]:
+        return [self.translate_node(self.make_binds, node) for node in nodes]
+
     def generate_def(self, name, graph, example_inputs):
-        def translate_node(make_binds, node) -> Tuple[Var, Expr]:
-            lookups: typing.Dict[str, Callable] = {
-                "prim::Constant": self.make_constant,
-                "prim::ListConstruct": self.make_list,
-                "prim::TupleConstruct": self.make_tuple,
-                "prim::Return": self.make_return,
-                "prim::CallFunction": self.make_callfunction,
-                "prim::PythonOp": self.make_PythonOp,
-                "prim::Loop": functools.partial(self.make_loop, make_binds=make_binds),
-                "prim::If": functools.partial(self.make_if, make_binds=make_binds),
-            }
-
-            kind = node.kind()
-            if kind in lookups:
-                return lookups[kind](node=node)
-
-            primfuns = ["prim::min"]
-            if kind.startswith("aten::") or kind in primfuns:
-                return self.make_aten_function(node, node.outputsAt(0), kind)
-
-            print("WARNING, unimplmented node kind: " + node.kind())
-            return Var("ERR"), Var(node.kind())
-
-        def make_binds(nodes) -> List[Tuple[Var, Expr]]:
-            return [translate_node(make_binds, node) for node in nodes]
 
         all_nodes = list(graph.nodes())
 
-        binds = make_binds(all_nodes)
+        binds = self.make_binds(all_nodes)
 
         args = [
             self.make_arg(input, example)
@@ -365,7 +366,7 @@ class TorchScriptVisitor:
                 print(
                     "WARNING: multiple print statements used, only final one currently translated"
                 )
-            op = translate_node(make_binds, all_nodes[-1])
+            op = self.translate_node(self.make_binds, all_nodes[-1])
             return_type = Type.Integer
         else:
             if print_count > 0:
@@ -373,7 +374,7 @@ class TorchScriptVisitor:
                     "WARNING: print statement currently only supported as final operation"
                 )
             return_node = graph.return_node()
-            op = translate_node(make_binds, return_node)
+            op = self.translate_node(self.make_binds, return_node)
             return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
 
         body = self.make_lets(binds, op)
