@@ -405,33 +405,34 @@ class TorchScriptVisitor:
 
         module_fns = dict(inspect.getmembers(module))
 
-        ksc_defs = []
-        while self.functions_todo:
-            print(f"TorchScriptVisitor: Remaining: {self.functions_todo}")
-            todo = next(iter(self.functions_todo))
-            if isinstance(todo, str):
-                # String function name, try to find it in the caller's module
-                module_fn_obj = module_fns.get(todo)
-                if module_fn_obj is not None:
-                    print(
-                        f"TorchScriptVisitor: converting {todo}, remaining: {self.functions_todo}"
-                    )
-                    if isinstance(module_fn_obj, KscStub):
-                        todo_fn = module_fn_obj.raw_f
+        def ksc_defs():
+            while self.functions_todo:
+                print(f"TorchScriptVisitor: Remaining: {self.functions_todo}")
+                todo = next(iter(self.functions_todo))
+                if isinstance(todo, str):
+                    # String function name, try to find it in the caller's module
+                    module_fn_obj = module_fns.get(todo)
+                    if module_fn_obj is not None:
+                        print(
+                            f"TorchScriptVisitor: converting {todo}, remaining: {self.functions_todo}"
+                        )
+                        if isinstance(module_fn_obj, KscStub):
+                            todo_fn = module_fn_obj.raw_f
+                        else:
+                            todo_fn = module_fn_obj
                     else:
-                        todo_fn = module_fn_obj
+                        raise ValueError(f"Did not find string-named function {todo}")
                 else:
-                    raise ValueError(f"Did not find string-named function {todo}")
-            else:
-                todo_fn = todo
+                    todo_fn = todo
 
-            self.mark_function_as_done(todo)
+                self.mark_function_as_done(todo)
 
-            ts_fn = torch.jit.script(todo_fn)
-            ts_graph = ts_fn.graph
-            ksc_def = self.generate_def(todo_fn.__name__, ts_graph, example_inputs)
-            ksc_defs.insert(0, ksc_def)
-        return ksc_defs
+                ts_fn = torch.jit.script(todo_fn)
+                ts_graph = ts_fn.graph
+                ksc_def = self.generate_def(todo_fn.__name__, ts_graph, example_inputs)
+                yield ksc_def
+
+        return list(ksc_defs())[::-1]
 
 
 def make_tuple_if_many_args(*args):
