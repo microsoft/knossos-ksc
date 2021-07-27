@@ -715,7 +715,12 @@ class KscStub:
         if not self.compiled:
             print(f"knossos.register: Compiling {self.raw_f.__name__}")
             torch_extension_name = (
-                "KscStub_" + self.module.__name__ + "_" + self.raw_f.__name__
+                "KscStub_"
+                + ("vmap_" if self.elementwise else "")
+                + ("lm_" if self.generate_lm else "")
+                + self.module.__name__
+                + "_"
+                + self.raw_f.__name__
             )
             if self.generate_lm:
                 torch_extension_name += "__generate_lm"
