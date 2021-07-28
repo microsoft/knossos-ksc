@@ -289,7 +289,7 @@ def build_module_using_pytorch_from_ks(
     cpp_str = generate_cpp_for_py_module_from_ks(
         ks_str,
         bindings_to_generate,
-        torch_extension_name,
+        "TORCH_EXTENSION_NAME",
         elementwise=elementwise,
         use_aten=use_aten,
         use_torch=True,
@@ -304,7 +304,7 @@ def build_module_using_pytorch_from_cpp(
     cpp_str, bindings_to_generate, torch_extension_name, use_aten, extra_cflags=[]
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
-        bindings_to_generate, torch_extension_name
+        bindings_to_generate, "TORCH_EXTENSION_NAME"
     )
     return build_module_using_pytorch_from_cpp_backend(
         cpp_str + cpp_pybind, torch_extension_name, use_aten, extra_cflags
