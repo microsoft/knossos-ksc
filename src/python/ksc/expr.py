@@ -521,7 +521,7 @@ class Assert(Expr):
 
 from functools import singledispatch
 
-from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
+# from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
 
 
 def pyname(s: str) -> str:
