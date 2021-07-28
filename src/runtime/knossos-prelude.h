@@ -13,6 +13,70 @@ inline Float rev$edef_example$af(allocator *, Float x, Float ddr) { return ddr; 
 inline ks::Tuple<Float,ks::Tuple<>> suffwdpass$edef_example$af(allocator *, Float x) { return ks::make_Tuple(x, ks::make_Tuple()); }
 inline Float sufrevpass$edef_example$af(allocator *, Float ddr, ks::Tuple<>) { return ddr; }
 
+inline Bool lt$aff(allocator *, Float t1, Float t2)
+{
+	return t1 < t2;
+}
+
+inline Bool lt$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 < t2;
+}
+
+inline Bool gt$aff(allocator *, Float t1, Float t2)
+{
+	return t1 > t2;
+}
+
+inline Bool gt$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 > t2;
+}
+
+inline Bool lte$aff(allocator *, Float t1, Float t2)
+{
+	return t1 <= t2;
+}
+
+inline Bool lte$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 <= t2;
+}
+
+inline Bool gte$aff(allocator *, Float t1, Float t2)
+{
+	return t1 >= t2;
+}
+
+inline Bool gte$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 >= t2;
+}
+
+inline Float add$aff(allocator *, Float t1, Float t2)
+{
+	return t1 + t2;
+}
+
+inline Integer add$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 + t2;
+}
+
+inline Float mul$aff(allocator *, Float t1, Float t2)
+{
+	return t1 * t2;
+}
+
+inline Integer mul$aii(allocator *, Integer t1, Integer t2)
+{
+	return t1 * t2;
+}
+
+inline Float abs$af(allocator *, Float d) { return d > 0 ? d : -d; }
+
+inline Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
+
 inline Float dot$aT1fT1f(allocator *, tensor<1, Float> const& a, tensor<1, Float> const& b)
 {
 	return ts_dot(a,b);
@@ -148,6 +212,22 @@ inline Float to_float$ai(allocator *, Integer d) { return d; }
 inline Bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
 inline Bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
 inline Float bool_to_float$ab(allocator *, Bool b) { return b; }
+
+// ranhash functions from
+//     https://mathoverflow.net/questions/104915/pseudo-random-algorithm-allowing-o1-computation-of-nth-element
+inline uint64_t $ranhash(allocator *, uint64_t v) {
+	v *= 3935559000370003845LL;
+	v += 2691343689449507681LL;
+	v ^= v >> 21; v ^= v << 37; v ^= v >> 4;
+	v *= 4768777513237032717LL;
+	v ^= v << 20; v ^= v >> 41; v ^= v << 5;
+	return v;
+}
+
+inline Float $ranhashdoub$ai(allocator * alloc, int32_t v) {
+	return Float(5.42101086242752217E-20 * $ranhash(alloc, v));
+}
+
 }
 
 #include "knossos-prelude-lm.h"

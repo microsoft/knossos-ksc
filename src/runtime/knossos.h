@@ -1598,74 +1598,10 @@ namespace ks {
 	}
 
 	template <class T>
-          inline Bool ne(T t1, T t2)
+	inline Bool ne(T t1, T t2)
 	{
 		return t1 != t2;
 	}
-
-        inline Bool lt$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 < t2;
-	}
-
-        inline Bool lt$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 < t2;
-	}
-
-	inline Bool gt$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 > t2;
-	}
-
-	inline Bool gt$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 > t2;
-	}
-
-	inline Bool lte$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 <= t2;
-	}
-
-	inline Bool lte$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 <= t2;
-	}
-
-	inline Bool gte$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 >= t2;
-	}
-
-	inline Bool gte$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 >= t2;
-	}
-
-	inline Float add$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 + t2;
-	}
-
-	inline Integer add$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 + t2;
-	}
-
-	inline Float mul$aff(allocator *, Float t1, Float t2)
-	{
-		return t1 * t2;
-	}
-
-	inline Integer mul$aii(allocator *, Integer t1, Integer t2)
-	{
-		return t1 * t2;
-	}
-
-	inline Float abs$af(allocator *, Float d) { return d > 0 ? d : -d; }
-
-	inline Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
 
 	inline Integer to_integer(Integer d) { return d; }
 
@@ -1691,23 +1627,6 @@ namespace ks {
 	{
 		return unzip_impl(alloc, t, std::index_sequence_for<Types...>{});
 	}
-
-	// ========================= Random primitives ============
-        // ranhash functions from
-        //
-        //     https://mathoverflow.net/questions/104915/pseudo-random-algorithm-allowing-o1-computation-of-nth-element
-        inline uint64_t $ranhash(allocator *, uint64_t v) {
-          v *= 3935559000370003845LL;
-          v += 2691343689449507681LL;
-          v ^= v >> 21; v ^= v << 37; v ^= v >> 4;
-          v *= 4768777513237032717LL;
-          v ^= v << 20; v ^= v >> 41; v ^= v << 5;
-          return v;
-        }
-
-        inline Float $ranhashdoub$ai(allocator * alloc, int32_t v) {
-          return Float(5.42101086242752217E-20 * $ranhash(alloc, v));
-        }
 
 	// ========================= Trace primitive ===============
 	template <class T>
