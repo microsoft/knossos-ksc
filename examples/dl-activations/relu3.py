@@ -606,7 +606,6 @@ def relu3_in_fcdnn():
 
 
 if __name__ == "__main__":
-    y = relu3(0.3)
     xs = next(vrelu3_bench_configs())
     ys = vrelu3(xs)
     print(ys.sum())
