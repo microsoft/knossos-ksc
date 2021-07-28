@@ -1,7 +1,7 @@
 import pytest
 
 from ksc.alpha_equiv import are_alpha_equivalent
-from ksc.expr import Call
+from ksc.expr import Call, Const, Var
 from ksc.rewrites import (
     rule,
     RuleSet,
@@ -285,9 +285,10 @@ def test_parsed_rule_capture(prelude_symtab):
 
 def parsed_rule_side_conditions(prelude_symtab):
     e = parse_expr_string("(if (gt (index 1 v) 0) 2 2)")
-    type_propagate(e, prelude_symtab)
+    type_propagate_decls([e], prelude_symtab)
     rule_general = parse_rule_str(
-        '(rule "if_both_same$i" ((p : Bool) (x : Integer)) (if p x x) x)'
+        '(rule "if_both_same$i" ((p : Bool) (x : Integer)) (if p x x) x)',
+        prelude_symtab,
     )
     assert apply_in_only_location(rule_general, e) == parse_expr_string("2")
 
@@ -295,7 +296,8 @@ def parsed_rule_side_conditions(prelude_symtab):
     # an exception-throwing program into a succeeding one
     rule_restricted = parse_rule_str(
         'rule "if_both_same_restricted$i" ((p : Bool) (x : Integer)) (if p x x) x)',
-        side_conditions=lambda *, p, x: isinstance(p, [Const, Var]),
+        prelude_symtab,
+        side_conditions=lambda *, p, x: isinstance(p, (Const, Var)),
     )
     check_nowhere_applicable(rule_restricted, e)
 

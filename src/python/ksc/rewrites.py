@@ -544,7 +544,7 @@ def rewrite_seq_to_exprs(
             else:
                 # No match. To diagnose the error, first check if the path was valid within the expression.
                 try:
-                    subexp = ExprWithPath.from_expr(expr, path)
+                    _ = ExprWithPath.from_expr(expr, path)
                 except Exception as e:
                     raise ValueError(
                         f"Path {path} not valid within expression {expr}. Could not apply rule {rule_name}"
