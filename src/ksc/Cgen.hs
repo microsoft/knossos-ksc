@@ -474,19 +474,21 @@ cgenExprWithoutResettingAlloc env = \case
   Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
+    vartuple <- freshCVar
 
-    let cgenType_ = case pat of
-          VarPat _ -> cgenType type1
-          TupPat _ -> "auto"
-        cgenBinder = case pat of
+    let cgenBinder = case pat of
           VarPat v -> cgenVar (tVarVar v)
-          TupPat vs -> "["
-                       ++ intercalate ", " (map (cgenVar . tVarVar) vs)
-                       ++ "]"
+          TupPat _ -> vartuple
+        cgenUntupling = case pat of
+          VarPat _ -> []
+          TupPat vs -> map (\(i, v) ->
+            "auto " ++ cgenVar (tVarVar v) ++ " = ks::get<" ++ show i ++ ">(" ++ vartuple ++ ");"
+            ) (zip [0..] vs)
 
     return $ CG
       (  decle1
-      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ generateCGRE ve1 ++ ";" ]
+      ++ [ cgenType type1 ++ " " ++ cgenBinder ++ " = " ++ generateCGRE ve1 ++ ";" ]
+      ++ cgenUntupling
       ++ declbody
       )
       vbody
