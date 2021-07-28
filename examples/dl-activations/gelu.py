@@ -3,7 +3,6 @@ import torch
 
 import ksc.torch_frontend as knossos
 
-from ksc.torch_utils import elementwise_apply_hack
 import ksc.compile
 from ksc.torch_frontend import cpp_string_to_autograd_function
 
@@ -83,8 +82,8 @@ def sigmoid(x):
 
 
 # Gelu and activations
-@knossos.register
-def gelu(x: float) -> float:
+@knossos.vmap
+def vgelu(x: float) -> float:
     return 0.5 * x * (1.0 + erf(x / sqrt(2)))
 
 
@@ -125,11 +124,6 @@ def gelu_approx_tanh(x: float) -> float:
     C = 0.035677408136300125  # 0.044715 * sqrt(2.0 / M_PI)
 
     return 0.5 * (1 + tanh(x * (C * x * x + B))) * x
-
-
-@knossos.register
-def vgelu(x: torch.Tensor):
-    return elementwise_apply_hack("gelu", x)
 
 
 def vgelu_pytorch(x: torch.Tensor):

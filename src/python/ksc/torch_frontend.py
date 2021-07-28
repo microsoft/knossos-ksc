@@ -1,6 +1,6 @@
 from typing import Callable, List, Tuple, Optional, Union, Set
 from types import ModuleType
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from contextlib import contextmanager
 import functools
 import inspect
@@ -225,27 +225,7 @@ class TorchScriptVisitor:
         )
 
     def make_PythonOp(self, node):
-        value = node.outputsAt(0)
-        assert (
-            len(list(node.outputs())) == 1
-        )  # Assemble into tuple for multiple outputs
         pyname = node.pyname()
-        if pyname == "elementwise_apply_hack":
-            function_name_constant = node.inputsAt(0).node()
-            function_name = function_name_constant.s("value")
-            self.mark_function_as_needed(function_name)
-
-            var = self.make_new_var(Type.Float)  # TODO: need to propagate properly
-            map_lambda = Lam(var, Call(function_name, [var]))
-
-            return (
-                Var(mangled_name(value)),
-                Call(
-                    "map",
-                    [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())],
-                ),
-            )
-
         raise NotImplementedError(f"PythonOp {pyname}")
 
     def make_lets(self, bindings, body) -> Expr:
@@ -650,59 +630,16 @@ def cpp_string_to_autograd_function(
     return make_KscAutogradFunction(mod)
 
 
-def is_elementwise_operation(ksc_def):
-    """
-    Inspect the body of a def to determine whether it is a
-    simple elementwise operation, e.g.
-
-    (def vrelu3 None ((_x$o1 : (Tensor 1 Float)))
-      (let (_1 "relu3")
-      (let (_3 (map (lam (ts2ks$0 : Float)
-                          (relu3 ts2ks$0)) _x$o1))
-      _3)))
-    """
-
-    def is_map(expr, arg_name):
-        if isinstance(expr, Call):
-            if expr.name != make_structured_name("map"):
-                return False
-            assert len(expr.args) == 2
-            if not (isinstance(expr.args[1], Var) and expr.args[1].name == arg_name):
-                return False
-            lam = expr.args[0]
-            assert isinstance(lam, Lam)
-            return (
-                isinstance(lam.body, Call)
-                and len(lam.body.args) == 1
-                and isinstance(lam.body.args[0], Var)
-                and lam.body.args[0].name == lam.arg.name
-            )
-        elif isinstance(expr, Let):
-            if isinstance(expr.vars, Var):
-                if expr.body == expr.vars:
-                    return is_map(expr.rhs, arg_name)
-                else:
-                    return is_map(expr.body, arg_name)
-            else:
-                return False
-        else:
-            return False
-
-    if len(ksc_def.args) != 1:
-        print(f"Num args {len(ksc_def.args)}")
-        return False
-    return is_map(ksc_def.body, ksc_def.args[0].name)
-
-
 def _tsmod2ksmod(
-    module, function_obj, torch_extension_name, example_inputs, generate_lm=True
+    module,
+    function_obj,
+    torch_extension_name,
+    example_inputs,
+    generate_lm=True,
+    elementwise=False,
 ):
     visitor = TorchScriptVisitor()
     ksc_defs = visitor.generate_defs_recursive(module, function_obj, example_inputs)
-
-    elementwise = is_elementwise_operation(ksc_defs[-1])
-    if elementwise:
-        ksc_defs.pop()
 
     entry_def = ksc_defs[-1]
     return ksc_defs_to_autograd_function(
@@ -731,8 +668,9 @@ def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
 class KscStub:
     raw_f: Callable
     generate_lm: bool
-    f_module: ModuleType
-    compiled: Optional[KscAutogradFunction]
+    elementwise: bool
+    module: ModuleType
+    compiled: Optional[KscAutogradFunction] = field(default=None)
 
     def __call__(self, *args):
         """
@@ -763,11 +701,12 @@ class KscStub:
 
     def compile(self, example_inputs, torch_extension_name):
         self.compiled = _tsmod2ksmod(
-            self.f_module,
+            self.module,
             self.raw_f,
             torch_extension_name=torch_extension_name,
             example_inputs=example_inputs,
             generate_lm=self.generate_lm,
+            elementwise=self.elementwise,
         )
 
         return self.compiled
@@ -776,7 +715,12 @@ class KscStub:
         if not self.compiled:
             print(f"knossos.register: Compiling {self.raw_f.__name__}")
             torch_extension_name = (
-                "KscStub_" + self.f_module.__name__ + "_" + self.raw_f.__name__
+                "KscStub_"
+                + ("vmap_" if self.elementwise else "")
+                + ("lm_" if self.generate_lm else "")
+                + self.module.__name__
+                + "_"
+                + self.raw_f.__name__
             )
             if self.generate_lm:
                 torch_extension_name += "__generate_lm"
@@ -802,7 +746,7 @@ def optional_arg_decorator(register):
 
 
 @optional_arg_decorator
-def register(f: Callable, module: ModuleType, generate_lm=False) -> KscStub:
+def register(f: Callable, module: ModuleType, generate_lm=False, vmap=False) -> KscStub:
     """
     Main Knossos entry point.
 
@@ -823,4 +767,29 @@ def register(f: Callable, module: ModuleType, generate_lm=False) -> KscStub:
     when "f.compile()" is explicitly called.
     """
 
-    return KscStub(f, generate_lm, module, None)
+    return KscStub(f, generate_lm=generate_lm, elementwise=vmap, module=module)
+
+
+@optional_arg_decorator
+def vmap(f: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
+    """
+    Knossos entry point for vmap.
+    ```
+       @knossos.vmap
+       def f(x : float) -> float:
+           return x * sin(x)
+    ```
+    Transforms f to have signature Tensor -> Tensor
+    TODO: handle multiple args and return types,
+    e.g. transform (float, float, float) -> (float, float)
+                to (Tensor, Tensor, Tensor) -> (Tensor, Tensor)
+    ```
+    The implementation delays compilation until the first call, or
+    when "f.compile()" is explicitly called.
+    """
+    if isinstance(f, KscStub):
+        # Copy the existing one, setting elementwise, and force recompilation
+        return replace(f, elementwise=True, compiled=None)
+    else:
+        # F is a callable, do as register does
+        return KscStub(f, generate_lm=generate_lm, elementwise=True, module=module)
