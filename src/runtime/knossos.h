@@ -1603,8 +1603,6 @@ namespace ks {
 		return t1 != t2;
 	}
 
-	inline Integer to_integer(Integer d) { return d; }
-
 	template<size_t I, size_t Dim, typename TupleType>
 	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
 	{
