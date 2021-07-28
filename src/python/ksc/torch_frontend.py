@@ -403,25 +403,24 @@ class TorchScriptVisitor:
     def generate_defs_recursive(self, module, function_obj, example_inputs):
         self.mark_function_as_needed(function_obj)
 
+        module_fns = dict(inspect.getmembers(module))
+
         ksc_defs = []
         while self.functions_todo:
             print(f"TorchScriptVisitor: Remaining: {self.functions_todo}")
             todo = next(iter(self.functions_todo))
             if isinstance(todo, str):
                 # String function name, try to find it in the caller's module
-                todo_fn = None
-                for module_fn_name, module_fn_obj in inspect.getmembers(module):
-                    if module_fn_name == todo:
-                        print(
-                            f"TorchScriptVisitor: converting {todo}, remaining: {self.functions_todo}"
-                        )
-                        if isinstance(module_fn_obj, KscStub):
-                            todo_fn = module_fn_obj.raw_f
-                        else:
-                            todo_fn = module_fn_obj
-                        break
-                # Check we found it
-                if not todo_fn:
+                module_fn_obj = module_fns.get(todo)
+                if module_fn_obj is not None:
+                    print(
+                        f"TorchScriptVisitor: converting {todo}, remaining: {self.functions_todo}"
+                    )
+                    if isinstance(module_fn_obj, KscStub):
+                        todo_fn = module_fn_obj.raw_f
+                    else:
+                        todo_fn = module_fn_obj
+                else:
                     raise ValueError(f"Did not find string-named function {todo}")
             else:
                 todo_fn = todo
