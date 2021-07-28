@@ -482,7 +482,7 @@ cgenExprWithoutResettingAlloc env = \case
         cgenUntupling = case pat of
           VarPat _ -> []
           TupPat vs -> map (\(i, v) ->
-            "auto " ++ (cgenVar (tVarVar v)) ++ " = ks::get<" ++ show i ++ ">(" ++ vartuple ++ ");"
+            "auto " ++ cgenVar (tVarVar v) ++ " = ks::get<" ++ show i ++ ">(" ++ vartuple ++ ");"
             ) (zip [0..] vs)
 
     return $ CG
