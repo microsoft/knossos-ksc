@@ -192,6 +192,12 @@ def generate_cpp_for_py_module_from_ks(
     use_aten=True,
     use_torch=False,
 ):
+    """Returns two strings of C++ code:
+       The first string contains definitions of all ksc-generated functions and entry points.
+       The second string defines a pybind module which uses the entry points.
+       These can either be compiled separately or concatenated into a single source file.
+       """
+
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
             raise ValueError(
@@ -205,14 +211,20 @@ def generate_cpp_for_py_module_from_ks(
     ]
 
     cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-    cpp_entry_points = cgen.generate_cpp_entry_points(
+    (
+        cpp_entry_point_declarations,
+        cpp_entry_point_definitions,
+    ) = cgen.generate_cpp_entry_points(
         bindings_to_generate, decls, elementwise=elementwise, use_torch=use_torch
     )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
     )
 
-    return cpp_ks_functions + cpp_entry_points + cpp_pybind_module_declaration
+    return (
+        cpp_ks_functions + cpp_entry_point_definitions,
+        cpp_entry_point_declarations + cpp_pybind_module_declaration,
+    )
 
 
 def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
@@ -224,7 +236,15 @@ def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_n
     return (
         """
 
-#include "knossos-pybind.h"
+namespace ks {
+namespace entry_points {
+
+void reset_allocator();
+size_t allocator_top();
+size_t allocator_peak();
+
+}
+}
 
 PYBIND11_MODULE("""
         + python_module_name
@@ -236,8 +256,6 @@ PYBIND11_MODULE("""
         + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """
 }
-
-#include "knossos-entry-points.cpp"
 """
     )
 
@@ -246,7 +264,7 @@ def build_py_module_from_ks(
     ks_str, bindings_to_generate, elementwise=False, use_aten=False, use_torch=False
 ):
 
-    cpp_str = generate_cpp_for_py_module_from_ks(
+    cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
         ks_str,
         bindings_to_generate,
         "PYTHON_MODULE_NAME",
@@ -254,6 +272,8 @@ def build_py_module_from_ks(
         use_aten=use_aten,
         use_torch=use_torch,
     )
+
+    cpp_str = cpp_definitions + cpp_pybind
 
     cpp_fname = (
         gettempdir() + "/ksc-pybind.cpp"
@@ -286,7 +306,7 @@ def build_module_using_pytorch_from_ks(
       str is the Python name given to that function when exposed.
       Each StructuredName must have a type attached
     """
-    cpp_str = generate_cpp_for_py_module_from_ks(
+    cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
         ks_str,
         bindings_to_generate,
         "TORCH_EXTENSION_NAME",
@@ -296,7 +316,10 @@ def build_module_using_pytorch_from_ks(
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str, torch_extension_name, use_aten, extra_cflags
+        [("ksc-main.cpp", cpp_definitions), ("ksc-pybind.cpp", cpp_pybind)],
+        torch_extension_name,
+        use_aten,
+        extra_cflags,
     )
 
 
@@ -307,12 +330,15 @@ def build_module_using_pytorch_from_cpp(
         bindings_to_generate, "TORCH_EXTENSION_NAME"
     )
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str + cpp_pybind, torch_extension_name, use_aten, extra_cflags
+        [("ksc.cpp", cpp_str + cpp_pybind + '#include "knossos-entry-points.cpp"\n')],
+        torch_extension_name,
+        use_aten,
+        extra_cflags,
     )
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_str, torch_extension_name, use_aten, extra_cflags
+    cpp_strs, torch_extension_name, use_aten, extra_cflags
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
@@ -337,15 +363,17 @@ def build_module_using_pytorch_from_cpp_backend(
     )
     os.makedirs(build_directory, exist_ok=True)
 
-    cpp_str = "#include <torch/extension.h>\n" + cpp_str
+    def source_path(filename):
+        return os.path.join(build_directory, filename)
 
-    cpp_source_path = os.path.join(build_directory, "ksc-main.cpp")
-
-    utils.write_file_if_different(cpp_str, cpp_source_path, verbose)
+    for filename, cpp_str in cpp_strs:
+        utils.write_file_if_different(
+            "#include <torch/extension.h>\n" + cpp_str, source_path(filename), verbose
+        )
 
     module = cpp_extension.load(
         name=torch_extension_name,
-        sources=[cpp_source_path],
+        sources=[source_path(filename) for filename, _ in cpp_strs],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=extra_cflags,
         build_directory=build_directory,

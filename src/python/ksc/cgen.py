@@ -59,31 +59,46 @@ def generate_cpp_entry_points(
             raise ValueError(f"No ks definition found for binding: {structured_name}")
         return decls_by_name[structured_name]
 
-    cpp_entry_points = "".join(
-        generate_cpp_entry_point(
-            binding_name,
-            lookup_decl(structured_name),
-            elementwise=elementwise,
-            use_torch=use_torch,
+    cpp_declarations, cpp_definitions = zip(
+        *(
+            generate_cpp_entry_point(
+                binding_name,
+                lookup_decl(structured_name),
+                elementwise=elementwise,
+                use_torch=use_torch,
+            )
+            for binding_name, structured_name in bindings_to_generate
         )
-        for binding_name, structured_name in bindings_to_generate
     )
 
     entry_point_header = (
         "knossos-entry-points-torch.h" if use_torch else "knossos-entry-points.h"
     )
 
-    return f"""
+    return (
+        f"""
+namespace ks {{
+namespace entry_points {{
+namespace generated {{
+{"".join(cpp_declarations)}
+}}
+}}
+}}
+""",
+        f"""
 #include "{entry_point_header}"
 
 namespace ks {{
 namespace entry_points {{
 namespace generated {{
-{cpp_entry_points}
+{"".join(cpp_definitions)}
 }}
 }}
 }}
-"""
+
+#include "knossos-entry-points.cpp"
+""",
+    )
 
 
 def arg_types_of_decl(decl):
@@ -112,7 +127,13 @@ def generate_cpp_entry_point(cpp_function_name, decl, elementwise, use_torch):
     cpp_return_type = entry_point_cpp_type(decl.return_type, use_torch)
 
     # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
-    cpp = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')}) {{\n"
+    cpp_function = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')})"
+
+    cpp_declaration = f"{cpp_function};\n"
+
+    cpp = f"""
+{cpp_function} {{
+"""
 
     # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
     # ...
@@ -130,7 +151,7 @@ def generate_cpp_entry_point(cpp_function_name, decl, elementwise, use_torch):
     return convert_return_value<{cpp_return_type}>(ks_ret);
 }}
 """
-    return cpp
+    return cpp_declaration, cpp
 
 
 def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
@@ -147,7 +168,13 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
     ks_function_name = utils.encode_name(decl.name.mangled())
 
     # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
-    cpp = f"torch::Tensor {cpp_function_name}({join_args(', ', lambda i: f'torch::Tensor arg{i}')}) {{\n"
+    cpp_function = f"torch::Tensor {cpp_function_name}({join_args(', ', lambda i: f'torch::Tensor arg{i}')})"
+
+    cpp_declaration = f"{cpp_function};\n"
+
+    cpp = f"""
+{cpp_function} {{
+"""
 
     # auto* arg_data0 = arg0.data_ptr<float>();
     # ...
@@ -168,4 +195,4 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
     return ret;
 }}
 """
-    return cpp
+    return cpp_declaration, cpp
