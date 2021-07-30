@@ -235,6 +235,8 @@ def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_n
 
     return (
         """
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace ks {
 namespace entry_points {
