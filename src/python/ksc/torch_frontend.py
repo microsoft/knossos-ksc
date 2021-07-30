@@ -579,11 +579,7 @@ def cpp_string_to_module(
         ("entry_vjp", entry_vjp_name),
     ]
     return build_module_using_pytorch_from_cpp(
-        cpp_str,
-        bindings_to_generate,
-        torch_extension_name,
-        use_aten=True,
-        extra_cflags=extra_cflags,
+        cpp_str, bindings_to_generate, torch_extension_name, extra_cflags=extra_cflags,
     )
 
 

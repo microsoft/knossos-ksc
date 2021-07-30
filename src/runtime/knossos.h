@@ -1749,7 +1749,3 @@ namespace ks {
 #include "knossos-lm.h"
 
 #include "knossos-prelude.h"
-
-#ifdef KS_INCLUDE_ATEN
-#include "prelude-aten.cpp"
-#endif
