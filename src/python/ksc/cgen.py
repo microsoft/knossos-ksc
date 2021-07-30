@@ -77,6 +77,8 @@ def generate_cpp_entry_points(
 
     return (
         f"""
+#include "knossos-types.h"
+
 namespace ks {{
 namespace entry_points {{
 namespace generated {{
