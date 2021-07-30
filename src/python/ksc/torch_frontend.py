@@ -118,7 +118,6 @@ def var_or_constant(node):
 class TorchScriptVisitor:
     functions_todo: Set[Union[str, Callable]]
     functions_done: Set[Union[str, Callable]]
-    make_new_var_index = 0
 
     def __init__(self):
         self.functions_todo = set()
@@ -135,11 +134,6 @@ class TorchScriptVisitor:
         if f in self.functions_todo:
             self.functions_todo.remove(f)
         self.functions_done.add(f)
-
-    def make_new_var(self, type=None):
-        name = f"ts2ks${self.make_new_var_index}"
-        self.make_new_var_index += 1
-        return Var(name, type)
 
     def make_arg(self, input, example_input):
         input_type = from_torch_type(input.type())
