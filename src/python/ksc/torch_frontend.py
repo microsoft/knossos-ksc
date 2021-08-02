@@ -646,19 +646,6 @@ def _tsmod2ksmod(
     )
 
 
-def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
-    fn = torch.jit.script(function)
-    visitor = TorchScriptVisitor()
-    ksc_def = visitor.generate_def(False, fn.name, fn.graph, example_inputs)
-    return ksc_defs_to_autograd_function(
-        [ksc_def],
-        ksc_def,
-        torch_extension_name,
-        elementwise=False,
-        generate_lm=generate_lm,
-    )
-
-
 @dataclass
 class KscStub:
     raw_f: Callable

@@ -5,7 +5,6 @@ import torch
 import numpy
 
 import ksc.torch_frontend as knossos
-from ksc.torch_frontend import ts2mod
 from ksc.torch_utils import elementwise_apply
 
 
@@ -200,10 +199,3 @@ def test_relu3(generate_lm):
         ks_ans = ks_relu3._entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
-
-
-# def test_Vec_init():
-#     def f(x : float):
-#         return torch.tensor([x, 2.2])
-
-#     ts2mod(f, [Type.Float], Type.Vec(Type.Float))
