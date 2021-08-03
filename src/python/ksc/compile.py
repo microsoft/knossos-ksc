@@ -57,7 +57,7 @@ def subprocess_run(cmd, env=None):
     )
 
 
-def generate_cpp_from_ks(ks_str, use_aten=False):
+def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
     ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -71,12 +71,10 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
     ksc_command = [
         ksc_path,
         "--generate-cpp",
-        "--ks-source-file",
-        ksc_runtime_dir + "/prelude.ks",
         *(
-            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
-            if use_aten
-            else ()
+            opt
+            for prelude in preludes
+            for opt in ("--ks-source-file", f"{ksc_runtime_dir}/{prelude}")
         ),
         "--ks-source-file",
         fks.name,
@@ -103,6 +101,8 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
     with open(fcpp.name) as f:
         generated_cpp = f.read()
 
+    prelude_includes = "".join(f'#include "{header}"\n' for header in prelude_headers)
+
     # only delete these file if no error
     if not preserve_temporary_files:
 
@@ -118,10 +118,10 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
             os.unlink(fcpp.name)
             os.unlink(fkso.name)
 
-    return generated_cpp, decls
+    return prelude_includes + generated_cpp, decls
 
 
-def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
+def build_py_module_from_cpp(cpp_str, profiling=False):
     """
     Build python module, independently of pytorch, non-ninja
     """
@@ -154,7 +154,6 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
             " -fPIC"
             + (" -g -pg -O3" if profiling else "")
             + " -shared"
-            + (" -DKS_INCLUDE_ATEN" if use_aten else "")
             + f" -DPYTHON_MODULE_NAME={module_name}"
             f" -o {module_path} " + fcpp.name
         )
@@ -210,7 +209,9 @@ def generate_cpp_for_py_module_from_ks(
         for (python_name, _) in bindings_to_generate
     ]
 
-    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, use_aten=use_aten)
+    preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
+    prelude_headers = ["prelude-aten.cpp"] if use_aten else []
+    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
     (
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
@@ -284,7 +285,7 @@ def build_py_module_from_ks(
     with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
 
-    module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
+    module_name, module_path = build_py_module_from_cpp(cpp_str)
     return utils.import_module_from_path(module_name, module_path)
 
 
@@ -320,13 +321,12 @@ def build_module_using_pytorch_from_ks(
     return build_module_using_pytorch_from_cpp_backend(
         [("ksc-main.cpp", cpp_definitions), ("ksc-pybind.cpp", cpp_pybind)],
         torch_extension_name,
-        use_aten,
         extra_cflags,
     )
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, torch_extension_name, use_aten, extra_cflags=[]
+    cpp_str, bindings_to_generate, torch_extension_name, extra_cflags=[]
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
         bindings_to_generate, "TORCH_EXTENSION_NAME"
@@ -334,17 +334,14 @@ def build_module_using_pytorch_from_cpp(
     return build_module_using_pytorch_from_cpp_backend(
         [("ksc.cpp", cpp_str + cpp_pybind + '#include "knossos-entry-points.cpp"\n')],
         torch_extension_name,
-        use_aten,
         extra_cflags,
     )
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_strs, torch_extension_name, use_aten, extra_cflags
+    cpp_strs, torch_extension_name, extra_cflags
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
-
-    extra_cflags = extra_cflags + CFlags.All(["-DKS_INCLUDE_ATEN"] if use_aten else [])
 
     # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
     # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
