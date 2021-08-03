@@ -31,6 +31,8 @@ Contents:
 #include <string>
 #include <chrono>
 
+#include "knossos-types.h"
+
 
 #define xKS_BOUNDS_CHECK
 
@@ -61,12 +63,6 @@ namespace ks {
 #define KS_ENTER { objects.insert(this); KS_LOG("ctor", log_indent++); }
 #define KS_NOTE { KS_LOG("note " << (KS_FIND ? (void*)this : (void*)0), log_indent); }
 #define KS_LEAVE { KS_LOG("dtor " << KS_FIND, --log_indent);  objects.erase(this); }
-
-	// ===============================  Core types  ==================================
-	typedef float Float;
-	typedef int Integer;
-	typedef bool Bool;
-	typedef std::string String;
 
 	// ===============================  Tuple  ==================================
 
