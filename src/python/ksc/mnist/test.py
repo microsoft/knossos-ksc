@@ -26,10 +26,6 @@ def vvvvd(x):
     return [vvvd(y) for y in x]
 
 
-def vec_iter(v):
-    return (v[i] for i in range(len(v)))
-
-
 # There are only 9 layers in the JAX convnet that we use.  The main
 # unpacking function unpacks the weights corresponding to 10 layers
 # instead of 9 to give us the opportunity to add a LogSoftmax layer
@@ -82,7 +78,7 @@ def test():
     random_image_j = jax_image(random_image)
 
     mk = e.mnist(random_image_k, *random_weights_k)
-    mk = np.array(list(vec_iter(mk)))
+    mk = np.array(mk)
 
     mj = mnist_classifier.mnistjax(random_weights_j, random_image_j)
     mj = mj[0]
