@@ -546,20 +546,6 @@ namespace ks {
 			return sizeof(T) * static_cast<size_t>(dimension::num_elements(size));
 		}
 
-                // We cannot efficiently construct from a std::vector.
-                // When constructing from a std::vector we need to
-                // allocate and copy because we have no guarantee
-                // that the std::vector will not mutate or vanish
-                // beneath our feet.
-		tensor(allocator_base * alloc, std::vector<T> const& that) : 
-			tensor{ alloc, tensor_dimension<1>::index_type(that.size()) }
-		{
-			static_assert(Dim == 1);
-			// Copying from std vector - allocate.
-			for (size_t i = 0; i < that.size(); ++i)
-				data_[i] = that[i];
-		}
-
 		index_type size() const { return size_; }
 		int outer_dimension() const { return get_dimension<0>(size_); }
 		int num_elements() const { return dimension::num_elements(size_); }
