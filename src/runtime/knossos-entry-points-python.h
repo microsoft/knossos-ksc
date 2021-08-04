@@ -9,7 +9,7 @@ template<typename KsElementType, typename EntryPointElementType>
 struct Converter<ks::tensor<1, KsElementType>, std::vector<EntryPointElementType>>
 {
   static ks::tensor<1, KsElementType> to_ks(std::vector<EntryPointElementType> const& arg) {
-    ks::tensor<1, KsElementType> ks_arg(&g_alloc, arg.size());
+    auto ks_arg = ks::tensor<1, KsElementType>::create(&g_alloc, arg.size());
     for (int i = 0; i != ks_arg.size(); ++i) {
       ks_arg[i] = convert_argument<KsElementType>(arg[i]);
     }
