@@ -2,8 +2,6 @@
 # knossos
 Knossos: The AI-driven AI Compiler
 
-See OneNote: https://microsoft-my.sharepoint.com/personal/awf_microsoft_com/Documents/Notebooks/Knossos/
-
 Knossos is a functional compiler and code-gen tool that will
 accelerate writing AI algorithms as well as making them easier. The
 code will be optimised using reinforcement learning, automating the

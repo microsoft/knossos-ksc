@@ -47,6 +47,3 @@ $ scripts/amlt_runner.sh amulet_configs/train_on_dataset.yaml --upload-data
 
 # Troubleshooting: delete stale passwords
 Out-of-date passwords stored by Amulet can cause authentication errors.  We have seen this happen when AzureML attempted to fetch Docker images from the Knossos container registry. If you suspect this is happening, look for the stored password in `~/.config/amulet/vault.yml` and delete it.
-
-# See also
-Detailed but out-of-date instructions are on Knossos OneNote page [Philly Set up](https://microsoft.sharepoint.com/teams/KnossoswasCoconut/_layouts/OneNote.aspx?id=%2Fteams%2FKnossoswasCoconut%2FShared%20Documents%2FKnossos&wd=target%28RLO.one%7C15FBBD46-3F4D-4FF0-B133-44BC735A7D5F%2FPhilly%20set%20up%7C4CF58CFB-CF4F-4033-8867-3861E5E3779D%2F%29).
