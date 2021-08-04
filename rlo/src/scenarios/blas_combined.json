@@ -1,0 +1,23 @@
+{
+  "simulation_depth_train": 49,
+  "simulation_depth_eval": 49,
+  "template_path": "ksc/blas/blas_template.kso",
+  "rules": "ml_rules_no_bind",
+  "train_exprs": "ksc/blas/blas_combined.kso",
+  "test_exprs": "ksc/blas/blas_combined.kso",
+  "oracle": false,
+  "cost_normalization": "log",
+  "train_search": "astar",
+  "max_gnn_train": 5000,
+  "eval_search": "beam",
+  "max_gnn_eval": 5000,
+  "num_generations": 40,
+  "graph_state_keep_prob": 1.0,
+  "output_keep_prob": 1.0,
+  "max_epochs": 30,
+  "patience_epochs": 10,
+  "value_bin_splits": [0.2, 1, 10, 100, 500, 1000],
+  "time_bin_splits": [5, 10, 20, 30, 40],
+  "episode_bin_splits": [5, 10, 20, 30, 40],
+  "dataset_refiners": []
+}

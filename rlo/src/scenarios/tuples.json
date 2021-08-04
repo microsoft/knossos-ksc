@@ -1,0 +1,16 @@
+{
+"_comment": ["Note the oracle is not the optimum, merely the optimum in three rewrites. Thus, we test that the network learns to inline the correct let.",
+ "At the moment, tuple-to-child edges are indistinguishable, so there is NO WAY for the network to see that",
+  "so success rate per rollout should max out at 50% - i.e. blind luck.  Generalization to A*/Beam would have to restrict evaluation budget very carfeully."],
+  "train_exprs": "tuple_train_exprs()",
+  "test_exprs": "tuple_test_exprs()",
+  "rules": "vector_tuple_rules",
+  "oracle": true,
+  "simulation_depth_train": 3,
+  "simulation_depth_eval": 3,
+  "time_bin_splits": [1, 2, 3],
+  "episode_bin_splits": [1, 2, 3],
+  "num_generations": 30,
+  "train_search": "rollout",
+  "eval_search": "rollout"
+}

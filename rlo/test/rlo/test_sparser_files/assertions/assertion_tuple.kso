@@ -1,0 +1,2 @@
+(def check_tuple_error Float ((x : Float) (y : Float)) (- x y))
+(def a Float ((x : Float)) (* 3.0 x))

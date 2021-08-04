@@ -1,0 +1,3 @@
+* text=auto
+# Force bash scripts to have \n not \r\n, as bash is picky and complains otherwise
+*.sh text eol=lf

@@ -1,0 +1,102 @@
+# Visual Studio[ Code] state
+.vs/
+.vscode/
+
+# autodiff, could also be a submodule
+/autodiff/
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+obj/
+Debug/
+Release/
+cmake-build/
+
+# nuget packages
+/packages/
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Haskell stuff
+*~
+*#
+#*#
+*.bak
+*.BAK
+*.orig
+*.prof
+*.rej
+*.patch
+*.stackdump
+
+*.hi
+*.hi-boot
+*.o-boot
+*.p_o
+*.t_o
+*.debug_o
+*.thr_o
+*.thr_p_o
+*.thr_debug_o
+*.o
+*.a
+*.o.cmd
+*.depend*
+*.dyn_o
+*.dyn_hi
+
+# TeX
+users/simonpj/AD.dvi
+users/simonpj/AD.log
+users/simonpj/AD.aux
+users/simonpj/AD.fdb*
+users/simonpj/AD.fls
+users/simonpj/AD.xdv
+users/simonpj/AD.pdf
+*.synctex(busy)
+*.synctex.gz
+*.xcp
+users/simonpj/obj/
+autodiff
+
+# Python byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# mypy cache
+.mypy_cache/
+
+# vscode settings
+.vscode/settings.json
+
+# Default output_dir for rlo flags.py
+outputs/

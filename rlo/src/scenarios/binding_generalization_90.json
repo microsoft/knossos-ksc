@@ -1,0 +1,12 @@
+{
+  "rules": "binding_rules",
+  "exprs_per_generation": 6,
+  "train_exprs": "bindgen_90",
+  "test_exprs": "bindgen_test",
+  "oracle": true,
+  "total_train_time": 1800,
+  "eval_search": "astar",
+  "max_gnn_eval": 300,
+  "train_search": "astar",
+  "max_gnn_train": 1000
+}

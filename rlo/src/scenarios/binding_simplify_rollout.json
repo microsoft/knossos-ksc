@@ -1,0 +1,12 @@
+{
+  "_comment": "The test/train/rules setup is comparable with binding_simplify_astar.json",
+  "train_exprs": "binding_simplify_expressions",
+  "test_exprs": "binding_simplify_expressions",
+  "rules": "binding_simplify_rules",
+  "_comment2": "But here we train with rollouts - this learns slowly at first but keeps improving to around the oracle min_cost",
+  "train_search": "rollout",
+  "eval_search": "astar",
+  "max_gnn_eval": 1000,
+  "total_train_time": 3600,
+  "oracle": true
+}

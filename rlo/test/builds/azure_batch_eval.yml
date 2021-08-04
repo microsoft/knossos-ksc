@@ -1,0 +1,39 @@
+name: $(Date:yyyyMMdd)-$(Rev:r)
+trigger: none
+pr: none
+
+jobs:
+- job: AzureBatchEval
+  timeoutInMinutes: 0
+  pool: Knossos-batch-master
+  workspace:
+    clean: all
+
+  steps:
+  - task: AzureCLI@1
+    displayName: 'Azure CLI azure_batch_eval.ps'
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptLocation: inlineScript
+      inlineScript: 'powershell -ExecutionPolicy bypass -File test\builds\azure_batch_eval.ps1 $(EXPERIMENT)'
+    # dockerPassword is defined in the Azure DevOps build definition 'variables' (not in source control)
+    env:
+      DOCKER_PASSWORD: $(dockerPassword)
+
+  - task: AzureCLI@1
+    displayName: Stop Azure Batch if cancelled
+    condition: canceled()
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptLocation: inlineScript
+      inlineScript: 'az batch job stop --job-id build-%BUILD_BUILDNUMBER%'
+
+  - task: PublishPipelineArtifact@0
+    displayName: 'Publish errors'
+    condition: failed()
+    inputs:
+      artifactName: Errors
+      targetPath: errors
+
+  - powershell: rm -r -force *
+    displayName: 'Clean'

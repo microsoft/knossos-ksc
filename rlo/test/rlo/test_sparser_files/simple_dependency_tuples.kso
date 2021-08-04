@@ -1,0 +1,2 @@
+(def a Float ((x : Float) (y : Float)) (mul x y))
+(def b Float ((x : Float) (y : Float)) (sub 2.0 (a x y)))
