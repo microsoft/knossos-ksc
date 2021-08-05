@@ -46,7 +46,7 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 (def myfun                                       ; function name
   (Tuple String Float)                           ; return type
   ((i : Integer)                                 ; argument 1: int
-   (v : Tensor 1 (Tuple Float Float)))           ; argument 2: tensor of tuple
+   (v : Tensor 3 (Tuple Float Float)))           ; argument 2: 3D tensor of tuple
   (assert (gt i 0)                               ; (assert TEST BODY)
      (if (eq i 0)                                ; (if TEST TEXPR FEXPR)
         ; "then" br
