@@ -1,0 +1,7 @@
+--extra-index-url https://azuremlsdktestpypi.azureedge.net/K8s-Compute/D58E86006C65
+pylint==2.4.4
+black==19.10b0
+azureml-sdk
+azureml-contrib-reinforcementlearning
+azureml_contrib_k8s~=0.1.16
+mypy==0.812

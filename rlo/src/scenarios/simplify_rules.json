@@ -1,0 +1,10 @@
+{
+  "_comment": "Legacy rollout scenario. Usually ends early after 35 or so generations",
+  "train_exprs": "simplify_expressions",
+  "test_exprs": "simplify_expressions",
+  "rules": "simplify_rules",
+  "num_generations": 60,
+  "train_search": "rollout",
+  "eval_search": "rollout",
+  "oracle": true
+}

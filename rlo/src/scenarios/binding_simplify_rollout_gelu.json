@@ -1,0 +1,14 @@
+{
+    "simulation_depth_train": 11,
+    "simulation_depth_eval": 20,
+    "rules": "ml_rules",
+    "train_exprs": "binding_simplify_expressions",
+    "test_exprs": "ksc/release/gelu.kso",
+    "oracle": false,
+    "train_search": "rollout",
+    "max_num_episodes_train": 20,
+    "eval_search": "rollout",
+    "max_num_episodes_eval": 10,
+    "num_generations": 40
+  }
+  

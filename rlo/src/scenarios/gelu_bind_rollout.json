@@ -1,0 +1,20 @@
+{
+  "simulation_depth_train": 99,
+  "simulation_depth_eval": 99,
+  "rules": "ml_rules",
+  "train_exprs": "ksc/release/gelu.kso",
+  "test_exprs": "ksc/release/gelu.kso",
+  "oracle": false,
+  "train_search": "rollout",
+  "max_num_episodes_train": 10,
+  "eval_search": "rollout",
+  "max_num_episodes_eval": 10,
+  "num_generations": 40,
+  "graph_state_keep_prob": 0.8,
+  "output_keep_prob": 0.8,
+  "max_epochs": 30,
+  "patience_epochs": 10,
+  "time_bin_splits": [5, 10, 20, 30, 40, 50, 60, 70, 80, 90],
+  "episode_bin_splits": [5, 10, 20, 30, 40, 50, 60, 70, 80, 90],
+  "dataset_refiners": []
+}

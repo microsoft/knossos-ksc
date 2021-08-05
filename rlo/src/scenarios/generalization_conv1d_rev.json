@@ -1,0 +1,10 @@
+{
+  "_comment": "TODO - should use A*, what max_gnn etc. are appropriate? And is vector_tuple_rules right?",
+  "simulation_depth_train": 34,
+  "simulation_depth_eval": 34,
+  "template_path": "ksc/conv1d_rev/conv1d_rev_template.kso",
+  "rules": "vector_tuple_rules",
+  "train_exprs": "ksc/conv1d_rev/conv1d_rev_train.kso",
+  "test_exprs": "ksc/conv1d_rev/conv1d_rev_test.kso",
+  "oracle": false
+}

@@ -1,0 +1,36 @@
+target:
+  cluster: rr3
+  vc: msrhyperprojvc3
+
+environment:
+  image: philly/jobs/toolkit/tensorflow:community-gpu-1.14.0-cp35
+  registry: phillyregistry.azurecr.io
+  setup:
+  - pip install --upgrade pip
+  - pip install --no-cache-dir numpy\>=1.17 sexpdata matplotlib sklearn pandas scikit-learn==0.22.1
+
+code:
+  local_dir: src
+
+search:
+  job_template:
+    name: "{experiment_name:s}_{sd}_{nt}"
+    sku: G16 # G8 seems to work but is frowned upon
+    command:
+    - tr -d \\r < ./parallel_train_over_expressions.sh | bash -s blas_combined --simulation_depth={sd} --num_timesteps={nt}
+      --output_dir $$PT_OUTPUT_DIR
+      --num_parallel=16
+      --num_repetitions=16
+      --gpu_memory_fraction=0.15
+      --total_train_time=43200 # 12 hrs + eval
+    submit_args:
+      max_attempts: 1
+  type: grid
+  max_trials: 9
+  params:
+    - name: nt
+      spec: discrete
+      values: [10, 15, 20]
+    - name: sd
+      spec: discrete
+      values: [49, 59, 69]

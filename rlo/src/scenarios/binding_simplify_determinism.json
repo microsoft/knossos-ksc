@@ -1,0 +1,13 @@
+{
+  "_comment": "Test determinism of both A* + rollout between repetitions with same random seed",
+  "train_exprs": "binding_simplify_expressions",
+  "test_exprs": "binding_simplify_expressions",
+  "rules": "binding_simplify_rules",
+  "train_search": "astar",
+  "eval_search": "rollout",
+  "max_gnn_train": 1000,
+  "total_train_time": 3600,
+  "oracle": true,
+  "seed_all_reps": 1,
+  "num_repetitions": 2
+}

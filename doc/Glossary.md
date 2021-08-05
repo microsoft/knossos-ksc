@@ -23,7 +23,7 @@ An extension of ANF where every variable has exactly one use.  Useful for functi
 
 ### OtOs: Optimized for time or space
 
-Many functions have a choice of space or time efficient implementations, which might be named `foo$Ot` or `foo$Os`.  It's the optimizer's job to choose between them.   [OneNote](https://microsoft.sharepoint.com/teams/KnossoswasCoconut/_layouts/OneNote.aspx?id=%2Fteams%2FKnossoswasCoconut%2FShared%20Documents%2FKnossos&wd=target%28Introduction.one%7C5B8BBD78-8DBB-4260-89A9-79396A29CB75%2FSpace%20vs%20time%20%24Os%20and%20%24Ot%7C2EDADD99-C3B1-45F6-9CBE-CCBAE18C2068%2F%29)
+Many functions have a choice of space or time efficient implementations, which might be named `foo$Ot` or `foo$Os`.  It's the optimizer's job to choose between them.
 
 ### IDTW: If that didn't work
 

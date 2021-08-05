@@ -1,0 +1,6 @@
+{
+    "train_exprs": "simplify_expressions",
+    "test_exprs": "simplify_expressions",
+    "rules": "simplify_rules",
+    "num_timesteps": 10
+}

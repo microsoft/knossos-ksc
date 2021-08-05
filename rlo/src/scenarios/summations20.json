@@ -1,0 +1,17 @@
+{
+  "train_exprs": "summations(n=50,min_terms=11,max_terms=20,choose_from=100)",
+  "test_exprs": "summations(n=100,min_terms=11,max_terms=20)",
+  "rules": "simplify_rules",
+  "train_search": "beam",
+  "max_gnn_train": 3000,
+  "eval_search": "beam",
+  "max_gnn_eval": 1000,
+  "max_epochs": 10,
+  "total_train_time": 60000,
+  "simulation_depth_train": 40,
+  "simulation_depth_eval": 40,
+  "oracle": false,
+  "dataset_refiners": ["reuse_refiner"],
+  "extra_plots": ["summations_fit_animated"],
+  "sparse_gnn": true
+}

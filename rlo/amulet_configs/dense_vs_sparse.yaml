@@ -1,0 +1,46 @@
+# This experiment shows the difference between the dense and sparse GNN.
+# datasets/value_dataset.json was extracted through an untrained astar
+# search on binding_simplify scenario. See datasets/config.json.
+
+target:
+  cluster: cam
+  vc: msrlabs
+
+environment:
+  # cam cluster does not support later TF versions
+  image: tensorflow/tensorflow:1.12.0-gpu-py3
+  setup:
+  - pip install --user --upgrade pip
+  - pip install --user --no-cache-dir numpy\>=1.17 sexpdata matplotlib sklearn scikit-learn==0.22.1 pandas tabulate
+
+code:
+  local_dir: src
+
+data:
+  local_dir: datasets
+  remote_dir: datasets
+
+jobs:
+  - name: "train_on_dataset_dense"
+    sku: G1
+    command:
+    - python train_on_dataset.py train
+      --dataset_config_path /mnt/default/datasets
+      --dataset_path /mnt/default/datasets/value_dataset.json
+      --seed_all_reps 0
+      --graph_state_keep_prob 1.0
+      --output_keep_prob 0.5
+      --patience_epochs 30
+      --output_dir $$PT_OUTPUT_DIR
+  - name: "train_on_dataset_sparse"
+    sku: G1
+    command:
+    - python train_on_dataset.py train
+      --dataset_config_path /mnt/default/datasets
+      --dataset_path /mnt/default/datasets/value_dataset.json
+      --seed_all_reps 0
+      --output_keep_prob 0.5
+      --patience_epochs 30
+      --sparse_gnn
+      --max_nodes_per_batch 256
+      --output_dir $$PT_OUTPUT_DIR
