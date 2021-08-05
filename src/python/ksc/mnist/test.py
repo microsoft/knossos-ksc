@@ -11,23 +11,19 @@ import numpy.random
 
 
 def vd(x):
-    return e.vec_Float([y for y in x])
+    return [y for y in x]
 
 
 def vvd(x):
-    return e.vec_vec_Float([vd(y) for y in x])
+    return [vd(y) for y in x]
 
 
 def vvvd(x):
-    return e.vec_vec_vec_Float([vvd(y) for y in x])
+    return [vvd(y) for y in x]
 
 
 def vvvvd(x):
-    return e.vec_vec_vec_vec_Float([vvvd(y) for y in x])
-
-
-def vec_iter(v):
-    return (v[i] for i in range(len(v)))
+    return [vvvd(y) for y in x]
 
 
 # There are only 9 layers in the JAX convnet that we use.  The main
@@ -82,7 +78,7 @@ def test():
     random_image_j = jax_image(random_image)
 
     mk = e.mnist(random_image_k, *random_weights_k)
-    mk = np.array(list(vec_iter(mk)))
+    mk = np.array(mk)
 
     mj = mnist_classifier.mnistjax(random_weights_j, random_image_j)
     mj = mj[0]
