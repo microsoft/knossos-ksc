@@ -86,7 +86,7 @@ tensor<1, Float>
 inline mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const& v)
 {
 	int r = M.outer_dimension();
-	tensor<1, Float> ret(alloc, r);
+	auto ret = tensor<1, Float>::create(alloc, r);
 	for(int i = 0; i < r; ++i)
 		ret[i] = ts_dot(M[i], v);
 	return ret;
@@ -98,7 +98,7 @@ inline rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Floa
 	auto [M, v] = M_v;
 	int r = M.outer_dimension();
 	int c = size(v);
-	tensor<2, Float> retM(alloc, size(M));
+	auto retM = tensor<2, Float>::create(alloc, size(M));
 	for(int i = 0; i < r; ++i) {
 		// Inlined retM[i].assign(ts_scale(dr[i], v))
 		tensor<1, Float> retrow = retM[i];
@@ -106,7 +106,7 @@ inline rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Floa
 			retrow[j] = dr[i] * v[j];
 	}
 
-	tensor<1, Float> retv(alloc, c);
+	auto retv = tensor<1, Float>::create(alloc, c);
 	for(int i = 0; i < c; ++i) {
 		Float retvi = 0;
 		for(int j = 0; j < r; ++j)

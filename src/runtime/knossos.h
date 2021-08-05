@@ -523,24 +523,8 @@ namespace ks {
 		typedef typename dimension::index_type index_type;
 		typedef T value_type;
 
-		tensor() :
-			size_{},
-			data_{ nullptr }
-		{
-		}
-
-		tensor(allocator_base * alloc, index_type dims) {
-			allocate(alloc, dims);
-		}
-
+		tensor() : size_{}, data_{ nullptr } {}
 		tensor(index_type size, T * data) : size_(size), data_(data) {}
-
-		void allocate(allocator_base * alloc, index_type size)
-		{
-			void *storage = alloc->allocate(bytes_required(size));
-			this->size_ = size;
-			this->data_ = (T*)storage;
-		}
 
 		static size_t bytes_required(index_type size) {
 			return sizeof(T) * static_cast<size_t>(dimension::num_elements(size));
@@ -601,7 +585,8 @@ namespace ks {
 
 		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
-			return tensor<Dim, T>(alloc, size);
+			void *storage = alloc->allocate(bytes_required(size));
+			return tensor<Dim, T>(size, (T*)storage);
 		}
 
 		bool operator == (tensor const& other) const {
@@ -662,7 +647,7 @@ namespace ks {
 	template<size_t Dim, class T>
 	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
 		const T* indata = t.data();
-		tensor<Dim, decltype(shape(alloc, *indata))> s(alloc, t.size());
+		auto s = tensor<Dim, decltype(shape(alloc, *indata))>::create(alloc, t.size());
 		auto* outdata = s.data();
 		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
 			outdata[ii] = shape(alloc, indata[ii]);
@@ -824,7 +809,7 @@ namespace ks {
 					   in the way! */
 					dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
 				}
-				*t = tensor<Dim, T>(dest->alloc, t->size());
+				*t = tensor<Dim, T>::create(dest->alloc, t->size());
 				std::memcpy(t->data(), sourceData, num_elements * (int)sizeof(T));
 			}
 			dest->subobjectDestination += allocator::padded_size(sizeof(T) * num_elements);
@@ -871,7 +856,7 @@ namespace ks {
 	void copydown_by_memmove_inplace(allocator * alloc, tensor<Dim, T> * t) {
 		int num_elements = t->num_elements();
 		T* oldData = t->data();
-		*t = tensor<Dim, T>(alloc, t->size());
+		*t = tensor<Dim, T>::create(alloc, t->size());
 		std::memmove(t->data(), oldData, sizeof(T) * static_cast<size_t>(num_elements));
 		T* newData = t->data();
 		for (int i = 0; i != num_elements; ++i) {
@@ -966,7 +951,7 @@ namespace ks {
 	template <size_t Dim, class T>
 	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
 	{
-		tensor<Dim, T> ret(alloc, val.size());
+		auto ret = tensor<Dim, T>::create(alloc, val.size());
 		T* retdata = ret.data();
 		const T* indata = val.data();
 		for (int i = 0; i != ret.num_elements(); ++i) {
@@ -998,7 +983,7 @@ namespace ks {
 	struct make_zero_t<tensor<Dim, T>>
 	{
 		static tensor<Dim, T> ofShape(allocator_base * alloc, shape_t<tensor<Dim, T>> const& shape) {
-			tensor<Dim, T> ret(alloc, shape.size());
+			auto ret = tensor<Dim, T>::create(alloc, shape.size());
 			T* retdata = ret.data();
 			const shape_t<T>* shapedata = shape.data();
 			for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
@@ -1136,7 +1121,7 @@ namespace ks {
 
 	template <size_t Dim, class T>
 	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
-		tensor<Dim, T> ret(alloc, t.size());
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
 		const T* indata = t.data();
 		T* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
@@ -1474,7 +1459,7 @@ namespace ks {
 		}
 
 		dS dScope = s_zero;
-		auto dv = vec<dT>(alloc, v.size());
+		auto dv = vec<dT>::create(alloc, v.size());
 
 		for (int i = v.size() - 1; i >= 0; i--) {
 			Tuple<dS, Tuple<dA, dT>> f_call = f_(alloc, make_Tuple(forward_pass[i], v[i]), dr);
@@ -1514,7 +1499,7 @@ namespace ks {
 	{
 		constexpr int num_args = 1 + static_cast<int>(sizeof...(args));
 		T arr[num_args] = {arg0, args...};
-		tensor<1, T> ret(alloc, num_args);
+		auto ret = tensor<1, T>::create(alloc, num_args);
 		T* retdata = ret.data();
 		for (int i = 0; i != num_args; ++i) {
 			retdata[i] = arr[i];
@@ -1532,7 +1517,7 @@ namespace ks {
 	auto constVec(allocator * alloc, SizeType size, T val)
 	{
 		constexpr size_t Dim = dimension_of_tensor_index_type<SizeType>::value;
-		tensor<Dim, T> ret(alloc, size);
+		auto ret = tensor<Dim, T>::create(alloc, size);
 		T* retdata = ret.data();
 		for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
 			retdata[j] = val;
@@ -1588,7 +1573,7 @@ namespace ks {
 	template<size_t I, size_t Dim, typename TupleType>
 	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
 	{
-		tensor<Dim, std::tuple_element_t<I, TupleType>> ret(alloc, t.size());
+		auto ret = tensor<Dim, std::tuple_element_t<I, TupleType>>::create(alloc, t.size());
 		const TupleType* indata = t.data();
 		auto* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
