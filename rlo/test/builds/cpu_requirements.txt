@@ -2,7 +2,7 @@
 # If you can use conda, then just use conda-env.yaml.
 # If you want to do a pip-only install, use print_requirements.py to extract some requirements from 
 # the 'pip' section of the conda-env.yaml, and then install the rest from here. See install_linux.sh for an example.
-tensorflow-cpu==2.2
+tensorflow-cpu==2.4.2
 pyyaml
 --find-links https://download.pytorch.org/whl/torch_stable.html
 --find-links https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
