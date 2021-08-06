@@ -1,0 +1,13 @@
+{
+  "train_exprs": "ksc/extra/binding_simplify_defs_tuples.kso",
+  "test_exprs": "ksc/extra/binding_simplify_defs_tuples.kso",
+  "rules": "ml_rules",
+  "eval_search": "beam",
+  "max_gnn_eval": 2000,
+  "train_search": "beam",
+  "max_gnn_train": 2000,
+  "total_train_time": 7200,
+  "oracle": false,
+  "simulation_depth_train": 22,
+  "simulation_depth_eval": 22
+}

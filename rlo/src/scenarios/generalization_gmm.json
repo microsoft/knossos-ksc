@@ -1,0 +1,11 @@
+{
+  "_comment": "Just porting this scenario ATM, no experiments were made here. Should probably use A*, TODO find appropriate flags",
+  "simulation_depth_train": 49,
+  "simulation_depth_eval": 49,
+  "template_path": "ksc/gmm/gmm_template.kso",
+  "rules": "ml_rules_no_bind",
+  "train_exprs": "ksc/gmm/gmm_train.kso",
+  "test_exprs": "ksc/gmm/gmm_test.kso",
+  "oracle": false,
+  "test_on_defs": ["rev$gmm_knossos_gmm_objective"]
+}

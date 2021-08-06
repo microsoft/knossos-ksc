@@ -1,0 +1,18 @@
+{
+  "_comment": "This uses the search algorithms the opposite way around (test/train) to fewer_simplify_rules for test coverage and determinism",
+  "train_exprs": "simplify_expressions",
+  "test_exprs": "fewer_simplify_expressions",
+  "rules": "simplify_rules",
+  "num_generations": 2,
+  "exprs_per_generation": 5,
+  "num_repetitions": 2,
+  "eval_search": "hybrid",
+  "max_gnn_eval": 100,
+  "hybrid_alpha": 2.0,
+  "max_epochs": 10,
+  "min_epochs": 2,
+  "train_search": "beam",
+  "max_gnn_train": 200,
+  "oracle": true,
+  "sparse_gnn": true
+}

@@ -1,0 +1,12 @@
+{
+  "_comment": "The test/train/rules setup is comparable with binding_simplify_rollout.json and binding_simplify_astar.json",
+  "train_exprs": "binding_simplify_expressions",
+  "test_exprs": "binding_simplify_expressions",
+  "rules": "binding_simplify_rules",
+  "eval_search": "beam",
+  "max_gnn_eval": 1000,
+  "train_search": "beam",
+  "max_gnn_train": 1000,
+  "total_train_time": 3600,
+  "oracle": true
+}

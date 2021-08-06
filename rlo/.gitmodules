@@ -1,0 +1,3 @@
+[submodule "knossos-ksc"]
+	path = knossos-ksc
+	url = https://github.com/microsoft/knossos-ksc

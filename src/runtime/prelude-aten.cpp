@@ -9,8 +9,8 @@ tensor<1, Float>
 aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,Float> const& M, tensor<1,Float> const& v)
 {
 	auto [r,c] = size(M);
-    KS_ASSERT(c == size(v));
-	tensor<1,Float> ret(alloc, r);
+	KS_ASSERT(c == size(v));
+	auto ret = tensor<1,Float>::create(alloc, r);
 	for(int i = 0; i < r; ++i)
 		ret[i] = ts_dot(M[i], v);
 	return ret;
@@ -21,8 +21,8 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Flo
 {
 	auto [r,K] = size(A);
 	auto [K_,c] = size(B);
-  KS_ASSERT(K == K_);
-	tensor<2,Float> ret(alloc, make_Tuple(r, c));
+	KS_ASSERT(K == K_);
+	auto ret = tensor<2,Float>::create(alloc, make_Tuple(r, c));
 	for(int i = 0; i < r; ++i)
 		for(int j = 0; j < c; ++j) {
 			Float tot = 0;
@@ -40,11 +40,11 @@ rev$aten$8$8matmul$aT2fT1f(allocator * alloc, Tuple<tensor<2,Float>, tensor<1,Fl
 	auto [r, c] = size(M);
 	KS_ASSERT(c == size(v));
 
-	tensor<2,Float> retM(alloc, size(M));
+	auto retM = tensor<2,Float>::create(alloc, size(M));
 	for(int i = 0; i < r; ++i)
 		retM[i] = ts_scale(alloc, dr[i], v);
 
-	tensor<1,Float> retv(alloc, c);
+	auto retv = tensor<1,Float>::create(alloc, c);
 	for(int i = 0; i < c; ++i) {
 		Float retvi = 0; // TODO: Accumulator types
 		for(int j = 0; j < r; ++j)
@@ -93,7 +93,7 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 			get_dimension<Dim>(sz_out) += get_dimension<Dim>(sz);
 		}
 
-		Mat retM(alloc, sz_out);
+		Mat retM = Mat::create(alloc, sz_out);
 		
 		Mat::index_type offset = {0,0};
 		for(int ai = 0; ai < n; ++ai) {
@@ -126,7 +126,7 @@ rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg
 	auto [As, dim] = arg;
 	int n = size(As);
 
-	tensor<1, Mat> retM(alloc, n);
+	auto retM = tensor<1, Mat>::create(alloc, n);
 	
 	if (dim == 1) {
 		constexpr int Dim = 1;
@@ -134,7 +134,7 @@ rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg
 		for(int ai = 0; ai < n; ++ai) {
 			auto const& A = As[ai];
 			auto sz = size(A);
-			retM[ai] = Mat(alloc, sz);
+			retM[ai] = Mat::create(alloc, sz);
 			Mat& Mi = retM[ai];
 			for(int i = 0; i < get_dimension<0>(sz); ++i)
 				for(int j = 0; j < get_dimension<1>(sz); ++j) {
@@ -174,7 +174,7 @@ addA1bt$aT2fT1f(allocator * alloc, Mat const& A, Vec const& b)
 	auto [M, N] = size(A);
 	KS_ASSERT(N == size(b));
 	
-	Mat retM(alloc, size(A));
+	Mat retM = Mat::create(alloc, size(A));
 	for(int i = 0; i < M; ++i)
 		for(int j = 0; j < N; ++j)
 			retM[i][j] = A[i][j] + b[j];
@@ -191,12 +191,12 @@ rev$addA1bt$aT2fT1f(allocator * alloc, Tuple<Mat, Vec> const& args, Mat const& d
 {
 	auto [M, N] = size(dret);
 	
-	Mat retdA(alloc, size(dret));
+	Mat retdA = Mat::create(alloc, size(dret));
 	for(int i = 0; i < M; ++i)
 		for(int j = 0; j < N; ++j)
 			retdA[i][j] = dret[i][j];
 
-	Vec retdb(alloc, N);
+	Vec retdb = Vec::create(alloc, N);
 	for(int j = 0; j < N; ++j) {
 		Float tot = 0; // TODO: Accumulator types
 		for(int i = 0; i < M; ++i)

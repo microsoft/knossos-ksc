@@ -18,7 +18,8 @@ Current backends:
  * MLIR: In [mlir](mlir/README.md)
 
 Current transformers:
- * KSC: Various Autodiff and optimization transforms, in Haskell 
+ * KSC: Various Autodiff and optimization transforms, in Haskell
+ * RLO: A rewriting-based optimizer using reinforcement learning
 
 ### KS-Lisp: A low-sugar IR
 

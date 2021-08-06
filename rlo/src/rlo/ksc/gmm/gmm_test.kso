@@ -1,0 +1,422 @@
+(edef dotv Float ((Vec Float) (Vec Float)))
+(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
+(edef
+ rev$mul$Mat$Vec
+ (Tuple (Vec (Vec Float)) (Vec Float))
+ ((Vec (Vec Float)) (Vec Float) (Vec Float)))
+
+(def
+ gmm_knossos_tri Integer
+ ((n : Integer))
+ (div (mul n (sub n 1)) 2))
+
+(def
+ exp$VecR (Vec Float)
+ ((v : Vec Float))
+ (build (size v) (lam (i : Integer) (exp (index i v)))))
+
+(def
+ mul$R$VecR (Vec Float)
+ ((r : Float) (a : Vec Float))
+ (build (size a) (lam (i : Integer) (mul r (index i a)))))
+
+(def
+ sub$VecR$VecR (Vec Float)
+ ((a : Vec Float) (b : Vec Float))
+ (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
+
+(def
+ rev$dotv (Tuple (Vec Float) (Vec Float))
+ ((a : Vec Float) (b : Vec Float) (dr : Float))
+ (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
+
+(def sqnorm Float ((v : Vec Float)) (dotv v v))
+
+(def
+ gmm_knossos_makeQ (Vec (Vec Float))
+ ((q : Vec Float) (l : Vec Float))
+ (assert (eq (size l) (gmm_knossos_tri (size q)))
+  (build (size q)
+         (lam (i : Integer) (build (size q)
+                                   (lam (j : Integer) (if
+                                                       (lt i j)
+                                                       0.0
+                                                       (if
+                                                        (eq i j)
+                                                        (exp (index i q))
+                                                        (index (add (sub (gmm_knossos_tri (size q))
+                                                                         (gmm_knossos_tri (sub (size q)
+                                                                                               j)))
+                                                                    (sub (sub i j) 1))
+                                                               l)))))))))
+
+(def
+ rev$exp$VecR (Vec Float)
+ ((v : Vec Float) (d$r : Vec Float))
+ (let
+  ((t14032 (size v)))
+  (sumbuild t14032
+            (lam (i : Integer) (add$vfvf (build t14032 (lam (i_5 : Integer) 0.0))
+                                    (deltaVec t14032 i (mul (exp (index i v)) (index i d$r))))))))
+
+(def
+ rev$sub$VecR$VecR (Tuple (Vec Float) (Vec Float))
+ ((a : Vec Float) (b : Vec Float) (d$r : Vec Float))
+ (let
+  ((t14109 (size a)))
+  (tuple (sumbuild t14109
+                   (lam (i : Integer) (let
+                                       ((t14111 (build t14109 (lam (i_6 : Integer) 0.0))))
+                                       (add (add$vfvf t14111 (deltaVec t14109 i (index i d$r)))
+                                            (add t14111 t14111)))))
+         (sumbuild t14109
+                   (lam (i : Integer) (let
+                                       ((t14123 (size b))
+                                        (t14124 (build t14123 (lam (i_6 : Integer) 0.0))))
+                                       (add (add t14124 t14124)
+                                            (add t14124
+                                                 (deltaVec t14123
+                                                           i
+                                                           (mul -1.0 (index i d$r)))))))))))
+
+(def
+ rev$sqnorm (Vec Float)
+ ((v : Vec Float) (d$r : Float))
+ (let
+  ((t14185 (rev$dotv v v d$r)))
+  (add (get$1$2 t14185) (get$2$2 t14185))))
+
+(def
+ rev$gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))
+ ((q : Vec Float) (l : Vec Float) (d$r : Vec (Vec Float)))
+ (assert (eq (size l) (gmm_knossos_tri (size q)))
+  (sumbuild (size q)
+            (lam (i : Integer) (let
+                                ((a_6 (index i d$r)))
+                                (sumbuild (size q)
+                                          (lam (j : Integer) (if
+                                                              (lt i j)
+                                                              (tuple (build (size q)
+                                                                            (lam (i_8 : Integer) 0.0))
+                                                                     (build (gmm_knossos_tri (size q))
+                                                                            (lam (i_8 : Integer) 0.0)))
+                                                              (if
+                                                               (eq i j)
+                                                               (let
+                                                                ((t14208 (build (gmm_knossos_tri (size q))
+                                                                                (lam (i_8 : Integer) 0.0))))
+                                                                (tuple (add (build (size q)
+                                                                                   (lam (i_8 : Integer) 0.0))
+                                                                            (deltaVec (size q)
+                                                                                      i
+                                                                                      (mul (exp (index i
+                                                                                                       q))
+                                                                                           (index j
+                                                                                                  a_6))))
+                                                                       (add t14208 t14208)))
+                                                               (let
+                                                                ((t14213 (build (size q)
+                                                                                (lam (i_8 : Integer) 0.0)))
+                                                                 (t14218 (add t14213 t14213))
+                                                                 (t14230 (build (gmm_knossos_tri (size q))
+                                                                                (lam (i_8 : Integer) 0.0)))
+                                                                 (t14235 (add t14230 t14230)))
+                                                                (tuple (add (add (add t14213 t14218)
+                                                                                 t14218)
+                                                                            t14213)
+                                                                       (add (add (add t14230 t14235)
+                                                                                 t14235)
+                                                                            (deltaVec (gmm_knossos_tri (size q))
+                                                                                      (add (sub (gmm_knossos_tri (size q))
+                                                                                                (gmm_knossos_tri (sub (size q)
+                                                                                                                      j)))
+                                                                                           (sub (sub i
+                                                                                                     j)
+                                                                                                1))
+                                                                                      (index j
+                                                                                             a_6))))))))))))))
+(def
+ rev$logsumexp (Vec Float)
+ ((v : Vec Float) (d$r : Float))
+ (let
+  ((t14256 (exp$VecR v))
+   (a (mul (div 1.0 (sum t14256)) d$r)))
+  (rev$exp$VecR v (build (size t14256) (lam (sum$i : Integer) a)))))
+
+(def
+ rev$log_wishart_prior (Tuple (Tuple Float (Tuple))
+                              (Vec Float)
+                              (Vec Float))
+ ((wishart : (Tuple Float Integer))
+  (log_Qdiag : Vec Float)
+  (ltri_Q : Vec Float)
+  (d$r : Float))
+ (let
+  ((p (size log_Qdiag))
+   (wishart_gamma (get$1$2 wishart))
+   (wishart_m (get$2$2 wishart))
+   (Qdiag (exp$VecR log_Qdiag))
+   (t14269 (mul -1.0 d$r))
+   (a (mul (to_float wishart_m) t14269))
+   (t14275 (mul 0.5 d$r))
+   (t14289 (build p (lam (i : Integer) 0.0)))
+   (t14294 (add t14289 t14289))
+   (t14297 (mul (mul wishart_gamma wishart_gamma) t14275))
+   (t14336 (build (size ltri_Q) (lam (i : Integer) 0.0)))
+   (t14341 (add t14336 t14336))
+   (t14372 (add t14336 t14341)))
+  (tuple (tuple (add (mul (mul (add (sqnorm Qdiag) (sqnorm ltri_Q))
+                               (add wishart_gamma wishart_gamma))
+                          t14275)
+                     (mul (div 1.0 wishart_gamma)
+                          (mul (to_float (mul (add p (add wishart_m 1)) p)) t14269)))
+                (tuple))
+         (add (add (add t14289
+                        (add t14294
+                             (add (rev$exp$VecR log_Qdiag (rev$sqnorm Qdiag t14297)) t14289)))
+                   (add t14289 (build p (lam (sum$i : Integer) a))))
+              (add (add t14294 (add t14289 t14294)) (add t14294 t14289)))
+         (add (add (add t14336
+                        (add t14341 (add t14336 (rev$sqnorm ltri_Q t14297))))
+                   t14341)
+              (add (add (add t14341 t14336) t14372) (add t14372 t14336))))))
+(def
+ rev$gmm_knossos_gmm_objective (Tuple (Vec (Vec Float))
+                                      (Vec Float)
+                                      (Vec (Vec Float))
+                                      (Vec (Vec Float))
+                                      (Vec (Vec Float))
+                                      (Tuple Float (Tuple)))
+ ((x : Vec (Vec Float))
+  (alphas : Vec Float)
+  (means : Vec (Vec Float))
+  (qs : Vec (Vec Float))
+  (ls : Vec (Vec Float))
+  (wishart : (Tuple Float Integer))
+  (d$r : Float))
+ (let
+  ((N (size x))
+   (K (size alphas)))
+  (assert (eq (size (index 0 ls))
+              (gmm_knossos_tri (size (index 0 x))))
+   (let
+    ((a (build (size (index 0 x)) (lam (i : Integer) 0.0)))
+     (a_16 (build N (lam (sum$i : Integer) d$r)))
+     (a_23 (build K (lam (sum$i : Integer) d$r)))
+     (t14397 (build N
+                    (lam (i : Integer) (build (size (index i x))
+                                              (lam (i_12 : Integer) 0.0)))))
+     (t14414 (build K (lam (i : Integer) 0.0)))
+     (t14419 (add t14414 t14414))
+     (t14424 (size means))
+     (t14427 (build t14424
+                    (lam (i : Integer) (build (size (index i means))
+                                              (lam (i_12 : Integer) 0.0)))))
+     (t14436 (add t14427 t14427))
+     (t14443 (size qs))
+     (t14446 (build t14443
+                    (lam (i : Integer) (build (size (index i qs))
+                                              (lam (i_12 : Integer) 0.0)))))
+     (t14455 (add t14446 t14446))
+     (t14462 (size ls))
+     (t14465 (build t14462
+                    (lam (i : Integer) (build (size (index i ls))
+                                              (lam (i_12 : Integer) 0.0)))))
+     (t14474 (add t14465 t14465))
+     (t14860 (add t14397 t14397))
+     (t14900 (to_float K)))
+    (add (add (tuple (add (add t14397
+                               (add t14397
+                                    (build N
+                                           (lam (primDindex$i : Integer) (if
+                                                                          (eq primDindex$i 0)
+                                                                          a
+                                                                          a)))))
+                          t14397)
+                     (add (add t14414 t14419) t14414)
+                     (add (add t14427 t14436) t14427)
+                     (add (add t14446 t14455) t14446)
+                     (add (add t14465 t14474) t14465)
+                     (tuple 0.0 (tuple)))
+              (add (sumbuild N
+                             (lam (i : Integer) (let
+                                                 ((a_12 (rev$logsumexp (build K
+                                                                              (lam (k : Integer) (let
+                                                                                                  ((t14485 (index k
+                                                                                                                  qs)))
+                                                                                                  (sub (add (index k
+                                                                                                                   alphas)
+                                                                                                            (sum t14485))
+                                                                                                       (mul 0.5
+                                                                                                            (sqnorm (mul$Mat$Vec (gmm_knossos_makeQ t14485
+                                                                                                                                                    (index k
+                                                                                                                                                           ls))
+                                                                                                                                 (sub$VecR$VecR (index i
+                                                                                                                                                       x)
+                                                                                                                                                (index k
+                                                                                                                                                       means)))))))))
+                                                                       (index i a_16))))
+                                                 (sumbuild K
+                                                           (lam (k : Integer) (let
+                                                                               ((t14499 (index k
+                                                                                               qs))
+                                                                                (t14500 (index k
+                                                                                               ls))
+                                                                                (Q (gmm_knossos_makeQ t14499
+                                                                                                      t14500))
+                                                                                (t14501 (index i x))
+                                                                                (t14502 (index k
+                                                                                               means))
+                                                                                (t14503 (sub$VecR$VecR t14501
+                                                                                                       t14502))
+                                                                                (t14509 (index k
+                                                                                               a_12))
+                                                                                (t14513 (rev$mul$Mat$Vec Q
+                                                                                                         t14503
+                                                                                                         (rev$sqnorm (mul$Mat$Vec Q
+                                                                                                                                  t14503)
+                                                                                                                     (mul 0.5
+                                                                                                                          (mul -1.0
+                                                                                                                               t14509)))))
+                                                                                (t14515 (rev$sub$VecR$VecR t14501
+                                                                                                           t14502
+                                                                                                           (get$2$2 t14513)))
+                                                                                (a_22 (get$1$2 t14515))
+                                                                                (a_36 (get$2$2 t14515))
+                                                                                (t14529 (size t14499))
+                                                                                (a_25 (build t14529
+                                                                                             (lam (sum$i : Integer) t14509)))
+                                                                                (t14541 (rev$gmm_knossos_makeQ t14499
+                                                                                                               t14500
+                                                                                                               (get$1$2 t14513)))
+                                                                                (a_26 (get$1$2 t14541))
+                                                                                (a_27 (get$2$2 t14541))
+                                                                                (t14562 (add t14397
+                                                                                             t14397))
+                                                                                (t14572 (add t14562
+                                                                                             t14562))
+                                                                                (t14642 (add t14419
+                                                                                             t14419))
+                                                                                (t14675 (add t14436
+                                                                                             t14436))
+                                                                                (t14803 (add t14474
+                                                                                             t14474)))
+                                                                               (tuple (add t14572
+                                                                                           (add t14397
+                                                                                                (add t14572
+                                                                                                     (add (add t14397
+                                                                                                               (build N
+                                                                                                                      (lam (primDindex$i : Integer) (if
+                                                                                                                                                     (eq primDindex$i
+                                                                                                                                                         i)
+                                                                                                                                                     a_22
+                                                                                                                                                     (build (size t14501)
+                                                                                                                                                            (lam (i_18 : Integer) 0.0))))))
+                                                                                                          t14562))))
+                                                                                      (add (add (add t14414
+                                                                                                     (deltaVec K
+                                                                                                               k
+                                                                                                               t14509))
+                                                                                                t14419)
+                                                                                           (add t14414
+                                                                                                (add t14642
+                                                                                                     t14642)))
+                                                                                      (add t14675
+                                                                                           (add t14427
+                                                                                                (add t14675
+                                                                                                     (add t14436
+                                                                                                          (add t14427
+                                                                                                               (build t14424
+                                                                                                                      (lam (primDindex$i : Integer) (if
+                                                                                                                                                     (eq primDindex$i
+                                                                                                                                                         k)
+                                                                                                                                                     a_36
+                                                                                                                                                     (build (size t14502)
+                                                                                                                                                            (lam (i_18 : Integer) 0.0))))))))))
+                                                                                      (add (add t14455
+                                                                                                (add t14446
+                                                                                                     (build t14443
+                                                                                                            (lam (primDindex$i : Integer) (if
+                                                                                                                                           (eq primDindex$i
+                                                                                                                                               k)
+                                                                                                                                           a_25
+                                                                                                                                           (build t14529
+                                                                                                                                                  (lam (i_18 : Integer) 0.0)))))))
+                                                                                           (add t14446
+                                                                                                (add (add (add t14446
+                                                                                                               (build t14443
+                                                                                                                      (lam (primDindex$i : Integer) (if
+                                                                                                                                                     (eq primDindex$i
+                                                                                                                                                         k)
+                                                                                                                                                     a_26
+                                                                                                                                                     (build t14529
+                                                                                                                                                            (lam (i_18 : Integer) 0.0))))))
+                                                                                                          t14455)
+                                                                                                     (add t14455
+                                                                                                          t14455))))
+                                                                                      (add t14803
+                                                                                           (add t14465
+                                                                                                (add (add t14474
+                                                                                                          (add t14465
+                                                                                                               (build t14462
+                                                                                                                      (lam (primDindex$i : Integer) (if
+                                                                                                                                                     (eq primDindex$i
+                                                                                                                                                         k)
+                                                                                                                                                     a_27
+                                                                                                                                                     (build (size t14500)
+                                                                                                                                                            (lam (i_18 : Integer) 0.0)))))))
+                                                                                                     t14803)))
+                                                                                      (tuple 0.0
+                                                                                             (tuple)))))))))
+                   (tuple t14860
+                          (add t14414
+                               (rev$logsumexp alphas (mul (to_float N) (mul -1.0 d$r))))
+                          t14436
+                          t14455
+                          t14474
+                          (tuple 0.0 (tuple)))))
+         (tuple (mul t14900 (add t14397 (add t14860 t14860)))
+                (mul t14900 (add t14414 (add t14419 t14419)))
+                (mul t14900 (add t14427 (add t14436 t14436)))
+                (sumbuild K
+                          (lam (k : Integer) (let
+                                              ((t14968 (index k qs))
+                                               (a_12 (get$2$3 (rev$log_wishart_prior wishart
+                                                                                     t14968
+                                                                                     (index k ls)
+                                                                                     (index k
+                                                                                            a_23)))))
+                                              (add t14446
+                                                   (add (add t14446
+                                                             (build t14443
+                                                                    (lam (primDindex$i : Integer) (if
+                                                                                                   (eq primDindex$i
+                                                                                                       k)
+                                                                                                   a_12
+                                                                                                   (build (size t14968)
+                                                                                                          (lam (i : Integer) 0.0))))))
+                                                        t14455)))))
+                (sumbuild K
+                          (lam (k : Integer) (let
+                                              ((t14997 (index k ls))
+                                               (a_12 (get$3$3 (rev$log_wishart_prior wishart
+                                                                                     (index k qs)
+                                                                                     t14997
+                                                                                     (index k
+                                                                                            a_23)))))
+                                              (add t14465
+                                                   (add t14474
+                                                        (add t14465
+                                                             (build t14462
+                                                                    (lam (primDindex$i : Integer) (if
+                                                                                                   (eq primDindex$i
+                                                                                                       k)
+                                                                                                   a_12
+                                                                                                   (build (size t14997)
+                                                                                                          (lam (i : Integer) 0.0)))))))))))
+                (sumbuild K
+                          (lam (k : Integer) (get$1$3 (rev$log_wishart_prior wishart
+                                                                             (index k qs)
+                                                                             (index k ls)
+                                                                             (index k
+                                                                                    a_23)))))))))))

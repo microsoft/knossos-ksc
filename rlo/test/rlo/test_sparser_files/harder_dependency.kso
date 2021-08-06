@@ -1,0 +1,6 @@
+(def a Float ((x : Float)) (mul 3.0 x))
+(def b Float ((x : Float)) (div 1.0 (mul x x)))
+(def c Float ((x : Float)) (sub (mul 2.0 (b x)) (add (a x) 3.0)))
+(def d Float ((x : Float)) (add 4.0 (b (mul 2.0 (a x)))))
+(def e Float ((x : Float)) (d ( c ( b x))))
+(def f Float ((x : Float)) (div x (mul x x)))
