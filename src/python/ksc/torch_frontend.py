@@ -510,7 +510,7 @@ def make_KscAutogradFunction(py_mod):
 
 
 def ksc_defs_to_module(
-    ksc_defs, entry_def, torch_extension_name, vectorization, generate_lm
+    ksc_defs, entry_def, torch_extension_name, vectorization, generate_lm, gpu=False
 ):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
@@ -549,11 +549,18 @@ def ksc_defs_to_module(
         vectorization,
         generate_lm,
         extra_cflags=default_cflags,
+        gpu=gpu,
     )
 
 
 def ksc_string_to_module(
-    ks_str, entry_sn, torch_extension_name, vectorization, generate_lm, extra_cflags
+    ks_str,
+    entry_sn,
+    torch_extension_name,
+    vectorization,
+    generate_lm,
+    extra_cflags,
+    gpu=False,
 ):
     der = "rev" if generate_lm else "sufrev"
     bindings_to_generate = [
@@ -567,6 +574,7 @@ def ksc_string_to_module(
         vectorization=vectorization,
         use_aten=True,
         extra_cflags=extra_cflags,
+        gpu=gpu,
     )
 
 
@@ -583,7 +591,12 @@ def cpp_string_to_module(
 
 
 def ksc_defs_to_autograd_function(
-    ksc_defs, entry_def, torch_extension_name, vectorization=False, generate_lm=True
+    ksc_defs,
+    entry_def,
+    torch_extension_name,
+    vectorization=False,
+    generate_lm=True,
+    gpu=False,
 ):
     mod = ksc_defs_to_module(
         ksc_defs,
@@ -591,6 +604,7 @@ def ksc_defs_to_autograd_function(
         torch_extension_name,
         vectorization=vectorization,
         generate_lm=generate_lm,
+        gpu=gpu,
     )
     return make_KscAutogradFunction(mod)
 
@@ -633,6 +647,7 @@ def _tsmod2ksmod(
     example_inputs,
     generate_lm=True,
     vectorization: VecSpec = VecSpec_None(),
+    gpu=False,
 ):
     assert isinstance(example_inputs, tuple)
 
@@ -656,6 +671,7 @@ def _tsmod2ksmod(
         torch_extension_name,
         vectorization=vectorization,
         generate_lm=generate_lm,
+        gpu=gpu,
     )
 
 
@@ -694,7 +710,7 @@ class KscStub:
         assert self.compiled  # TODO: infer call args from vjp args
         return self.compiled.py_mod.entry_vjp(*args)
 
-    def compile(self, example_inputs, torch_extension_name):
+    def compile(self, example_inputs, torch_extension_name, gpu=False):
         self.compiled = _tsmod2ksmod(
             self.module,
             self.raw_f,
@@ -702,6 +718,7 @@ class KscStub:
             example_inputs=example_inputs,
             generate_lm=self.generate_lm,
             vectorization=self.vectorization,
+            gpu=gpu,
         )
 
         return self.compiled
