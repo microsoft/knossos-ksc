@@ -113,17 +113,22 @@ def functions_to_benchmark(
                 ks_compiled = fn_obj.compile(
                     torch_extension_name=torch_extension_name,
                     example_inputs=example_inputs,
+                    gpu=torch.cuda.is_available(),
                 )
-                yield BenchmarkFunction("Knossos", ks_compiled.apply)
+                yield BenchmarkFunction(
+                    "Knossos CUDA" if torch.cuda.is_available() else "Knossos",
+                    ks_compiled.apply,
+                    torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                )
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)
-            elif fn_name == benchmark_name + "_aten":
-                yield BenchmarkFunction("Aten", fn_obj())
-            elif fn_name.startswith(benchmark_name + "_embedded_"):
-                n = len(benchmark_name + "_embedded_")
-                benchmark_display_name = "Embedded " + fn_name[n:]
-                yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
+            # elif fn_name == benchmark_name + "_aten":
+            #    yield BenchmarkFunction("Aten", fn_obj())
+            # elif fn_name.startswith(benchmark_name + "_embedded_"):
+            #    n = len(benchmark_name + "_embedded_")
+            #    benchmark_display_name = "Embedded " + fn_name[n:]
+            #    yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
             else:
                 # perhaps we should just allow anything that matches the pattern?
                 # would make it easier to add arbitrary comparisons e.g. TF

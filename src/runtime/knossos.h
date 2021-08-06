@@ -31,19 +31,32 @@ Contents:
 #include <string>
 #include <chrono>
 
-#include "knossos-types.h"
-
+#ifdef KS_CUDA
+#define KS_DEF __device__
+#define KS_INLINE_EDEF inline __device__
+#define KS_FUNCTION __device__
+#define KS_CORE_FUNCTION __host__ __device__
+#else
+#define KS_DEF
+#define KS_INLINE_EDEF inline
+#define KS_FUNCTION
+#define KS_CORE_FUNCTION
+#endif
 
 #define xKS_BOUNDS_CHECK
 
 #define COMMENT(x)
 
 // KS_ASSERT
+#ifdef KS_CUDA
+#define KS_ASSERT(expr)
+#else
 #define KS_ASSERT(expr)                     \
     if (expr)                               \
         ;                                   \
     else                                    \
         ks::fail(__FILE__, __LINE__, #expr);
+#endif
 
 namespace ks {
 	inline void fail [[noreturn]] (char const* file, int line, char const* expr)
@@ -64,6 +77,12 @@ namespace ks {
 #define KS_NOTE { KS_LOG("note " << (KS_FIND ? (void*)this : (void*)0), log_indent); }
 #define KS_LEAVE { KS_LOG("dtor " << KS_FIND, --log_indent);  objects.erase(this); }
 
+	// ===============================  Core types  ==================================
+	typedef float Float;
+	typedef int Integer;
+	typedef bool Bool;
+	typedef std::string String;
+
 	// ===============================  Tuple  ==================================
 
 	// Trivially-copyable Tuple type. For n <= 4, an n-Tuple is just a struct with n public members
@@ -83,34 +102,34 @@ namespace ks {
 		Tuple<T4, Ts...> others;
 	};
 
-	template<typename ...Ts> ks::Tuple<Ts...> make_Tuple(Ts ...ts) {
+	template<typename ...Ts> KS_CORE_FUNCTION ks::Tuple<Ts...> make_Tuple(Ts ...ts) {
 		return ks::Tuple<Ts...>{ts...};
 	}
 
 	template<size_t I> struct get_helper_t
 	{
 		template<typename Tuple>
-		static auto const& get(Tuple const& t) {
+		static KS_CORE_FUNCTION auto const& get(Tuple const& t) {
 			return get_helper_t<I - 4>::get(t.others);
 		}
 	};
-	template<> struct get_helper_t<0> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t0; } };
-	template<> struct get_helper_t<1> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t1; } };
-	template<> struct get_helper_t<2> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t2; } };
-	template<> struct get_helper_t<3> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t3; } };
+	template<> struct get_helper_t<0> { template<typename Tuple> static KS_CORE_FUNCTION auto const& get(Tuple const& t) { return t.t0; } };
+	template<> struct get_helper_t<1> { template<typename Tuple> static KS_CORE_FUNCTION auto const& get(Tuple const& t) { return t.t1; } };
+	template<> struct get_helper_t<2> { template<typename Tuple> static KS_CORE_FUNCTION auto const& get(Tuple const& t) { return t.t2; } };
+	template<> struct get_helper_t<3> { template<typename Tuple> static KS_CORE_FUNCTION auto const& get(Tuple const& t) { return t.t3; } };
 
-	template<typename T> T& const_cast_deduce_type(T const& t) { return const_cast<T&>(t); }
+	template<typename T> T& KS_CORE_FUNCTION const_cast_deduce_type(T const& t) { return const_cast<T&>(t); }
 
-	template<size_t I, typename ...Ts> auto& get(Tuple<Ts...> & t) {
+	template<size_t I, typename ...Ts> KS_CORE_FUNCTION auto& get(Tuple<Ts...> & t) {
 		return const_cast_deduce_type(get_helper_t<I>::get(t));
 	}
-	template<size_t I, typename ...Ts> auto const& get(Tuple<Ts...> const& t) {
+	template<size_t I, typename ...Ts> KS_CORE_FUNCTION auto const& get(Tuple<Ts...> const& t) {
 		return get_helper_t<I>::get(t);
 	}
-	template<size_t I, typename ...Ts> auto&& get(Tuple<Ts...> && t) {
+	template<size_t I, typename ...Ts> KS_CORE_FUNCTION auto&& get(Tuple<Ts...> && t) {
 		return std::move(ks::get<I>(t));
 	}
-	template<size_t I, typename ...Ts> auto const&& get(Tuple<Ts...> const&& t) {
+	template<size_t I, typename ...Ts> KS_CORE_FUNCTION auto const&& get(Tuple<Ts...> const&& t) {
 		return std::move(ks::get<I>(t));
 	}
 
@@ -409,11 +428,6 @@ namespace ks {
 	}
 
 	// ===============================  Tensor class ==================================
-
-	/* Helper struct used to create the type Tuple<int, int, ...>
-	   Note the following alternative is rejected by nvcc:
-	      template<size_t Dummy> using Int_t = int;
-	*/
 	template<size_t Dummy>
 	struct Int_t
 	{
@@ -427,17 +441,19 @@ namespace ks {
 	{
 		using index_type = ks::Tuple<typename Int_t<Indices>::type...>;
 
-		static int num_elements(index_type const& size) {
+		static KS_FUNCTION int num_elements(index_type const& size) {
 			return (1 * ... * ks::get<Indices>(size));
 		}
 
+#ifdef KS_BOUNDS_CHECK
 		static std::string index_to_string(index_type const& i) {
 			std::string ret = ("(" + ... + (std::to_string(ks::get<Indices>(i)) + ","));
 			ret.back() = ')'; // replaces final comma
 			return ret;
 		}
+#endif
 
-		static bool index_is_in_range(index_type const& i, index_type const& tensor_size) {
+		static KS_FUNCTION bool index_is_in_range(index_type const& i, index_type const& tensor_size) {
 			return (
 				(ks::get<Indices>(i) >= 0 && ks::get<Indices>(i) < ks::get<Indices>(tensor_size)) && ...
 			);
@@ -453,10 +469,10 @@ namespace ks {
 		using typename base::index_type;
 
 		template<typename HigherIndexType>
-		static index_type tail(const HigherIndexType & i) { return ks::tail(i); }
+		static KS_FUNCTION index_type tail(const HigherIndexType & i) { return ks::tail(i); }
 
 		template<typename IndexType>
-		static int flatten_index_recursive(IndexType const& index, IndexType const& tensor_size) {
+		static KS_FUNCTION int flatten_index_recursive(IndexType const& index, IndexType const& tensor_size) {
 			/* flatten_index({i1, i2, i3}, {s1, s2, s3})
 			           = i3 + s3 * i2 + s3 * s2 * i1
 			           = i3 + s3 * (i2 + s2 * i1)
@@ -467,7 +483,7 @@ namespace ks {
 					tensor_dimension<Dim - 1u>::flatten_index_recursive(index, tensor_size);
 		}
 
-		static int flatten_index(index_type index, index_type tensor_size) {
+		static KS_FUNCTION int flatten_index(index_type index, index_type tensor_size) {
 			return flatten_index_recursive(index, tensor_size);
 		}
 	};
@@ -479,22 +495,24 @@ namespace ks {
 	{
 		using index_type = int;
 
-		static int tail(ks::Tuple<int, int> higherIndexType) { return ks::get<1>(higherIndexType); }
+		static KS_FUNCTION int tail(ks::Tuple<int, int> higherIndexType) { return ks::get<1>(higherIndexType); }
 
-		static int num_elements(index_type size) { return size; }
+		static KS_FUNCTION int num_elements(index_type size) { return size; }
 
+#ifdef KS_BOUNDS_CHECK
 		static std::string index_to_string(index_type i) { return std::to_string(i); }
+#endif
 
-		static bool index_is_in_range(index_type index, index_type tensor_size) {
+		static KS_FUNCTION bool index_is_in_range(index_type index, index_type tensor_size) {
 			return index >= 0 && index < tensor_size;
 		}
 
 		template<typename IndexType>
-		static int flatten_index_recursive(IndexType const& index, IndexType const& /*tensor_size*/) {
+		static KS_FUNCTION int flatten_index_recursive(IndexType const& index, IndexType const& /*tensor_size*/) {
 			return ks::get<0>(index);
 		}
 
-		static int flatten_index(index_type index, index_type tensor_size) {
+		static KS_FUNCTION int flatten_index(index_type index, index_type tensor_size) {
 			return index;
 		}
 	};
@@ -505,11 +523,11 @@ namespace ks {
 	// Get the ith dimension of a tensor index object:
 	//   get_dimension<I>(Tuple<int, ..., int> t) = get<I>(t)
 	//   get_dimension<0>(int t) = t
-	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return ks::get<I>(t); }
-	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
+	template<size_t I, typename TupleType> KS_FUNCTION int get_dimension(TupleType const& t) { return ks::get<I>(t); }
+	template<size_t I> KS_FUNCTION int get_dimension(int val) { static_assert(I == 0); return val; }
 
-	template<size_t I, typename TupleType> int& get_dimension(TupleType& t) { return ks::get<I>(t); }
-	template<size_t I> int& get_dimension(int& val) { static_assert(I == 0); return val; }
+	template<size_t I, typename TupleType> KS_FUNCTION int& get_dimension(TupleType& t) { return ks::get<I>(t); }
+	template<size_t I> KS_FUNCTION int& get_dimension(int& val) { static_assert(I == 0); return val; }
 
 	template <size_t Dim, class T>
 	class tensor
@@ -523,21 +541,51 @@ namespace ks {
 		typedef typename dimension::index_type index_type;
 		typedef T value_type;
 
-		tensor() : size_{}, data_{ nullptr } {}
-		tensor(index_type size, T * data) : size_(size), data_(data) {}
+		KS_CORE_FUNCTION tensor() :
+			size_{},
+			data_{ nullptr }
+		{
+		}
 
-		static size_t bytes_required(index_type size) {
+		tensor(allocator_base * alloc, index_type dims) {
+			allocate(alloc, dims);
+		}
+
+		KS_CORE_FUNCTION tensor(index_type size, T * data) : size_(size), data_(data) {}
+
+		void allocate(allocator_base * alloc, index_type size)
+		{
+			void *storage = alloc->allocate(bytes_required(size));
+			this->size_ = size;
+			this->data_ = (T*)storage;
+		}
+
+		KS_CORE_FUNCTION static size_t bytes_required(index_type size) {
 			return sizeof(T) * static_cast<size_t>(dimension::num_elements(size));
 		}
 
-		index_type size() const { return size_; }
-		int outer_dimension() const { return get_dimension<0>(size_); }
-		int num_elements() const { return dimension::num_elements(size_); }
+                // We cannot efficiently construct from a std::vector.
+                // When constructing from a std::vector we need to
+                // allocate and copy because we have no guarantee
+                // that the std::vector will not mutate or vanish
+                // beneath our feet.
+		tensor(allocator_base * alloc, std::vector<T> const& that) : 
+			tensor{ alloc, tensor_dimension<1>::index_type(that.size()) }
+		{
+			static_assert(Dim == 1);
+			// Copying from std vector - allocate.
+			for (size_t i = 0; i < that.size(); ++i)
+				data_[i] = that[i];
+		}
 
-		T* data() { return data_; }
-		const T* data() const { return data_; }
+		KS_CORE_FUNCTION index_type size() const { return size_; }
+		KS_CORE_FUNCTION int outer_dimension() const { return get_dimension<0>(size_); }
+		KS_CORE_FUNCTION int num_elements() const { return dimension::num_elements(size_); }
 
-		std::conditional_t<Dim == 1u, T&, tensor<Dim-1, T>> operator[](int i) {
+		KS_CORE_FUNCTION T* data() { return data_; }
+		KS_CORE_FUNCTION const T* data() const { return data_; }
+
+		KS_CORE_FUNCTION std::conditional_t<Dim == 1u, T&, tensor<Dim-1, T>> operator[](int i) {
 			if constexpr (Dim == 1u) {
 				return data_[i];
 			} else {
@@ -545,7 +593,7 @@ namespace ks {
 			}
 		}
 
-		std::conditional_t<Dim == 1u, const T&, tensor<Dim-1, T>> operator[](int i) const {
+		KS_CORE_FUNCTION std::conditional_t<Dim == 1u, const T&, tensor<Dim-1, T>> operator[](int i) const {
 			if constexpr (Dim == 1u) {
 				return data_[i];
 			} else {
@@ -553,13 +601,13 @@ namespace ks {
 			}
 		}
 
-		tensor<Dim-1, T> subtensor(int i) const {
+		KS_CORE_FUNCTION tensor<Dim-1, T> subtensor(int i) const {
 			static_assert(Dim >= 2u);
 			auto sz = tensor_dimension<Dim-1>::tail(size_);
 			return tensor<Dim-1, T>(sz, data_ + i * tensor_dimension<Dim-1>::num_elements(sz));
 		}
 
-		T& index_aux(index_type i) {
+		KS_CORE_FUNCTION T& index_aux(index_type i) {
 #ifdef KS_BOUNDS_CHECK
 			if (!dimension::index_is_in_range(i, size_)) {
 				std::cerr << "ERROR: Accessing element " << dimension::index_to_string(i) << " of tensor of size " << dimension::index_to_string(size_) << std::endl;
@@ -569,15 +617,15 @@ namespace ks {
 			return data_[dimension::flatten_index(i, size_)];
 		}
 
-		T const& index(index_type i) const {
+		KS_CORE_FUNCTION T const& index(index_type i) const {
 			return const_cast<tensor*>(this)->index_aux(i);
 		}
 
-		T& index(index_type i) {
+		KS_CORE_FUNCTION T& index(index_type i) {
 			return index_aux(i);
 		}
 		
-		void set_if_index_is_in_range(index_type i, T const& val) {
+		KS_CORE_FUNCTION void set_if_index_is_in_range(index_type i, T const& val) {
 			if (dimension::index_is_in_range(i, size_)) {
 				data_[dimension::flatten_index(i, size_)] = val;
 			}
@@ -585,11 +633,10 @@ namespace ks {
 
 		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
-			void *storage = alloc->allocate(bytes_required(size));
-			return tensor<Dim, T>(size, (T*)storage);
+			return tensor<Dim, T>(alloc, size);
 		}
 
-		bool operator == (tensor const& other) const {
+		KS_CORE_FUNCTION bool operator == (tensor const& other) const {
 			if (size() != other.size()) {
 				return false;
 			}
@@ -601,19 +648,19 @@ namespace ks {
 			return true;
 		}
 
-		bool operator != (tensor const& other) const { return !(*this == other); }
+		KS_CORE_FUNCTION bool operator != (tensor const& other) const { return !(*this == other); }
 	};
 
 	template<class T> using vec = tensor<1, T>;
 
 	template<size_t Dim, class T>
-	auto size(tensor<Dim, T> const & t)
+	KS_FUNCTION auto size(tensor<Dim, T> const & t)
 	{
 		return t.size();
 	}
 
 	template <size_t Dim, class T>
-	T const &index(typename tensor<Dim, T>::index_type i, tensor<Dim, T> const & t)
+	KS_FUNCTION T const &index(typename tensor<Dim, T>::index_type i, tensor<Dim, T> const & t)
 	{
 		return t.index(i);
 	}
@@ -647,7 +694,7 @@ namespace ks {
 	template<size_t Dim, class T>
 	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
 		const T* indata = t.data();
-		auto s = tensor<Dim, decltype(shape(alloc, *indata))>::create(alloc, t.size());
+		tensor<Dim, decltype(shape(alloc, *indata))> s(alloc, t.size());
 		auto* outdata = s.data();
 		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
 			outdata[ii] = shape(alloc, indata[ii]);
@@ -809,7 +856,7 @@ namespace ks {
 					   in the way! */
 					dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
 				}
-				*t = tensor<Dim, T>::create(dest->alloc, t->size());
+				*t = tensor<Dim, T>(dest->alloc, t->size());
 				std::memcpy(t->data(), sourceData, num_elements * (int)sizeof(T));
 			}
 			dest->subobjectDestination += allocator::padded_size(sizeof(T) * num_elements);
@@ -856,7 +903,7 @@ namespace ks {
 	void copydown_by_memmove_inplace(allocator * alloc, tensor<Dim, T> * t) {
 		int num_elements = t->num_elements();
 		T* oldData = t->data();
-		*t = tensor<Dim, T>::create(alloc, t->size());
+		*t = tensor<Dim, T>(alloc, t->size());
 		std::memmove(t->data(), oldData, sizeof(T) * static_cast<size_t>(num_elements));
 		T* newData = t->data();
 		for (int i = 0; i != num_elements; ++i) {
@@ -951,7 +998,7 @@ namespace ks {
 	template <size_t Dim, class T>
 	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
 	{
-		auto ret = tensor<Dim, T>::create(alloc, val.size());
+		tensor<Dim, T> ret(alloc, val.size());
 		T* retdata = ret.data();
 		const T* indata = val.data();
 		for (int i = 0; i != ret.num_elements(); ++i) {
@@ -983,7 +1030,7 @@ namespace ks {
 	struct make_zero_t<tensor<Dim, T>>
 	{
 		static tensor<Dim, T> ofShape(allocator_base * alloc, shape_t<tensor<Dim, T>> const& shape) {
-			auto ret = tensor<Dim, T>::create(alloc, shape.size());
+			tensor<Dim, T> ret(alloc, shape.size());
 			T* retdata = ret.data();
 			const shape_t<T>* shapedata = shape.data();
 			for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
@@ -1001,22 +1048,22 @@ namespace ks {
 	// ===============================  Inplace add ==================================
 	template <class T>
 	struct inplace_add_t {
-		static void go(T *t1, const T &t2) { *t1 += t2; }
+		static KS_FUNCTION void go(T *t1, const T &t2) { *t1 += t2; }
 	};
 
 	template <class T>
-	void inplace_add(T* t1, T const& t2)
+	KS_FUNCTION void inplace_add(T* t1, T const& t2)
 	{
 		inplace_add_t<T>::go(t1, t2);
 	}
 
 	template <>
 	struct inplace_add_t<Tuple<>> {
-		static void go(Tuple<> *t1, const Tuple<> &t2) { }
+		static KS_FUNCTION void go(Tuple<> *t1, const Tuple<> &t2) { }
 	};
 
 	template <size_t i, class T, class... Ts>
-	void inplace_add_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
+	KS_FUNCTION void inplace_add_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
 	{
 		static constexpr size_t n = sizeof...(Ts);
 
@@ -1027,7 +1074,7 @@ namespace ks {
 
 	template <class T, class... Ts>
 	struct inplace_add_t<Tuple<T, Ts...>> {
-		static void go(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
+		static KS_FUNCTION void go(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
 		{
 			inplace_add_aux<0>(t1, t2);
 		}
@@ -1035,7 +1082,7 @@ namespace ks {
 
 	template <size_t Dim, class T>
 	struct inplace_add_t<tensor<Dim, T>> {
-		static void go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
+		static void KS_FUNCTION go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
 		{
 			KS_ASSERT(t1->size() == t2.size());
 			T* t1data = t1->data();
@@ -1048,19 +1095,19 @@ namespace ks {
 	// ============================  Tangent-space arithmetic ================================
 
 	template <class T1, class T2>
-	T1 ts_add(allocator *, T1 t1, T2 t2) { return t1 + t2; }
+	KS_FUNCTION T1 ts_add(allocator *, T1 t1, T2 t2) { return t1 + t2; }
 
 	template <class T1>
-	T1 ts_add(allocator *, T1 t1, Tuple<> t2) { return t1; }
+	KS_FUNCTION T1 ts_add(allocator *, T1 t1, Tuple<> t2) { return t1; }
 
 	template<class T1, class T2, size_t ...Indices>
-	auto ts_add_Tuple(allocator * alloc, T1 const& t1, T2 const& t2, std::index_sequence<Indices...>)
+	KS_FUNCTION auto ts_add_Tuple(allocator * alloc, T1 const& t1, T2 const& t2, std::index_sequence<Indices...>)
 	{
 		return ks::make_Tuple(ts_add(alloc, ks::get<Indices>(t1), ks::get<Indices>(t2))...);
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
-	auto ts_add(allocator * alloc, Tuple<T0, Ts...> t1, Tuple<U0, Us...> t2)
+	KS_FUNCTION auto ts_add(allocator * alloc, Tuple<T0, Ts...> t1, Tuple<U0, Us...> t2)
 	{
 		return ts_add_Tuple(alloc, t1, t2, std::index_sequence_for<T0, Ts...>{});
 	}
@@ -1080,13 +1127,13 @@ namespace ks {
 	}
 
 	template <class T>
-	T ts_scale(allocator *, Float s, T const& t)
+	KS_FUNCTION T ts_scale(allocator *, Float s, T const& t)
 	{
 		return s * t;
 	}
 
 	template <class... Us>
-	auto ts_scale(allocator * alloc, Float s, Tuple<Us...> const& t)
+	KS_FUNCTION auto ts_scale(allocator * alloc, Float s, Tuple<Us...> const& t)
 	{
 		return transform_Tuple(t, [alloc, s](auto const& elem) { return ts_scale(alloc, s, elem); });
 	}
@@ -1112,16 +1159,16 @@ namespace ks {
 	// TODO: this should not be called.  Delete when confirmed.
 	//inline Integer ts_neg(allocator *, Integer d) { return -d; }
 
-	inline Float ts_neg(allocator *, Float d) { return -d; }
+	KS_FUNCTION inline Float ts_neg(allocator *, Float d) { return -d; }
 
 	template <class... Us>
-	inline Tuple<Us...> ts_neg(allocator * alloc, Tuple<Us...> t) {
+	KS_FUNCTION inline Tuple<Us...> ts_neg(allocator * alloc, Tuple<Us...> t) {
 		return transform_Tuple(t, [alloc](auto const& elem) { return ts_neg(alloc, elem); });
 	}
 
 	template <size_t Dim, class T>
 	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
-		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		tensor<Dim, T> ret(alloc, t.size());
 		const T* indata = t.data();
 		T* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
@@ -1459,7 +1506,7 @@ namespace ks {
 		}
 
 		dS dScope = s_zero;
-		auto dv = vec<dT>::create(alloc, v.size());
+		auto dv = vec<dT>(alloc, v.size());
 
 		for (int i = v.size() - 1; i >= 0; i--) {
 			Tuple<dS, Tuple<dA, dT>> f_call = f_(alloc, make_Tuple(forward_pass[i], v[i]), dr);
@@ -1499,7 +1546,7 @@ namespace ks {
 	{
 		constexpr int num_args = 1 + static_cast<int>(sizeof...(args));
 		T arr[num_args] = {arg0, args...};
-		auto ret = tensor<1, T>::create(alloc, num_args);
+		tensor<1, T> ret(alloc, num_args);
 		T* retdata = ret.data();
 		for (int i = 0; i != num_args; ++i) {
 			retdata[i] = arr[i];
@@ -1517,7 +1564,7 @@ namespace ks {
 	auto constVec(allocator * alloc, SizeType size, T val)
 	{
 		constexpr size_t Dim = dimension_of_tensor_index_type<SizeType>::value;
-		auto ret = tensor<Dim, T>::create(alloc, size);
+		tensor<Dim, T> ret(alloc, size);
 		T* retdata = ret.data();
 		for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
 			retdata[j] = val;
@@ -1559,13 +1606,13 @@ namespace ks {
 	}
 
 	template <class T>
-	inline Bool eq(T t1, T t2)
+	KS_FUNCTION inline Bool eq(T t1, T t2)
 	{
 		return t1 == t2;
 	}
 
 	template <class T>
-	inline Bool ne(T t1, T t2)
+          KS_FUNCTION inline Bool ne(T t1, T t2)
 	{
 		return t1 != t2;
 	}
@@ -1573,7 +1620,7 @@ namespace ks {
 	template<size_t I, size_t Dim, typename TupleType>
 	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
 	{
-		auto ret = tensor<Dim, std::tuple_element_t<I, TupleType>>::create(alloc, t.size());
+		tensor<Dim, std::tuple_element_t<I, TupleType>> ret(alloc, t.size());
 		const TupleType* indata = t.data();
 		auto* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
@@ -1646,28 +1693,28 @@ namespace ks {
 																		}))
 
 	// ===============================  Dot ===========================================
-	inline Float ts_dot(Float t1, Float t2) { return t1 * t2; }
+	KS_FUNCTION inline Float ts_dot(Float t1, Float t2) { return t1 * t2; }
 
 	template <class T>
-	inline Float ts_dot(T t1, Tuple<> t2)
+	KS_FUNCTION inline Float ts_dot(T t1, Tuple<> t2)
 	{
 		return 0.0;
 	}
 
 	template <class T>
-	inline Float ts_dot(T t1, Tuple<T> t2)
+	KS_FUNCTION inline Float ts_dot(T t1, Tuple<T> t2)
 	{
 		return ts_dot(t1,ks::get<0>(t2));
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
-	inline Float ts_dot(Tuple<T0, Ts...> t1, Tuple<U0, Us...> t2)
+	KS_FUNCTION inline Float ts_dot(Tuple<T0, Ts...> t1, Tuple<U0, Us...> t2)
 	{
 		return ts_dot(head(t1), head(t2)) + ts_dot(tail(t1), tail(t2));
 	}
 
 	template <size_t Dim, class T1, class T2>
-	inline Float ts_dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
+	KS_FUNCTION inline Float ts_dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
 	{
 		Float ret = 0;
 
@@ -1720,3 +1767,7 @@ namespace ks {
 #include "knossos-lm.h"
 
 #include "knossos-prelude.h"
+
+#ifdef KS_INCLUDE_ATEN
+#include "prelude-aten.cpp"
+#endif

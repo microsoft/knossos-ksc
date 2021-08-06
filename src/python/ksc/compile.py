@@ -190,6 +190,7 @@ def generate_cpp_for_py_module_from_ks(
     elementwise=False,
     use_aten=True,
     use_torch=False,
+    gpu=False,
 ):
     """Returns two strings of C++ code:
        The first string contains definitions of all ksc-generated functions and entry points.
@@ -209,14 +210,16 @@ def generate_cpp_for_py_module_from_ks(
         for (python_name, _) in bindings_to_generate
     ]
 
-    preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
+    preludes = ["prelude-cuda.ks"] if gpu else ["prelude.ks"]
+    if use_aten:
+        preludes.append("prelude-aten.ks")
     prelude_headers = ["prelude-aten.cpp"] if use_aten else []
     cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
     (
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
     ) = cgen.generate_cpp_entry_points(
-        bindings_to_generate, decls, elementwise=elementwise, use_torch=use_torch
+        bindings_to_generate, decls, elementwise=elementwise, use_torch=use_torch, gpu=gpu
     )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
@@ -296,6 +299,7 @@ def build_module_using_pytorch_from_ks(
     elementwise=False,
     use_aten=False,
     extra_cflags=[],
+    gpu=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -316,10 +320,14 @@ def build_module_using_pytorch_from_ks(
         elementwise=elementwise,
         use_aten=use_aten,
         use_torch=True,
+        gpu=gpu,
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        [("ksc-main.cpp", cpp_definitions), ("ksc-pybind.cpp", cpp_pybind)],
+        [
+            ("ksc-main.cu" if gpu else "ks-main.cpp", cpp_definitions),
+            ("ksc-pybind.cpp", cpp_pybind),
+        ],
         torch_extension_name,
         extra_cflags,
     )
@@ -375,6 +383,7 @@ def build_module_using_pytorch_from_cpp_backend(
         sources=[source_path(filename) for filename, _ in cpp_strs],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=extra_cflags,
+        extra_cuda_cflags=extra_cflags + ["-DKS_CUDA"],
         build_directory=build_directory,
         verbose=verbose,
     )

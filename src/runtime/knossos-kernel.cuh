@@ -143,3 +143,11 @@ torch::Tensor revmap_gpu(
   }
   return d_x;
 }
+
+template<typename RevF>
+torch::Tensor map_gpu(
+    torch::Tensor grad,
+    torch::Tensor x,
+    RevF rev_f) {
+  return revmap_gpu(grad, x, rev_f);
+}

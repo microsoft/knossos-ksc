@@ -361,7 +361,7 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       cftypealias = "ty$" ++ cf
       cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
   in (  [ "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";",
-          cftypealias `spc` cf ++ "(" ++ cparams ++ ") {" ]
+          "KS_DEF " ++ cftypealias `spc` cf ++ "(" ++ cparams ++ ") {" ]
      ++ indent cbody
      ++ [ "}" ]
      )
