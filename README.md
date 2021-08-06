@@ -136,6 +136,7 @@ a `.ks` program.  This example runs `hello-world.ks`.
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file test/ksc/hello-world.ks \
   --ks-output-file obj/test/ksc/hello-world.kso \
+  --cpp-include prelude.h \
   --cpp-output-file obj/test/ksc/hello-world.cpp \
   --c++ g++ \
   --exe-output-file obj/test/ksc/hello-world.exe
@@ -148,6 +149,7 @@ or with PowerShell syntax:
   --ks-source-file src/runtime/prelude.ks `
   --ks-source-file test/ksc/hello-world.ks `
   --ks-output-file obj/test/ksc/hello-world.kso `
+  --cpp-include prelude.h `
   --cpp-output-file obj/test/ksc/hello-world.cpp `
   --c++ g++ `
   --exe-output-file obj/test/ksc/hello-world.exe
@@ -195,6 +197,7 @@ command line
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file input.ks \
   --ks-output-file output.ks \
+  --cpp-include prelude.h \
   --cpp-output-file output.cpp
 ```
 

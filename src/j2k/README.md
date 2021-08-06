@@ -134,6 +134,7 @@ then (in PowerShell style)
   --ks-source-file src/runtime/prelude.ks `
   --ks-source-file obj/test/j2k/j2k_test0.ks `
   --ks-output-file obj/test/j2k/j2k_test0.kso `
+  --cpp-include prelude.h `
   --cpp-output-file obj/test/j2k/j2k_test0.cpp `
   --c++ g++ `
   --exe-output-file obj/test/j2k/j2k_test0.exe

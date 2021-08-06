@@ -1,6 +1,8 @@
 // Defines everything in Knossos.ks
 #pragma once
 
+#include "knossos.h"
+
 namespace ks {
 // ===============================  Test edef  ========================
 // These only exist so that we can test edef functionality.
