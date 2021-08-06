@@ -49,13 +49,13 @@ demoF files = do
 -- Main compiler driver
 -------------------------------------
 
-displayCppGen :: Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGen verbosity ksFiles ksofile cppfile =
+displayCppGen :: Maybe Int -> [String] -> [String] -> String -> String -> IO (String, String)
+displayCppGen verbosity cppincludefiles ksFiles ksofile cppfile =
   do {
   ; decls0 <- fmap concat (mapM parseF ksFiles)
   ; putStrLn "ksc: read decls"
   ; defs <- pipelineIO verbosity decls0
-  ; Cgen.cppGenWithFiles ksofile cppfile defs
+  ; Cgen.cppGenWithFiles ksofile cppfile cppincludefiles defs
   }
 
 displayCppGenAndCompile
@@ -64,10 +64,11 @@ displayCppGenAndCompile
   -> String
   -> Maybe Int
   -> [String]
+  -> [String]
   -> String
   -> IO (a, (String, String))
 displayCppGenAndCompile
-  compile ext verbosity files file = do {
+  compile ext verbosity cppincludefiles files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -75,7 +76,7 @@ displayCppGenAndCompile
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; outputFileContents <- displayCppGen verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; outputFileContents <- displayCppGen verbosity cppincludefiles (ksFiles ++ [ksFile]) ksofile cppfile
   ; compilerResult <- compiler cppfile exefile
   ; pure (compilerResult, outputFileContents)
   }
@@ -84,23 +85,24 @@ displayCppGenCompileAndRun :: HasCallStack
                            => String
                            -> Maybe Int
                            -> [String]
+                           -> [String]
                            -> String
                            -> IO (String, (String, String))
-displayCppGenCompileAndRun compilername verbosity file files = do
+displayCppGenCompileAndRun compilername verbosity cppincludefiles files file = do
   { (exefile, cpp_kso) <- displayCppGenAndCompile
-                          (Cgen.compile compilername) ".exe" verbosity file files
+                          (Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
   ; output <- Cgen.runExe exefile
   ; pure (output, cpp_kso)
   }
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
-  { (output, _) <- displayCppGenCompileAndRun compilername verbosity files file
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> [String] -> String -> IO ()
+displayCppGenCompileAndRunWithOutput compilername verbosity cppincludefiles files file = do
+  { (output, _) <- displayCppGenCompileAndRun compilername verbosity cppincludefiles files file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doall :: HasCallStack => Maybe Int -> [String] -> String -> IO ()
+doall :: HasCallStack => Maybe Int -> [String] -> [String] -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutput "g++-7"
 
 -------------------------------------

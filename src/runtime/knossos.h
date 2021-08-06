@@ -1718,5 +1718,3 @@ namespace ks {
 } // namespace ks
 
 #include "knossos-lm.h"
-
-#include "prelude.h"

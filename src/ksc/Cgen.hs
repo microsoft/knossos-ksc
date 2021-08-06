@@ -805,12 +805,13 @@ createDirectoryWriteFile filepath contents = do
   makeDirectoryForFile filepath
   writeFile filepath contents
 
-cppGen :: [TDef] -> String
-cppGen defs =
-  let lines =
-        [
-        "#include \"knossos.h\"",
-        "namespace ks {\n"
+cppGen :: [String] -> [TDef] -> String
+cppGen includefiles defs =
+  let includes = map (\h -> "#include \"" ++ h ++ "\"") ("knossos.h":includefiles)
+      head =
+        [ ""
+        , "namespace ks {"
+        , ""
         ]
       lls   = cgenDefs defs
       tail =
@@ -826,7 +827,7 @@ cppGen defs =
         ]
       call_main_if_present = if any isMainFunction defs then call_main else []
 
-  in unlines (lines ++ lls ++ tail ++ call_main_if_present)
+  in unlines (includes ++ head ++ lls ++ tail ++ call_main_if_present)
 
 isMainFunction :: TDef -> Bool
 isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
@@ -836,9 +837,9 @@ isMainFunction _ = False
 ksoGen :: [TDef] -> String
 ksoGen = unlines . map (renderSexp . ppr)
 
-cppGenWithFiles :: String -> String -> [TDef] -> IO (String, String)
-cppGenWithFiles ksofile cppfile defs = do
-  let cppcontents = cppGen defs
+cppGenWithFiles :: String -> String -> [String] -> [TDef] -> IO (String, String)
+cppGenWithFiles ksofile cppfile cppincludefiles defs = do
+  let cppcontents = cppGen cppincludefiles defs
       ksocontents = ksoGen defs
 
   putStrLn $ "ksc: Writing to " ++ ksofile

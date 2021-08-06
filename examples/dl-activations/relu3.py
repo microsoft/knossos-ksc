@@ -73,6 +73,7 @@ mtune_cflags = ksc.compile.CFlags.GCCOnly(["-mtune=native"])
 
 cpp_mask_bool_to_float = """
         #include "knossos.h"
+        #include "prelude.h"
 
         namespace ks{
         tensor<1, ks::Float> vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t) {

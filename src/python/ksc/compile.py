@@ -80,6 +80,7 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         fks.name,
         "--ks-output-file",
         fkso.name,
+        *(opt for header in prelude_headers for opt in ("--cpp-include", header)),
         "--cpp-output-file",
         fcpp.name,
     ]
@@ -101,8 +102,6 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
     with open(fcpp.name) as f:
         generated_cpp = f.read()
 
-    prelude_includes = "".join(f'#include "{header}"\n' for header in prelude_headers)
-
     # only delete these file if no error
     if not preserve_temporary_files:
 
@@ -118,7 +117,7 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
             os.unlink(fcpp.name)
             os.unlink(fkso.name)
 
-    return prelude_includes + generated_cpp, decls
+    return generated_cpp, decls
 
 
 def build_py_module_from_cpp(cpp_str, profiling=False):
@@ -210,7 +209,7 @@ def generate_cpp_for_py_module_from_ks(
     ]
 
     preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
-    prelude_headers = ["prelude-aten.h"] if use_aten else []
+    prelude_headers = ["prelude.h"] + (["prelude-aten.h"] if use_aten else [])
     cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
     (
         cpp_entry_point_declarations,

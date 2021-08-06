@@ -70,13 +70,14 @@ generateCppWithoutDiffs = parseErr p
   where p = do
           input  <- many (option "ks-source-file")
           ksout  <- option "ks-output-file"
+          cppincludefiles <- many (option "cpp-include")
           cppout <- option "cpp-output-file"
 
           return (putStrLn "DEPRECATION WARNING:"
                  >> putStrLn "--generate-cpp-without-diffs is no longer supported"
                  >> putStrLn "Use --generate-cpp instead and use gdef to enable or suppress generated derivatives"
                  >> Ksc.Pipeline.displayCppGen
-                   Nothing input ksout cppout
+                   Nothing cppincludefiles input ksout cppout
                  >> pure ())
 
 generateCpp :: [String] -> IO ()
@@ -84,9 +85,10 @@ generateCpp = parseErr p
   where p = do
           input  <- many (option "ks-source-file")
           ksout  <- option "ks-output-file"
+          cppincludefiles <- many (option "cpp-include")
           cppout <- option "cpp-output-file"
 
-          return (Ksc.Pipeline.displayCppGen Nothing input ksout cppout
+          return (Ksc.Pipeline.displayCppGen Nothing cppincludefiles input ksout cppout
                  >> pure ())
 
 compileAndRun :: [String] -> IO ()
@@ -94,12 +96,13 @@ compileAndRun = parseErr p
   where p = do
           inputs   <- many (option "ks-source-file")
           ksout    <- option "ks-output-file"
+          cppincludefiles <- many (option "cpp-include")
           cppout   <- option "cpp-output-file"
           compiler <- option "c++"
           exeout   <- option "exe-output-file"
 
           return $ do
-            Ksc.Pipeline.displayCppGen Nothing inputs ksout cppout
+            Ksc.Pipeline.displayCppGen Nothing cppincludefiles inputs ksout cppout
             Cgen.compile compiler cppout exeout
             output <- Cgen.runExe exeout
             putStrLn output
@@ -252,7 +255,7 @@ testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
   (output, (_, ksoContents)) <-
       Ksc.Pipeline.displayCppGenCompileAndRun
-      compiler Nothing ["src/runtime/prelude"] ksTest
+      compiler Nothing ["prelude.h"] ["src/runtime/prelude"] ksTest
 
   _ <- case parseE ksoContents of
           Left e -> error ("Generated .kso failed to parse:\n"
@@ -308,7 +311,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  (exe, _) <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
+  (exe, _) <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["prelude.h"] ["src/runtime/prelude"] source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
