@@ -1,5 +1,5 @@
 ;; Definitions for aten functions
-;; edefs will go in prelude-aten.cpp
+;; edefs will go in prelude-aten.h
 
 
 (def transpose (Tensor 2 Float) (x : Tensor 2 Float)

@@ -210,7 +210,7 @@ def generate_cpp_for_py_module_from_ks(
     ]
 
     preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
-    prelude_headers = ["prelude-aten.cpp"] if use_aten else []
+    prelude_headers = ["prelude-aten.h"] if use_aten else []
     cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
     (
         cpp_entry_point_declarations,
