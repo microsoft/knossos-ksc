@@ -26,15 +26,14 @@ Well, let's try it in an MNIST model.  First, however, we should make it work on
 
 .. code:: Python
 
-   from knossos import vmap
-   def vrelu3(t : Tensor) -> Tensor:
-      return vmap(relu3, t)
+   vrelu3 = torch.vmap(relu3)
 
-Or even just ``vrelu3 = vmap(relu3)``.  Like in JAX, this takes a function defined on scalars, 
-and "vectorizes" it to work on Tensors (or in fact any container of scalars, such as a tuple of tensors of tuples).
+Like in JAX, this takes a function defined on scalars, and "vectorizes" it to work on
+Tensors (or in fact any container of scalars, such as a tuple of tensors of tuples).
 
-Now if you know anything about PyTorch, you should be suspicious now: is'nt this going to be glacially slow?
-Well, let's see.  We'll make a simple DNN with ``vrelu3`` activations, as in [](https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa)
+Now if you know anything about PyTorch, you should be suspicious now: isn't this going 
+to be glacially slow?  Well, let's see.  
+We'll make a simple DNN with ``vrelu3`` activations, as in [](https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa)
 
 .. code:: Python
 
@@ -57,14 +56,14 @@ Well, let's see.  We'll make a simple DNN with ``vrelu3`` activations, as in [](
 
 And after a few hours, you can hit control C.  It was really slow.  
 
-Knossos.compile
----------------
+Compiling with Knossos
+----------------------
 
 This is where Knossos comes to the rescue.
 
 .. code:: Python
 
-   vrelu3 = knossos.compile(vrelu3)
+   vrelu3 = knossos.vmap(vrelu3)
 
 And run again, amazingly fast!
 
