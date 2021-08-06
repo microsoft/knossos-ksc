@@ -352,6 +352,34 @@ def vrelu3_embedded_cpp_mask_bool_to_float_flags_tune():
     )
 
 
+cpp_aten = """
+torch::Tensor entry(torch::Tensor x) {
+  torch::Tensor mask1_inf = x > 1.0;
+  torch::Tensor mask0_1 = (x > 0.0) & ~mask1_inf;
+  torch::Tensor val_0_1 = 1.0 / 3.0 * x * x * x;
+  torch::Tensor val_1_inf = x - 2.0 / 3.0;
+
+  return mask0_1 * val_0_1 + mask1_inf * val_1_inf;
+}
+
+torch::Tensor entry_vjp(torch::Tensor grad, torch::Tensor x) {
+  torch::Tensor mask1_inf = x > 1.0;
+  torch::Tensor mask0_1 = (x > 0.0) & ~mask1_inf;
+  torch::Tensor val_0_1 = x * x;
+
+  return (mask0_1 * val_0_1 + mask1_inf) * grad;
+}
+"""
+
+
+def vrelu3_embedded_cpp_aten():
+    return cpp_string_to_autograd_function(
+        cpp_aten,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_aten",
+        extra_cflags=embedded_cflags,
+    )
+
+
 def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
@@ -522,34 +550,6 @@ def vrelu3_cuda_init():
             return VReLu3Function.apply(input)
 
     return VReLu3()
-
-
-def vrelu3_aten():
-    this_dir = os.path.dirname(__file__)
-
-    vrelu3_aten = torch.utils.cpp_extension.load(
-        "vrelu3_aten_module", sources=[os.path.join(this_dir, "vrelu3_aten.cpp"),],
-    )
-
-    class VReLu3AtenFunction(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, input):
-            output = vrelu3_aten.forward(input)
-            ctx.save_for_backward(input)
-            return output
-
-        @staticmethod
-        def backward(ctx, grad):
-            return vrelu3_aten.backward(grad, *ctx.saved_variables)
-
-    class VReLu3Aten(torch.nn.Module):
-        def __init__(self):
-            super(VReLu3Aten, self).__init__()
-
-        def forward(self, input):
-            return VReLu3AtenFunction.apply(input)
-
-    return VReLu3Aten()
 
 
 # run-bench: Define a range of values at which to call the methods
