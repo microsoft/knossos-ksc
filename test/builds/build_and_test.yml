@@ -135,7 +135,7 @@ jobs:
     displayName: 'Clean'
 
 
-- job: 'RLO-Ubuntu'
+- job: 'RLO_Ubuntu'
   timeoutInMinutes: 120
   workspace:
     clean: all
@@ -230,7 +230,7 @@ jobs:
     displayName: 'Clean'
 
 
-- job: 'RLO-Windows'
+- job: 'RLO_Windows'
   timeoutInMinutes: 120
   workspace:
     clean: all
@@ -266,7 +266,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO-AzureBatch'
+- job: 'RLO_AzureBatch'
   timeoutInMinutes: 0
   pool: Knossos-batch-master
   workspace:
@@ -292,7 +292,7 @@ jobs:
         scriptLocation: inlineScript
         inlineScript: 'az batch job stop --job-id test-%BUILD_BUILDNUMBER%'
 
-- job: 'RLO-UbuntuDockerBuild'
+- job: 'RLO_UbuntuDockerBuild'
   workspace:
     clean: all
   pool:
@@ -311,7 +311,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO-AzureML'
+- job: 'RLO_AzureML'
   workspace:
     clean: all
   pool:
