@@ -36,7 +36,7 @@ The IR is pure functional, so functions may be called more than once or not at a
 
 The lisp-like IR is extremely simple -- all the language builtins are in this code:
 ```clojure
-;; Externally defined function "sqrt" returns a Float, takes two Float
+;; Externally defined function "atan2", which returns a Float, and takes two Floats
 (edef atan2 Float (Float Float)) 
 
 #| Block comments
@@ -47,7 +47,7 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 (def myfun                                       ; function name
   (Tuple String Float)                           ; return type
   ((i : Integer)                                 ; argument 1: int
-   (v : Tensor 1 (Tuple Float Float)))           ; argument 2: tensor of tuple
+   (v : Tensor 3 (Tuple Float Float)))           ; argument 2: 3D tensor of tuple
   (assert (gt i 0)                               ; (assert TEST BODY)
      (if (eq i 0)                                ; (if TEST TEXPR FEXPR)
         ; "then" br
@@ -174,6 +174,10 @@ Running
 Hello world!
 If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
 ```
+
+#### PyTorch frontend
+
+See doc/sphinx
 
 #### Tests
 
