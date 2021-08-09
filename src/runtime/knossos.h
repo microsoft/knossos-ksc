@@ -33,6 +33,19 @@ Contents:
 
 #include "knossos-types.h"
 
+#ifndef KS_NO_ALLOCATOR
+#define KS_ALLOCATOR
+#endif
+
+#ifdef KS_ALLOCATOR
+#define KS_MARK(alloc, markvar) ks::alloc_mark_t markvar = alloc->mark();
+#define KS_RESET(alloc, markvar) alloc->reset(markvar);
+#define KS_COPYDOWN(alloc, markvar, expr) ks::copydown(alloc, markvar, expr)
+#else
+#define KS_MARK(alloc, markvar)
+#define KS_RESET(alloc, markvar)
+#define KS_COPYDOWN(alloc, markvar, expr) (expr)
+#endif
 
 #define xKS_BOUNDS_CHECK
 
@@ -323,6 +336,8 @@ namespace ks {
 	}
 
 	// ===============================  Allocator  ==================================
+#ifdef KS_ALLOCATOR
+
 	class allocator_base {
 		size_t max_size_;
 		unsigned char* buf_;
@@ -389,6 +404,12 @@ namespace ks {
 			return allocator_ref((unsigned char*)alloc->allocate(numBytes), numBytes);
 		}
 	};
+
+#else
+	// No allocator support - just provide a forward declaration for use in function signatures
+	struct allocator_base;
+	using allocator = allocator_base;
+#endif
 
 	template<class Functor, class X, size_t ...Indices>
 	auto applyWithAllocatorImpl(allocator * alloc, Functor f, const X & x, std::index_sequence<Indices...>)
@@ -583,11 +604,19 @@ namespace ks {
 			}
 		}
 
+#ifdef KS_ALLOCATOR
 		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
 			void *storage = alloc->allocate(bytes_required(size));
 			return tensor<Dim, T>(size, (T*)storage);
 		}
+#else
+		static tensor<Dim, T> create(allocator_base *, index_type)
+		{
+			KS_ASSERT(false && "Allocation not supported");
+			return {};
+		}
+#endif
 
 		bool operator == (tensor const& other) const {
 			if (size() != other.size()) {
@@ -727,6 +756,7 @@ namespace ks {
 
 	// ===============================  Copydown  ==================================
 
+#ifdef KS_ALLOCATOR
 	// Tests if any of the memory referred to by val overlaps the
 	// range [start, end)
 	template<class T>
@@ -920,6 +950,8 @@ namespace ks {
 #endif
 		return ret;
 	}
+
+#endif // KS_ALLOCATOR
 
 	// ===============================  Zero  ==================================
 	// Return a zero value with the same shape as the input value
@@ -1233,12 +1265,12 @@ namespace ks {
 		static T do_sumbuild(allocator * alloc, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
 			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(size);
 			KS_ASSERT(thisDimension > 0);
-			alloc_mark_t mark0 = alloc->mark();
-			T ret = copydown(alloc, mark0, f(alloc, higherDimensionIndices..., 0));
-			alloc_mark_t mark1 = alloc->mark();
+			KS_MARK(alloc, mark0);
+			T ret = KS_COPYDOWN(alloc, mark0, f(alloc, higherDimensionIndices..., 0));
+			KS_MARK(alloc, mark1);
 			for (int i = 1; i != thisDimension; ++i) {
 				inplace_add(&ret, f(alloc, higherDimensionIndices..., i));
-				alloc->reset(mark1);
+				KS_RESET(alloc, mark1);
 			}
 			return ret;
 		}
@@ -1246,10 +1278,10 @@ namespace ks {
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static void inplace_sumbuild(allocator * alloc, T* result, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
 			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(size);
-			alloc_mark_t mark = alloc->mark();
+			KS_MARK(alloc, mark);
 			for (int i = 0; i != thisDimension; ++i) {
 				inplace_add(result, f(alloc, higherDimensionIndices..., i));
-				alloc->reset(mark);
+				KS_RESET(alloc, mark);
 			}
 		}
 	};
@@ -1310,20 +1342,20 @@ namespace ks {
 		template<size_t Dim, class T, class F, class LoopSize, class ...HigherDimensionIndices>
 		static void do_buildFromSparse(allocator * alloc, tensor<Dim, T>* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
 			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(loopSize);
-			alloc_mark_t mark = alloc->mark();
+			KS_MARK(alloc, mark);
 			for (int i = 0; i != thisDimension; ++i) {
 				buildFromSparse_addOneIteration(acc, f(alloc, higherDimensionIndices..., i));
-				alloc->reset(mark);
+				KS_RESET(alloc, mark);
 			}
 		}
 
 		template<class ...Ts, class F, class LoopSize, class ...HigherDimensionIndices>
 		static void do_buildFromSparseTupled(allocator * alloc, Tuple<Ts...>* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
 			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(loopSize);
-			alloc_mark_t mark = alloc->mark();
+			KS_MARK(alloc, mark);
 			for (int i = 0; i != thisDimension; ++i) {
 				buildFromSparseTupled_addOneIteration(acc, f(alloc, higherDimensionIndices..., i), std::index_sequence_for<Ts...>{});
-				alloc->reset(mark);
+				KS_RESET(alloc, mark);
 			}
 		}
 	};
