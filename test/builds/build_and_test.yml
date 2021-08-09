@@ -133,3 +133,194 @@ jobs:
 
   - script: rm -rf *
     displayName: 'Clean'
+
+
+- job: 'RLO - Ubuntu'
+  timeoutInMinutes: 120
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-18.04'
+  strategy:
+    matrix:
+      Python38:
+        python.version: '3.8'
+    maxParallel: 4
+
+  steps:
+  - checkout: self
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+
+  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+    displayName: 'Install dependencies'
+
+  - script: sh ./pylint.sh
+    displayName: pylint
+    
+  - bash: python -m mypy --version && python -m mypy ./
+    displayName: mypy
+
+  - script: sh ./check_format.sh
+    displayName: check_format
+
+  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml --durations=10
+    displayName: 'pytest_fast'
+
+  # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
+  - task: AzureCLI@1
+    displayName: 'pytest with Azure CLI'
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptLocation: 'inlineScript'
+      inlineScript: >
+        pytest --with-azurecli test/rlo/test_experiment_result.py --durations=5
+
+  # Try two-way parallelism, we don't have any GPUs but can run multithreaded on multiple CPUs
+  # Include test for determinism via seed_all_reps flag, although this does not test tensorflow-gpu.
+  - script: "python src/train_over_expressions.py fewer_simplify_rules --num_parallel 2 --run_id $(Build.BuildNumber) --seed_all_reps=1"
+    displayName: 'test_train_fewer_simplify_rules'
+
+  - script: "python src/train_on_dataset.py binding_simplify_astar --dataset_path datasets/value_dataset.json --max_epochs=2 --repetition=0"
+    displayName: Test train_on_dataset.py
+
+  - script: "python src/search_with_expert.py blas --test_on_exprs gemm --max_gnn_eval=10"
+    displayName: Test search_with_expert.py
+
+  - script: bash ./test/determinism_test.sh --force_cpu
+    displayName: Test determinism
+
+  - task: CopyFiles@2
+    displayName: 'Copy *.json to logs folder'
+    inputs:
+       contents: 'outputs/**/*.json'
+       targetFolder: logs
+
+  - task: CopyFiles@2
+    displayName: 'Copy *.html to logs folder'
+    inputs:
+       contents: 'outputs/**/*.html'
+       targetFolder: logs
+
+  - task: PublishPipelineArtifact@0
+    displayName: 'Publish logs'
+    inputs:
+      artifactName: 'Logs'
+      targetPath: logs
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-results*.xml'
+      testRunTitle: 'Python $(python.version)'
+    condition: succeededOrFailed()
+
+  - script: rm -rf *
+    displayName: 'Clean'
+
+
+- job: 'RLO - Windows'
+  timeoutInMinutes: 120
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'vs2017-win2016'
+  strategy:
+    matrix:
+      Python38:
+        python.version: '3.8'
+    maxParallel: 4
+
+  steps:
+  - checkout: self
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+
+  - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
+    displayName: 'Install dependencies'
+
+  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml
+    displayName: 'pytest_fast'
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFiles: '**/test-results*.xml'
+      testRunTitle: 'Python $(python.version)'
+    condition: succeededOrFailed()
+
+  - script: rm -rf *
+    displayName: 'Clean'
+
+- job: 'RLO - AzureBatch'
+  timeoutInMinutes: 0
+  pool: Knossos-batch-master
+  workspace:
+    clean: all
+  steps:
+    - task: AzureCLI@1
+      displayName: 'Azure CLI azure_batch_single.ps1'
+      inputs:
+        azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+        scriptLocation: inlineScript
+        inlineScript: >
+          powershell -ExecutionPolicy bypass -File test\builds\azure_batch_single.ps1 -b test-$(Build.BuildNumber) "bash ./test/azure_batch_test.sh"
+      # dockerPassword is defined in the Azure DevOps build definition 'variables' (not in source control)
+      env:
+        DOCKER_PASSWORD: $(dockerPassword)
+    - task: AzureCLI@1
+      displayName: Stop Azure Batch if cancelled
+      condition: canceled()
+      inputs:
+        azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+        scriptLocation: inlineScript
+        inlineScript: 'az batch job stop --job-id test-%BUILD_BUILDNUMBER%'
+
+- job: 'RLO - UbuntuDockerBuild'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-18.04'
+  strategy:
+    maxParallel: 4
+
+  steps:
+  - script: sh ./test/builds/build_docker.sh ${mappedDockerPassword}
+    displayName: 'Build Docker container image from conda-env.yaml'
+    env:
+      # dockerPassword must be defined as an Azure Pipelines variable
+      mappedDockerPassword: $(dockerPassword)
+
+  - script: rm -rf *
+    displayName: 'Clean'
+
+- job: 'RLO - AzureML'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-18.04'
+
+  steps:
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8'
+      architecture: 'x64'
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        sh ./test/builds/install_linux.sh
+        python --version
+    displayName: 'Install dependencies'
+  - task: AzureCLI@1
+    displayName: 'Submit Azure ML'
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptLocation: 'inlineScript'
+      inlineScript: >
+        python scripts/azureml_submit.py fewer_simplify_rules \
+          --num_repetitions 2 --compute_cluster cpucluster \
+          --wait_for_completion
