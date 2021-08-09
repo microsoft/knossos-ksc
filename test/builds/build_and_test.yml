@@ -135,7 +135,7 @@ jobs:
     displayName: 'Clean'
 
 
-- job: 'RLO - Ubuntu'
+- job: 'RLO-Ubuntu'
   timeoutInMinutes: 120
   workspace:
     clean: all
@@ -177,8 +177,8 @@ jobs:
   # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
   - task: AzureCLI@1
     displayName: 'pytest with Azure CLI'
-    workingDirectory: rlo
     inputs:
+      workingDirectory: rlo
       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
       scriptLocation: 'inlineScript'
       inlineScript: >
@@ -230,7 +230,7 @@ jobs:
     displayName: 'Clean'
 
 
-- job: 'RLO - Windows'
+- job: 'RLO-Windows'
   timeoutInMinutes: 120
   workspace:
     clean: all
@@ -266,7 +266,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO - AzureBatch'
+- job: 'RLO-AzureBatch'
   timeoutInMinutes: 0
   pool: Knossos-batch-master
   workspace:
@@ -274,8 +274,8 @@ jobs:
   steps:
     - task: AzureCLI@1
       displayName: 'Azure CLI azure_batch_single.ps1'
-      workingDirectory: rlo
       inputs:
+        workingDirectory: rlo
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
         inlineScript: >
@@ -285,14 +285,14 @@ jobs:
         DOCKER_PASSWORD: $(dockerPassword)
     - task: AzureCLI@1
       displayName: Stop Azure Batch if cancelled
-      workingDirectory: rlo
       condition: canceled()
       inputs:
+        workingDirectory: rlo
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
         inlineScript: 'az batch job stop --job-id test-%BUILD_BUILDNUMBER%'
 
-- job: 'RLO - UbuntuDockerBuild'
+- job: 'RLO-UbuntuDockerBuild'
   workspace:
     clean: all
   pool:
@@ -311,7 +311,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO - AzureML'
+- job: 'RLO-AzureML'
   workspace:
     clean: all
   pool:
@@ -325,16 +325,16 @@ jobs:
       architecture: 'x64'
   - task: Bash@3
     inputs:
+      workingDirectory: rlo
       targetType: 'inline'
       script: |
         sh ./test/builds/install_linux.sh
         python --version
     displayName: 'Install dependencies'
-    workingDirectory: rlo
   - task: AzureCLI@1
     displayName: 'Submit Azure ML'
-    workingDirectory: rlo
     inputs:
+      workingDirectory: rlo
       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
       scriptLocation: 'inlineScript'
       inlineScript: >
