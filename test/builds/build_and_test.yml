@@ -156,22 +156,28 @@ jobs:
 
   - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
     displayName: 'Install dependencies'
+    workingDirectory: rlo
 
   - script: sh ./pylint.sh
     displayName: pylint
-    
+    workingDirectory: rlo
+
   - bash: python -m mypy --version && python -m mypy ./
     displayName: mypy
+    workingDirectory: rlo
 
   - script: sh ./check_format.sh
     displayName: check_format
+    workingDirectory: rlo
 
   - script: pytest test/rlo --junitxml=junit/test-results_fast.xml --durations=10
     displayName: 'pytest_fast'
+    workingDirectory: rlo
 
   # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
   - task: AzureCLI@1
     displayName: 'pytest with Azure CLI'
+    workingDirectory: rlo
     inputs:
       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
       scriptLocation: 'inlineScript'
@@ -182,26 +188,30 @@ jobs:
   # Include test for determinism via seed_all_reps flag, although this does not test tensorflow-gpu.
   - script: "python src/train_over_expressions.py fewer_simplify_rules --num_parallel 2 --run_id $(Build.BuildNumber) --seed_all_reps=1"
     displayName: 'test_train_fewer_simplify_rules'
+    workingDirectory: rlo
 
   - script: "python src/train_on_dataset.py binding_simplify_astar --dataset_path datasets/value_dataset.json --max_epochs=2 --repetition=0"
     displayName: Test train_on_dataset.py
+    workingDirectory: rlo
 
   - script: "python src/search_with_expert.py blas --test_on_exprs gemm --max_gnn_eval=10"
     displayName: Test search_with_expert.py
+    workingDirectory: rlo
 
   - script: bash ./test/determinism_test.sh --force_cpu
     displayName: Test determinism
+    workingDirectory: rlo
 
   - task: CopyFiles@2
     displayName: 'Copy *.json to logs folder'
     inputs:
-       contents: 'outputs/**/*.json'
+       contents: 'rlo/outputs/**/*.json'
        targetFolder: logs
 
   - task: CopyFiles@2
     displayName: 'Copy *.html to logs folder'
     inputs:
-       contents: 'outputs/**/*.html'
+       contents: 'rlo/outputs/**/*.html'
        targetFolder: logs
 
   - task: PublishPipelineArtifact@0
@@ -241,9 +251,11 @@ jobs:
 
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
     displayName: 'Install dependencies'
+    workingDirectory: rlo
 
   - script: pytest test/rlo --junitxml=junit/test-results_fast.xml
     displayName: 'pytest_fast'
+    workingDirectory: rlo
 
   - task: PublishTestResults@2
     inputs:
@@ -262,6 +274,7 @@ jobs:
   steps:
     - task: AzureCLI@1
       displayName: 'Azure CLI azure_batch_single.ps1'
+      workingDirectory: rlo
       inputs:
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
@@ -272,6 +285,7 @@ jobs:
         DOCKER_PASSWORD: $(dockerPassword)
     - task: AzureCLI@1
       displayName: Stop Azure Batch if cancelled
+      workingDirectory: rlo
       condition: canceled()
       inputs:
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
@@ -289,6 +303,7 @@ jobs:
   steps:
   - script: sh ./test/builds/build_docker.sh ${mappedDockerPassword}
     displayName: 'Build Docker container image from conda-env.yaml'
+    workingDirectory: rlo
     env:
       # dockerPassword must be defined as an Azure Pipelines variable
       mappedDockerPassword: $(dockerPassword)
@@ -315,8 +330,10 @@ jobs:
         sh ./test/builds/install_linux.sh
         python --version
     displayName: 'Install dependencies'
+    workingDirectory: rlo
   - task: AzureCLI@1
     displayName: 'Submit Azure ML'
+    workingDirectory: rlo
     inputs:
       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
       scriptLocation: 'inlineScript'
