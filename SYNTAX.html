@@ -1,0 +1,685 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Knossos IR &mdash; Knossos 0.7 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Relu3 - An example kernel" href="relu3.html" />
+    <link rel="prev" title="About Knossos" href="About.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #333" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Knossos
+          
+
+          
+            
+            <img src="_static/knossos-logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Knossos IR</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-need-for-an-informal-syntax-and-semantics">The need for an informal syntax and semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-syntax">Basic Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#types">Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-constructs">Basic Constructs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="relu3.html">Relu3 - An example kernel</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Knossos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Knossos IR</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/SYNTAX.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="knossos-ir">
+<h1>Knossos IR<a class="headerlink" href="#knossos-ir" title="Permalink to this headline">¶</a></h1>
+<p>Knossos is a project that aims to accelerate writing AI algorithms to compiler
+problems. There are different sub-projects in different languages, but all
+using the same IR. This document aims to document the informal syntax of that IR.</p>
+<div class="section" id="the-need-for-an-informal-syntax-and-semantics">
+<h2>The need for an informal syntax and semantics<a class="headerlink" href="#the-need-for-an-informal-syntax-and-semantics" title="Permalink to this headline">¶</a></h2>
+<p>Creating a new language and writing a compiler are both perilous tasks, but
+doing both at the same time creates its own set of problems. Having multiple
+compilers for the same new language, where each evolves separately brings a
+uniquely unstable scenario.</p>
+<p>Fixing the syntax is the first step. Allows all compilers to know they’re parsing
+valid code and exchange IR amongst themselves. But it does not guarantee that
+the semantics are equivalent.</p>
+<p>The raw syntax can be seen in action <a class="reference external" href="test/ksc/syntax-primer.ks">here</a>. That
+file is used to make sure parsers can read the common parts of the Knossos IR
+but it does not describe a self-contained semantics over all possible syntax
+variations. That is the aim of this document.</p>
+</div>
+<div class="section" id="basic-syntax">
+<h2>Basic Syntax<a class="headerlink" href="#basic-syntax" title="Permalink to this headline">¶</a></h2>
+<p>The basic building block of the Knossos syntax is the S-expression (also
+used in Lisp and Scheme). That means that language constructs are identified by
+nested parentheses. All white-space characters (space, line break) are ignored.</p>
+<p>The constructs can be either a value or a list of values. Values have types
+associated, inferred by either: literal initialisation, previous declaration
+or argument/operand inference.</p>
+<p>For example, <code class="docutils literal notranslate"><span class="pre">10.0</span></code> is a literal, parsed as <code class="docutils literal notranslate"><span class="pre">Float</span></code>, while in <code class="docutils literal notranslate"><span class="pre">(add</span> <span class="pre">x</span> <span class="pre">y)</span></code>, both
+<code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">y</span></code> are inferred to have the same type.</p>
+<p>List of values are the basic block of the language, and their shapes determine
+whether they are calls, conditionals, declarations, definitions, etc.</p>
+<p>For example, <code class="docutils literal notranslate"><span class="pre">(let</span> <span class="pre">(x</span> <span class="pre">10)</span> <span class="pre">x)</span></code> declares a variable named <code class="docutils literal notranslate"><span class="pre">x</span></code> and returns an
+<code class="docutils literal notranslate"><span class="pre">Integer</span></code> of value <code class="docutils literal notranslate"><span class="pre">10</span></code>, while <code class="docutils literal notranslate"><span class="pre">(let</span> <span class="pre">(x</span> <span class="pre">(lam...))</span> <span class="pre">(x</span> <span class="pre">y))</span></code> <em>calls</em> a <code class="docutils literal notranslate"><span class="pre">Lambda</span></code>
+called <code class="docutils literal notranslate"><span class="pre">x</span></code> using <code class="docutils literal notranslate"><span class="pre">y</span></code> as an argument.</p>
+<div class="section" id="comments">
+<h3>Comments<a class="headerlink" href="#comments" title="Permalink to this headline">¶</a></h3>
+<p>Single-line comments start with a semi-colon <code class="docutils literal notranslate"><span class="pre">;</span></code> and run to the end of the line.</p>
+<p>Multi-line comments start with a <code class="docutils literal notranslate"><span class="pre">#|</span></code> and end with the reverse, <code class="docutils literal notranslate"><span class="pre">|#</span></code>.</p>
+<p>Multi-line comments can be nested, so you need to close as many tokens as
+you have opened.</p>
+</div>
+</div>
+<div class="section" id="types">
+<h2>Types<a class="headerlink" href="#types" title="Permalink to this headline">¶</a></h2>
+<p>Knossos is statically type-safe. Types that cannot be inferred statically
+generate a compiler error.</p>
+<p>Types are either declared explicitly (in function declarations/definitions) or
+they’re implied from the type of the arguments/operands.</p>
+<p>The main classes of types are: Scalar, Composite and Callable types.</p>
+<p><em>Note: There are internal compiler types, such as the linear map, which are not
+discussed here.</em></p>
+<p>Type declarations are only used when declaring functions (<em>see <code class="docutils literal notranslate"><span class="pre">(edef)</span></code></em>), which
+are used for type validation.</p>
+<div class="section" id="scalar-types">
+<h3>Scalar Types<a class="headerlink" href="#scalar-types" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="string">
+<h4>String<a class="headerlink" href="#string" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">String</span></code> types are used mostly for debugging purposes. There are no standard
+operations with strings available (such as concat, substr, etc).</p>
+<p><code class="docutils literal notranslate"><span class="pre">String</span></code> literals are values encompassed by quotes, for example: <code class="docutils literal notranslate"><span class="pre">&quot;Hello</span> <span class="pre">world&quot;</span></code>.</p>
+<p>The only operation that works with strings is print (<code class="docutils literal notranslate"><span class="pre">(print)</span></code>).</p>
+<p>Strings are also used in <code class="docutils literal notranslate"><span class="pre">(rule)</span></code> names, as to not pollute the symbol space
+(variables and functions).</p>
+<p>Support for extended character sets (like UTF-8) will depend on how the print
+function is implemented by the compiler and is not guaranteed.</p>
+</div>
+<div class="section" id="bool">
+<h4>Bool<a class="headerlink" href="#bool" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Bool</span></code> types are binary, mainly used for conditionals (if/else), but as a
+native scalar type, they can be composed with other types as well. They behave
+as if they only have one bit, regardless of storage choices.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Bool</span></code> literals are either <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>, case sensitive. Any variations will
+be interpreted as a variable name.</p>
+</div>
+<div class="section" id="integer">
+<h4>Integer<a class="headerlink" href="#integer" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Integer</span></code> types are signed 64-bit types, regardless of the underlying
+architecture.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Integer</span></code> literals are numeric values without a decimal point, with optional
+sign, for example: <code class="docutils literal notranslate"><span class="pre">42</span></code> and <code class="docutils literal notranslate"><span class="pre">-123</span></code>.</p>
+</div>
+<div class="section" id="float">
+<h4>Float<a class="headerlink" href="#float" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Float</span></code> types are 32-bit IEE 754 single-precision floating point numbers. Other
+precisions are an open issue (https://github.com/microsoft/knossos-ksc/issues/358)</p>
+<p><code class="docutils literal notranslate"><span class="pre">Float</span></code> literals are numeric values with a decimal point, with optional sign,
+for example: <code class="docutils literal notranslate"><span class="pre">10.0</span></code> and <code class="docutils literal notranslate"><span class="pre">-1.23</span></code>. Scientific notation is not supported.</p>
+<div class="section" id="to-float">
+<h5>to_float<a class="headerlink" href="#to-float" title="Permalink to this headline">¶</a></h5>
+<p>The <code class="docutils literal notranslate"><span class="pre">to_float</span></code> construct converts an <code class="docutils literal notranslate"><span class="pre">Integer</span></code> into a <code class="docutils literal notranslate"><span class="pre">Float</span></code>. Ex:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">;</span> <span class="n">Declares</span> <span class="n">an</span> <span class="n">Integer</span> <span class="n">variable</span> <span class="ow">and</span> <span class="k">return</span> <span class="k">as</span> <span class="n">Float</span>
+<span class="p">(</span><span class="n">let</span> <span class="p">(</span><span class="n">x</span> <span class="mi">10</span><span class="p">)</span> <span class="p">(</span><span class="n">to_float</span> <span class="n">x</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="composite-types">
+<h3>Composite Types<a class="headerlink" href="#composite-types" title="Permalink to this headline">¶</a></h3>
+<p>Composite types encompass other types in different ways. There are no composite
+type literals, they must be created using specific Knossos constructs.</p>
+<div class="section" id="tensor">
+<h4>Tensor<a class="headerlink" href="#tensor" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Tensor</span> <span class="pre">N</span></code> is a tensor of elements with the same type. Tensors are composable, so
+can contain any type, e.g. Tensor 2 (Tuple Float String (Tensor 3 Float))</p>
+<p>The type declaration is simply: <code class="docutils literal notranslate"><span class="pre">(Tensor</span> <span class="pre">N</span> <span class="pre">Type)</span></code>.</p>
+<p>Tensors have no predetermined shape, nor a way to guarantee it at runtime.
+A tensor of tensors will be jagged (aka ragged) by default: each of the
+inner Tensors could have a different size.</p>
+<div class="section" id="build">
+<h5>build<a class="headerlink" href="#build" title="Permalink to this headline">¶</a></h5>
+<p>Tensors need to be created algorithmically, either as the result of a
+function or using the <code class="docutils literal notranslate"><span class="pre">build</span></code> construct.  Build takes a size and a lambda, e.g.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Creating a 7-element vector</span>
+<span class="p">(</span><span class="nf">build</span> <span class="mi">7</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">i</span> <span class="nv">:</span> <span class="nv">Integer</span><span class="p">)</span> <span class="p">(</span><span class="nf">f</span> <span class="nv">i</span><span class="p">)))</span>
+<span class="c1">; Creating a 5x7 matrix </span>
+<span class="p">(</span><span class="nf">build</span> <span class="p">(</span><span class="nf">tuple</span> <span class="mi">7</span> <span class="mi">5</span><span class="p">)</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">ij</span> <span class="nv">:</span> <span class="nv">Tuple</span> <span class="nv">Integer</span> <span class="nv">Integer</span><span class="p">)</span> 
+  <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">i</span> <span class="nv">j</span><span class="p">)</span> <span class="nv">ij</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">atan2</span> <span class="nv">i</span> <span class="nv">j</span><span class="p">))))</span>
+<span class="c1">; Creating a 5x7 (ragged) matrix of i-element vectors of constants</span>
+<span class="p">(</span><span class="nf">build</span> <span class="p">(</span><span class="nf">tuple</span> <span class="mi">7</span> <span class="mi">5</span><span class="p">)</span> <span class="p">(</span><span class="k">lambda </span><span class="p">(</span><span class="nf">ij</span> <span class="nv">:</span> <span class="nv">Tuple</span> <span class="nv">Integer</span> <span class="nv">Integer</span><span class="p">)</span> 
+  <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">i</span> <span class="nv">j</span><span class="p">)</span> <span class="nv">ij</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">constVec</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">to_float</span> <span class="nv">j</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>Each element of <em>induction variable</em> passed to the lambda will have the range <code class="docutils literal notranslate"><span class="pre">[0,N[</span></code>, ie.
+zero inclusive, N exclusive.</p>
+</div>
+<div class="section" id="size">
+<h5>size<a class="headerlink" href="#size" title="Permalink to this headline">¶</a></h5>
+<p>Determining the runtime size of a tensor requires the <code class="docutils literal notranslate"><span class="pre">(size</span> <span class="pre">t)</span></code> construct.
+It returns the size of the array as a tuple of Integers.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Returns the size of the second row of a (Tensor 1 (Tensor 1 Float))</span>
+<span class="p">(</span><span class="nf">size</span> <span class="p">(</span><span class="nf">index</span> <span class="mi">1</span> <span class="nv">mat</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="index">
+<h5>index<a class="headerlink" href="#index" title="Permalink to this headline">¶</a></h5>
+<p>Accessing elements of a tensor requires the <code class="docutils literal notranslate"><span class="pre">(index</span> <span class="pre">(tuple</span> <span class="pre">N1</span> <span class="pre">N2)</span> <span class="pre">t)</span></code> construct.
+Each <code class="docutils literal notranslate"><span class="pre">N</span></code> has to be an <code class="docutils literal notranslate"><span class="pre">Integer</span></code>, zero-based.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Returning the _3rd_ element in a (Tensor 1 Type)</span>
+<span class="p">(</span><span class="nf">index</span> <span class="mi">2</span> <span class="nv">v</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="tuple">
+<h4>Tuple<a class="headerlink" href="#tuple" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Tuple</span></code> is a list of elements of (not-necessarily) different shapes. Tuples are
+composable, but unlike tensors, can nest at any element.</p>
+<p>The type declaration is a list of types: <code class="docutils literal notranslate"><span class="pre">(Tuple</span> <span class="pre">Type1</span> <span class="pre">Type2</span> <span class="pre">...)</span></code>. Similarly,
+if the type is a tuple, it needs its own parenthesis: <code class="docutils literal notranslate"><span class="pre">(Tuple</span> <span class="pre">Type1</span> <span class="pre">(Tuple</span> <span class="pre">Type2</span> <span class="pre">...)</span> <span class="pre">...)</span></code>.</p>
+<p>Tuples are bound, and require the exact number of elements as the declaration.
+There are no default assignment.</p>
+<p>You can also have a tensor inside tuples: <code class="docutils literal notranslate"><span class="pre">(Tuple</span> <span class="pre">Float</span> <span class="pre">(Tensor</span> <span class="pre">2</span> <span class="pre">Integer)</span> <span class="pre">Bool)</span></code>.</p>
+<div class="section" id="id1">
+<h5>tuple<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h5>
+<p><code class="docutils literal notranslate"><span class="pre">Tuple</span></code>s are constructed using the <code class="docutils literal notranslate"><span class="pre">(tuple</span> <span class="pre">...)</span></code> construct. The
+arguments’ types define the tuple’s arguments, which are checked when used.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Create a tuple of Integer, Float and Bool</span>
+<span class="p">(</span><span class="nf">tuple</span> <span class="mi">42</span> <span class="mf">10.0</span> <span class="nv">false</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="get">
+<h5>get<a class="headerlink" href="#get" title="Permalink to this headline">¶</a></h5>
+<p>Accessing elements of a tuple requires the <code class="docutils literal notranslate"><span class="pre">(get$i$N</span> <span class="pre">tup)</span></code> construct. <code class="docutils literal notranslate"><span class="pre">N</span></code> is the
+number of elements of the tuple and <code class="docutils literal notranslate"><span class="pre">i</span></code> is an Integer between 1 and <code class="docutils literal notranslate"><span class="pre">N</span></code>, inclusive.</p>
+<p>Unlike tensors, tuple <em>index</em> starts at 1 and ends with N.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Returns the 7th element from a tuple of 9 elements</span>
+<span class="p">(</span><span class="k">let </span><span class="p">(</span><span class="mi">7</span><span class="nv">of9</span> <span class="p">(</span><span class="nf">get$7$9</span> <span class="nv">USSRaven</span><span class="p">))</span> <span class="mi">7</span><span class="nv">of9</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="callable">
+<h3>Callable<a class="headerlink" href="#callable" title="Permalink to this headline">¶</a></h3>
+<p>Callable objects implement the lambda-calculus and can be called like regular
+functions. More importantly, they can define and compose behaviour directly
+at the call site.</p>
+<p>Like composite types, callable types don’t have literals and need specific
+Knossos constructs to be created.</p>
+<div class="section" id="lambda">
+<h4>Lambda<a class="headerlink" href="#lambda" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Lam</span></code> is a functional type. It represents an object that can be called as
+a function, and it’s the required type of many other constructs (like <code class="docutils literal notranslate"><span class="pre">(build)</span></code>
+and <code class="docutils literal notranslate"><span class="pre">(fold)</span></code>).</p>
+<p>The type declaration has the argument types followed by the return type: <code class="docutils literal notranslate"><span class="pre">(Lam</span> <span class="pre">(Tuple</span> <span class="pre">Float</span> <span class="pre">Float)</span> <span class="pre">Float)</span></code>.</p>
+<p>Lambdas are limited to a single argument, so tuples are used when more arguments
+are needed.</p>
+<p><em>Note: Lambdas are not fully implemented in the language, as that would require
+runtime memory management, function tables and argument marshalling. The current
+compilers only implement in-place declarations inside the constructs defined
+below, such as <code class="docutils literal notranslate"><span class="pre">(build)</span></code> and <code class="docutils literal notranslate"><span class="pre">(fold)</span></code>.</em></p>
+<div class="section" id="lam">
+<h5>lam<a class="headerlink" href="#lam" title="Permalink to this headline">¶</a></h5>
+<p><code class="docutils literal notranslate"><span class="pre">Lambda</span></code>s are created via the <code class="docutils literal notranslate"><span class="pre">(lam</span> <span class="pre">(arg)</span> <span class="pre">(expr))</span></code> construct. The argument is a
+variable declaration of the form <code class="docutils literal notranslate"><span class="pre">(var</span> <span class="pre">:</span> <span class="pre">Type)</span></code> and the expression is any valid
+Knossos expression.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; A lambda that returns the sum of two numbers</span>
+<span class="p">(</span><span class="nf">lam</span> <span class="p">(</span><span class="nf">t</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span> <span class="p">(</span><span class="nf">add</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">t</span><span class="p">)</span> <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">t</span><span class="p">)))</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="linear-maps">
+<h4>Linear Maps<a class="headerlink" href="#linear-maps" title="Permalink to this headline">¶</a></h4>
+<p>Maps one type onto another, used in auto-generated functions and are not meant
+for user consumption. They only show in function declarations (where the
+definition is inside the compiler run-time library) and opaquely implemented.</p>
+<p>Their syntax is: <code class="docutils literal notranslate"><span class="pre">(edef</span> <span class="pre">D$eq&#64;ff</span> <span class="pre">(LM</span> <span class="pre">(Tuple</span> <span class="pre">Float</span> <span class="pre">Float)</span> <span class="pre">Bool)</span> <span class="pre">(Float</span> <span class="pre">Float))</span></code>,
+which means the return type is a linear map that translates a tuple of two floats
+into one boolean, given the two floats to compare. The <code class="docutils literal notranslate"><span class="pre">D$</span></code> prefix means this
+is an auto-generated derivative of the function <code class="docutils literal notranslate"><span class="pre">eq</span></code> for two floats <code class="docutils literal notranslate"><span class="pre">&#64;ff</span></code>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="basic-constructs">
+<h2>Basic Constructs<a class="headerlink" href="#basic-constructs" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="callable-names">
+<h3>Callable Names<a class="headerlink" href="#callable-names" title="Permalink to this headline">¶</a></h3>
+<p>In Knossos, operations, functions and lambdas are indiscernible. They all have
+return types, arguments and a name. The main difference is that the operations
+are declared by the compiler (in <code class="docutils literal notranslate"><span class="pre">src/runtime/prelude.ks</span></code>) and implemented by
+the run-time (in Futhark, C++, etc.), while functions and lambdas are declared
+in user code.</p>
+<p>A call to a function, with syntax <code class="docutils literal notranslate"><span class="pre">(fname</span> <span class="pre">arg0</span> <span class="pre">arg1</span> <span class="pre">...)</span></code> is only valid if it
+has been declared (either by the compiler or user) and the arguments match in
+number and types, as well as having the same return type.</p>
+<p><em>Note: Lambdas are not a language first-class citizen, so existing compilers
+may not implement the full breath that is required to treat them like normal
+functions. They should work in <code class="docutils literal notranslate"><span class="pre">build</span></code>, <code class="docutils literal notranslate"><span class="pre">fold</span></code>, etc. but not necessarily
+when called directly.</em></p>
+</div>
+<div class="section" id="operations">
+<h3>Operations<a class="headerlink" href="#operations" title="Permalink to this headline">¶</a></h3>
+<p>Operations are pre-declared by the compiler with the following naming scheme:
+<code class="docutils literal notranslate"><span class="pre">name&#64;types</span></code>. The types are <code class="docutils literal notranslate"><span class="pre">i</span></code> for integers and <code class="docutils literal notranslate"><span class="pre">f</span></code> for float and the names
+separate into four categories:</p>
+<ul class="simple">
+<li><p><strong>Arithmetic</strong>: <code class="docutils literal notranslate"><span class="pre">add,</span> <span class="pre">sub,</span> <span class="pre">mul,</span> <span class="pre">div,</span> <span class="pre">neg</span></code>, for both <code class="docutils literal notranslate"><span class="pre">Float</span></code> and <code class="docutils literal notranslate"><span class="pre">Integer</span></code>.</p></li>
+<li><p><strong>Comparison</strong>: <code class="docutils literal notranslate"><span class="pre">eq,</span> <span class="pre">ne,</span> <span class="pre">gt,</span> <span class="pre">lt,</span> <span class="pre">gte,</span> <span class="pre">lte</span></code>, for both <code class="docutils literal notranslate"><span class="pre">Float</span></code> and <code class="docutils literal notranslate"><span class="pre">Integer</span></code>.</p></li>
+<li><p><strong>Maths</strong>: <code class="docutils literal notranslate"><span class="pre">log,</span> <span class="pre">exp,</span> <span class="pre">sin,</span> <span class="pre">cos,</span> <span class="pre">max,</span> <span class="pre">min,</span> <span class="pre">abs</span></code> for <code class="docutils literal notranslate"><span class="pre">Float</span></code></p></li>
+<li><p><strong>Type Conversion</strong>: <code class="docutils literal notranslate"><span class="pre">to_float</span></code> for <code class="docutils literal notranslate"><span class="pre">Integer</span></code></p></li>
+</ul>
+<p>Compilers will also generate their auto derivative, appending <code class="docutils literal notranslate"><span class="pre">D$</span></code> or <code class="docutils literal notranslate"><span class="pre">Dt$</span></code> to
+their names, but those should be used by the compiler only during
+auto-derivation.</p>
+<p>Operations cannot be redefined by users, and on binary operations, both types
+have to be the same. Return types are also the same, except on conversion
+operations.</p>
+<p><em>Note: There are examples where <code class="docutils literal notranslate"><span class="pre">(add</span> <span class="pre">x</span> <span class="pre">y)</span></code> is used, which means some compilers
+do try to assume the type of the operation by its arguments, but you should
+not rely on that. Using <code class="docutils literal notranslate"><span class="pre">(add&#64;ff</span> <span class="pre">x</span> <span class="pre">y)</span></code> is always safe.</em></p>
+</div>
+<div class="section" id="functions">
+<h3>Functions<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
+<p>Functions are <em>user defined operations</em>, and as such, need to be declared and/or
+defined before being used.</p>
+<div class="section" id="declaration">
+<h4>Declaration<a class="headerlink" href="#declaration" title="Permalink to this headline">¶</a></h4>
+<p>Declarations describe the <em>signature</em> of the function, ie. its name, return type
+and argument types, but not its argument names (which are unnecessary).</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(edef</span> <span class="pre">name</span> <span class="pre">RetTy</span> <span class="pre">(ArgTy0</span> <span class="pre">ArgTy1</span> <span class="pre">...))</span></code>. Any valid type can be
+used for return and argument types.</p>
+<p>Declared functions can be called but are not implemented, so unless it’s
+implemented somewhere else (compiler run-time libraries, another source file),
+it will lead to a linking error if you try to execute.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Declares a function that takes in two tuples and add them element wise</span>
+<span class="p">(</span><span class="nf">edef</span> <span class="nv">tadd@ff</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span> <span class="p">((</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="definition">
+<h4>Definition<a class="headerlink" href="#definition" title="Permalink to this headline">¶</a></h4>
+<p>Definitions show how the function is implemented, ie. define the function body
+and name the arguments that are used within.</p>
+<p>The function definition <em>signature</em> must match its declaration, if any. If there
+are no declarations with the same types, a new declaration is registered. This
+means you can directly define functions without declaring them first, but be
+careful, it also means if you make a mistake in the definition, the compiler will
+assume you want a new function instead.</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(def</span> <span class="pre">name</span> <span class="pre">RetTy</span> <span class="pre">((arg0</span> <span class="pre">:</span> <span class="pre">ArgTy0)(arg1</span> <span class="pre">:</span> <span class="pre">ArgTy1)...)</span> <span class="pre">(body))</span></code> with
+<code class="docutils literal notranslate"><span class="pre">body</span></code> any valid expression.</p>
+<p>The arguments are bound on call and can be used inside the function body.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Implements the tuple sum declared above</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tadd</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span>
+             <span class="p">(</span><span class="nf">a</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span> <span class="p">(</span><span class="nf">b</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)))</span>
+             <span class="p">(</span><span class="nf">tuple</span> <span class="p">(</span><span class="nf">add@ff</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">b</span><span class="p">))</span>
+                    <span class="p">(</span><span class="nf">add@ff</span> <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">b</span><span class="p">))</span>
+             <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1">; Directly defines a zip function, from two vectors, build a third vector that</span>
+<span class="c1">; holds a tuple for every pair of elements ({a[0], b[0]}, ... {a[N-1], b[N-1]})</span>
+<span class="c1">; Asserts (size a) == (size b).</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">zip</span>  <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span>
+             <span class="p">((</span><span class="nf">a</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">))</span> <span class="p">(</span><span class="nf">b</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">)))</span>
+             <span class="p">(</span><span class="nf">assert</span> <span class="p">(</span><span class="nf">eq</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">b</span><span class="p">))</span>
+               <span class="p">(</span><span class="nf">build</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">lam</span> <span class="p">(</span><span class="nf">i</span> <span class="nv">:</span> <span class="nv">Integer</span><span class="p">)</span>
+                               <span class="p">(</span><span class="nf">tuple</span> <span class="p">(</span><span class="nf">index</span> <span class="nv">i</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">index</span> <span class="nv">i</span> <span class="nv">b</span><span class="p">)))</span>
+               <span class="p">)</span>
+             <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="call">
+<h4>Call<a class="headerlink" href="#call" title="Permalink to this headline">¶</a></h4>
+<p>Calling a function is just like an operation. The return type, arguments order
+and types must match. However, unlike operations, the arguments and types are
+defined by the declaration/definition.</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(fname</span> <span class="pre">arg0</span> <span class="pre">arg1</span> <span class="pre">...)</span></code></p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Recursive function that sums a vector of tuples, element-wise</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tsum</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span>
+          <span class="p">(</span>
+           <span class="p">(</span><span class="nf">i</span> <span class="nv">:</span> <span class="nv">Integer</span><span class="p">)</span>
+           <span class="p">(</span><span class="nf">v</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)))</span>
+           <span class="p">(</span><span class="nf">acc</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span>
+          <span class="p">)</span>
+          <span class="c1">; One past last, tail return accumulated value</span>
+          <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">eq</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">v</span><span class="p">))</span>
+              <span class="nv">acc</span>
+          <span class="c1">; Every other element, increment and tail recurse</span>
+          <span class="p">(</span><span class="nf">tsum@ff</span> <span class="p">(</span><span class="nf">add@ii</span> <span class="nv">i</span> <span class="mi">1</span><span class="p">)</span> <span class="nv">v</span> <span class="p">(</span><span class="nf">tadd@ff</span> <span class="nv">acc</span> <span class="p">(</span><span class="nf">index</span> <span class="nv">i</span> <span class="nv">v</span><span class="p">))))</span>
+<span class="p">)</span>
+
+<span class="c1">; Wrapper that zips two lists and calls tsum@ff</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tsum_list</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span> <span class="p">((</span><span class="nf">a</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">))</span> <span class="p">(</span><span class="nf">b</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">)))</span>
+               <span class="p">(</span><span class="nf">assert</span> <span class="p">(</span><span class="nf">eq</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">size</span> <span class="nv">b</span><span class="p">))</span>
+                       <span class="p">(</span><span class="nf">tsum</span> <span class="p">(</span><span class="mi">0</span> <span class="p">(</span><span class="nf">zip@ff</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)</span> <span class="p">(</span><span class="nf">tuple</span> <span class="mf">0.0</span> <span class="mf">0.0</span><span class="p">))))</span>
+<span class="p">)</span>
+
+<span class="c1">; Print the reduced value</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tsum_print</span> <span class="p">()</span> <span class="p">((</span><span class="nf">a</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">))</span> <span class="p">(</span><span class="nf">b</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">)))</span>
+                <span class="p">(</span><span class="k">let </span><span class="p">(</span><span class="nf">s</span> <span class="p">(</span><span class="nf">tsum_list</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">))</span>
+                     <span class="p">(</span><span class="nf">print</span>
+                        <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">s</span><span class="p">)</span>
+                        <span class="s">&quot; &quot;</span>
+                        <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">s</span><span class="p">)</span>
+                     <span class="p">)</span>
+                <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><em>Note: <code class="docutils literal notranslate"><span class="pre">tadd&#64;ff</span></code> above is called with the accumulator and each element of the
+vector <code class="docutils literal notranslate"><span class="pre">v</span></code>, both of which are <code class="docutils literal notranslate"><span class="pre">(Tuple</span> <span class="pre">Float</span> <span class="pre">Float)</span></code>, while <code class="docutils literal notranslate"><span class="pre">zip&#64;ff</span></code> is called
+with the two vectors <code class="docutils literal notranslate"><span class="pre">a</span></code> and <code class="docutils literal notranslate"><span class="pre">b</span></code> (and will assert if they’re not the same),
+returning a <code class="docutils literal notranslate"><span class="pre">(Tensor</span> <span class="pre">1</span> <span class="pre">(Tuple</span> <span class="pre">Float</span> <span class="pre">Float))</span></code>, as expected.</em></p>
+</div>
+</div>
+<div class="section" id="variables">
+<h3>Variables<a class="headerlink" href="#variables" title="Permalink to this headline">¶</a></h3>
+<p>Variables are declared in two ways: either as function arguments in definitions
+or as <code class="docutils literal notranslate"><span class="pre">(let)</span></code> constructs. Both have limited lexical context and can be shadowed
+(new variables with the same name).</p>
+<p>Function arguments’ context is the function body, while <code class="docutils literal notranslate"><span class="pre">(let)</span></code> constructs
+define variables on an enclosed context, within their <code class="docutils literal notranslate"><span class="pre">(expr)</span></code> blocks.</p>
+<p>In the function definitions above, the arguments declared (<code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>) are only
+in context inside the <code class="docutils literal notranslate"><span class="pre">(def)</span></code> block, and so do <code class="docutils literal notranslate"><span class="pre">s</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code> declared by the
+<code class="docutils literal notranslate"><span class="pre">(let)</span></code>, inside the <code class="docutils literal notranslate"><span class="pre">(expr)</span></code> block.</p>
+<div class="section" id="let">
+<h4>Let<a class="headerlink" href="#let" title="Permalink to this headline">¶</a></h4>
+<p>Explicit variable definitions, with optional expression block where the variable
+is valid.</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(let</span> <span class="pre">(name</span> <span class="pre">(initialiser))</span> <span class="pre">(expr))</span></code></p>
+<p>The variable <code class="docutils literal notranslate"><span class="pre">name</span></code> is initialised to the expression <code class="docutils literal notranslate"><span class="pre">initialiser</span></code> and can be
+used in the <code class="docutils literal notranslate"><span class="pre">(expr)</span></code> block.</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; `argc` and `argv` are valid throughout the body of `main`</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">main</span> <span class="nv">Integer</span> <span class="p">((</span><span class="nf">argc</span> <span class="nv">:</span> <span class="nv">Integer</span><span class="p">)</span> <span class="p">(</span><span class="nf">argv</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tensor</span> <span class="mi">1</span> <span class="nv">String</span><span class="p">)))</span>
+                  <span class="c1">; Declares `a`, `b` and `c`</span>
+                  <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">a</span> <span class="mi">10</span><span class="p">)</span> <span class="p">(</span><span class="nf">b</span> <span class="mf">12.3</span><span class="p">)</span> <span class="p">(</span><span class="nf">c</span> <span class="p">(</span><span class="nf">index</span> <span class="mi">1</span> <span class="nv">argv</span><span class="p">)))</span>
+                    <span class="c1">; Uses `a`, redefines `b`</span>
+                    <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">d</span> <span class="p">(</span><span class="nf">add@ii</span> <span class="nv">a</span> <span class="mi">10</span><span class="p">))</span> <span class="p">(</span><span class="nf">b</span> <span class="p">(</span><span class="nf">sub@ff</span> <span class="p">(</span><span class="nf">to_float</span> <span class="nv">d</span><span class="p">)</span> <span class="nv">b</span><span class="p">)))</span>
+                      <span class="c1">; returns new `b`</span>
+                      <span class="nv">b</span>
+                    <span class="p">)</span>
+                  <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="conditionals">
+<h3>Conditionals<a class="headerlink" href="#conditionals" title="Permalink to this headline">¶</a></h3>
+<p>Conditionals return one of two values, depending on the condition evaluated
+as boolean. Each value is calculated from a generic expression and both have to
+have the same return type. The condition can be any expression that evaluates to
+<code class="docutils literal notranslate"><span class="pre">Bool</span></code>.</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(if</span> <span class="pre">(cond)</span> <span class="pre">(then</span> <span class="pre">expr)</span> <span class="pre">(else</span> <span class="pre">expr))</span></code></p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Sum the two elements of a tuple</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tsum@tff</span> <span class="p">(</span><span class="nf">Float</span><span class="p">)</span> <span class="p">(</span><span class="nf">t</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span>
+              <span class="p">(</span><span class="nf">add@ff</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">t</span><span class="p">)</span> <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">t</span><span class="p">)))</span>
+
+<span class="c1">; Returns the max of the sum of two tuples</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">tmax@tfftff</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span>
+                 <span class="p">((</span><span class="nf">a</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span> <span class="p">(</span><span class="nf">b</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)))</span>
+                 <span class="p">(</span><span class="k">if </span><span class="p">(</span><span class="nf">gt@ff</span> <span class="p">(</span><span class="nf">tsum@tff</span> <span class="nv">a</span><span class="p">)</span> <span class="p">(</span><span class="nf">tsum@tff</span> <span class="nv">b</span><span class="p">))</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="fold">
+<h3>Fold<a class="headerlink" href="#fold" title="Permalink to this headline">¶</a></h3>
+<p>Folds a vector using a lambda-defined reduction operation and returns the
+accumulator. Lambdas <em>have</em> to have a single argument, but fold requires two:
+one for the accumulator and one for the vector element type, so lambdas inside
+folds <em>have</em> to use a tuple of two types.</p>
+<p>Both accumulator and vector element type can be anything, so the tuple can
+have any two types.</p>
+<p>The syntax is: <code class="docutils literal notranslate"><span class="pre">(fold</span> <span class="pre">(lam</span> <span class="pre">(acc</span> <span class="pre">:</span> <span class="pre">(Tuple</span> <span class="pre">AccTy</span> <span class="pre">ElmTy))</span> <span class="pre">(body)</span> <span class="pre">init</span> <span class="pre">vector))</span></code></p>
+<p>The body must return a value of the accumulator type <code class="docutils literal notranslate"><span class="pre">AccTy</span></code>. Each iteration
+takes on the previous accumulator and passes is as the first element in the tuple
+argument for the next call, with the next vector element.</p>
+<p>In loop form, this would be equivalent to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">AccTy</span> <span class="n">acc</span> <span class="o">&lt;-</span> <span class="n">init</span>
+<span class="n">loop</span> <span class="p">[</span><span class="mf">0.</span><span class="o">.</span><span class="p">(</span><span class="n">size</span> <span class="n">vector</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-&gt;</span> <span class="n">i</span><span class="p">:</span>
+  <span class="n">acc</span> <span class="o">=</span> <span class="n">lam</span><span class="p">(</span><span class="nb">tuple</span> <span class="n">acc</span> <span class="n">vec</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+<span class="k">return</span> <span class="n">acc</span>
+</pre></div>
+</div>
+<p>Example:</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Returns the product of all elements of `v` (multiply-reduce)</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">prod_fold</span> <span class="nv">Float</span> <span class="p">((</span><span class="nf">v</span> <span class="nv">:</span> <span class="nv">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">))</span>
+     <span class="p">(</span><span class="nf">fold</span> <span class="p">(</span><span class="nf">lam</span> <span class="p">(</span><span class="nf">acc_x</span> <span class="nv">:</span> <span class="p">(</span><span class="nf">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">))</span>
+                <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">acc</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">acc_x</span><span class="p">))</span>
+                      <span class="p">(</span><span class="nf">x</span>   <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">acc_x</span><span class="p">)))</span>
+                  <span class="p">(</span><span class="nf">mul@ff</span> <span class="nv">acc</span> <span class="nv">x</span><span class="p">)))</span>
+           <span class="mf">1.0</span>
+           <span class="nv">v</span>
+     <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Any existing variable in context (environment) can be used, for example:</p>
+<div class="highlight-scheme notranslate"><div class="highlight"><pre><span></span><span class="c1">; Returns prod(v) * pow(closure, size(v))</span>
+<span class="p">(</span><span class="nf">def</span> <span class="nv">prod_fold_closure</span> <span class="nv">Float</span> <span class="p">((</span><span class="nf">v</span> <span class="nv">:</span> <span class="nv">Tensor</span> <span class="mi">1</span> <span class="nv">Float</span><span class="p">)</span> <span class="p">(</span><span class="nf">closure</span> <span class="nv">:</span> <span class="nv">Float</span><span class="p">))</span>
+     <span class="p">(</span><span class="nf">fold</span> <span class="p">(</span><span class="nf">lam</span> <span class="p">(</span><span class="nf">acc_x</span> <span class="nv">:</span> <span class="nv">Tuple</span> <span class="nv">Float</span> <span class="nv">Float</span><span class="p">)</span>
+                <span class="p">(</span><span class="k">let </span><span class="p">((</span><span class="nf">acc</span> <span class="p">(</span><span class="nf">get$1$2</span> <span class="nv">acc_x</span><span class="p">))</span>
+                      <span class="p">(</span><span class="nf">x</span>   <span class="p">(</span><span class="nf">get$2$2</span> <span class="nv">acc_x</span><span class="p">)))</span>
+                  <span class="p">(</span><span class="nf">mul@ff</span> <span class="p">(</span><span class="nf">mul@ff</span> <span class="nv">acc</span> <span class="nv">x</span><span class="p">)</span> <span class="nv">closure</span><span class="p">)))</span>
+           <span class="mf">1.0</span>
+           <span class="nv">v</span>
+     <span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="extra">
+<h3>Extra<a class="headerlink" href="#extra" title="Permalink to this headline">¶</a></h3>
+<p>Other functions used in this document.</p>
+<div class="section" id="assert">
+<h4>assert<a class="headerlink" href="#assert" title="Permalink to this headline">¶</a></h4>
+<p>Checks for a run-time condition before executing some code. Stops execution
+if condition doesn’t hold. Returns the value and type returned by <code class="docutils literal notranslate"><span class="pre">(expr)</span></code>.</p>
+<p>Syntax: <code class="docutils literal notranslate"><span class="pre">(assert</span> <span class="pre">(cond)</span> <span class="pre">(expr))</span></code></p>
+</div>
+<div class="section" id="print">
+<h4>print<a class="headerlink" href="#print" title="Permalink to this headline">¶</a></h4>
+<p>Prints a list of values of numeric or string types, from literals, expressions, etc.</p>
+<p>Returns the number of elements printed as Integer.</p>
+<p>Syntax: <code class="docutils literal notranslate"><span class="pre">(print</span> <span class="pre">value</span> <span class="pre">expr</span> <span class="pre">literal</span> <span class="pre">...</span> <span class="pre">)</span></code></p>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="relu3.html" class="btn btn-neutral float-right" title="Relu3 - An example kernel" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="About.html" class="btn btn-neutral float-left" title="About Knossos" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Microsoft.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

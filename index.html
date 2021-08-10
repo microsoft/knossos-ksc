@@ -1,0 +1,278 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Welcome to Knossos! &mdash; Knossos 0.7 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="About Knossos" href="About.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #333" >
+          
+
+          
+            <a href="#" class="icon icon-home"> Knossos
+          
+
+          
+            
+            <img src="_static/knossos-logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a></li>
+<li class="toctree-l1"><a class="reference internal" href="relu3.html">Relu3 - An example kernel</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Knossos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Welcome to Knossos!</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="welcome-to-knossos">
+<h1>Welcome to Knossos!<a class="headerlink" href="#welcome-to-knossos" title="Permalink to this headline">¶</a></h1>
+<p>Knossos turns (a subset of) PyTorch code into C++ (and, one day, MLIR and ONNX and other stuff).
+By which we mean actual C++, that you can deploy completely runtime-free if you like,
+or linking against ATen, MLAS, ONNX Runtime, whatever you have.</p>
+<p>But that’s not all – it also contains a source-to-source autodiff, so you can get gradients for free.</p>
+<p>The canonical use case is to write custom PyTorch extenstions.
+Suppose you’ve invented this great new activation function <code class="docutils literal notranslate"><span class="pre">relu3</span></code>:</p>
+<p>It should be better, right?  Smoother with a robust backbone sounds like just the ticket for better convergence.
+Well, let’s try it in an MNIST model.  First, however, we should make it work on tensors:</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">relu3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Like in JAX, this takes a function defined on scalars, and “vectorizes” it to work on
+Tensors (or in fact any container of scalars, such as a tuple of tensors of tuples).</p>
+<p>Now if you know anything about PyTorch, you should be suspicious now: isn’t this going
+to be glacially slow?  Well, let’s see.
+We’ll make a simple DNN with <code class="docutils literal notranslate"><span class="pre">vrelu3</span></code> activations, as in [](<a class="reference external" href="https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa">https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa</a>)</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize the model using nn.Sequential</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">([</span>
+                     <span class="p">(</span><span class="s1">&#39;fc1&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span> <span class="mi">256</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;activation1&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
+                     <span class="p">(</span><span class="s1">&#39;fc2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;bn2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">128</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;activation2&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
+                     <span class="p">(</span><span class="s1">&#39;dropout&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;fc3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;bn3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">64</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;activation3&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
+                     <span class="p">(</span><span class="s1">&#39;logits&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">)),</span>
+                     <span class="p">(</span><span class="s1">&#39;logsoftmax&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">LogSoftmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))]))</span>
+
+<span class="c1"># Run training</span>
+<span class="n">train_model</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And after a few hours, you can hit control C.  It was really slow.</p>
+<div class="section" id="compiling-with-knossos">
+<h2>Compiling with Knossos<a class="headerlink" href="#compiling-with-knossos" title="Permalink to this headline">¶</a></h2>
+<p>This is where Knossos comes to the rescue.</p>
+<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">knossos</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">vrelu3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And run again, amazingly fast!</p>
+<p>So what’s happening?</p>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#the-need-for-an-informal-syntax-and-semantics">The need for an informal syntax and semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-syntax">Basic Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#types">Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-constructs">Basic Constructs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="relu3.html">Relu3 - An example kernel</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="About.html" class="btn btn-neutral float-right" title="About Knossos" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Microsoft.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
