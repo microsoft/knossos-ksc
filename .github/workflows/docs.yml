@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - cogravil/docs_ghpages
   workflow_dispatch:
 
 jobs:
