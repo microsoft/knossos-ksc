@@ -27,7 +27,7 @@ jobs:
         python -m pip install -r doc/requirements.txt
 
     - name: 'Build docs'
-      run:
+      run: >
         cd ./doc
         sh ./make.sh
       
