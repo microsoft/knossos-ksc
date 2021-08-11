@@ -674,6 +674,7 @@ class KscStub:
         Does not wrap torch tensors, or reset memory allocator.
         For test use only
         """
+        self.ensure_compiled(args)
         assert self.compiled  # TODO: infer call args from vjp args
         return self.compiled.py_mod.entry_vjp(*args)
 
