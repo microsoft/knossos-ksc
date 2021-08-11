@@ -1,5 +1,12 @@
 from ksc import utils
 from ksc.type import Type
+from enum import Enum
+
+
+class Vectorization(Enum):
+    NONE = 1
+    VMAP = 2
+    ELEMENTWISE = 3
 
 
 scalar_type_to_cpp_map = {
@@ -50,7 +57,7 @@ def entry_point_cpp_type(t, use_torch):
 
 
 def generate_cpp_entry_points(
-    bindings_to_generate, decls, elementwise=False, use_torch=False
+    bindings_to_generate, decls, vectorization, use_torch=False
 ):
     decls_by_name = {decl.name: decl for decl in decls}
 
@@ -64,7 +71,7 @@ def generate_cpp_entry_points(
             generate_cpp_entry_point(
                 binding_name,
                 lookup_decl(structured_name),
-                elementwise=elementwise,
+                vectorization=vectorization,
                 use_torch=use_torch,
             )
             for binding_name, structured_name in bindings_to_generate
@@ -111,11 +118,15 @@ def arg_types_of_decl(decl):
         return arg_types
 
 
-def generate_cpp_entry_point(cpp_function_name, decl, elementwise, use_torch):
-    if elementwise:
+def generate_cpp_entry_point(cpp_function_name, decl, vectorization, use_torch):
+    if vectorization == Vectorization.ELEMENTWISE:
         if not use_torch:
             raise ValueError("Elementwise operations only available when using torch")
         return generate_cpp_elementwise_entry_point(cpp_function_name, decl)
+    if vectorization == Vectorization.VMAP:
+        if not use_torch:
+            raise ValueError("Elementwise operations only available when using torch")
+        return generate_cpp_vmap_entry_point(cpp_function_name, decl)
 
     arg_types = arg_types_of_decl(decl)
     num_args = len(arg_types)
@@ -198,3 +209,7 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
 }}
 """
     return cpp_declaration, cpp
+
+
+def generate_cpp_vmap_entry_point(cpp_function_name, decl):
+    raise NotImplementedError("vmap")

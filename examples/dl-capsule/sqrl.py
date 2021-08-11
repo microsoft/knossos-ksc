@@ -35,4 +35,18 @@ def sqrl_pytorch_nice(x: torch.Tensor):
 def sqrl_bench_configs():
     yield torch.randn((4, 4))
     yield torch.randn((16, 16))
-    # yield torch.randn((128, 64))  TODO: uncomment after fixing SUF OOM issue
+
+
+#################################
+#
+# vsqrl - vectorized sqrl
+#
+
+vsqrl = knossos.vmap(sqrl)
+
+
+# run-bench: Define a range of values at which to call the methods
+def vsqrl_bench_configs():
+    yield torch.randn((10, 4, 4))
+    yield torch.randn((1000, 4, 4))
+    yield torch.randn((1000, 16, 16))

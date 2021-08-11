@@ -15,7 +15,7 @@ import ksc.torch_frontend as knossos
 import torch._vmap_internals
 
 # BEGINDOC
-@knossos.vmap
+@knossos.register(elementwise=True)
 def vrelu3(x: float) -> float:
     """
     Like ReLu, but smoother

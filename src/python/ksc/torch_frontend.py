@@ -2,6 +2,7 @@ from typing import Callable, List, Tuple, Optional, Union, Set
 from types import ModuleType
 from dataclasses import dataclass, field, replace
 from contextlib import contextmanager
+
 import functools
 import inspect
 import torch
@@ -15,6 +16,7 @@ from ksc.compile import (
     build_module_using_pytorch_from_ks,
     build_module_using_pytorch_from_cpp,
     default_cflags,
+    Vectorization,
 )
 
 from ksc.type import Type
@@ -505,7 +507,7 @@ def make_KscAutogradFunction(py_mod):
 
 
 def ksc_defs_to_module(
-    ksc_defs, entry_def, torch_extension_name, elementwise, generate_lm
+    ksc_defs, entry_def, torch_extension_name, vectorization, generate_lm
 ):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
@@ -541,14 +543,14 @@ def ksc_defs_to_module(
         ks_str,
         entry_def.name,
         torch_extension_name,
-        elementwise,
+        vectorization,
         generate_lm,
         extra_cflags=default_cflags,
     )
 
 
 def ksc_string_to_module(
-    ks_str, entry_sn, torch_extension_name, elementwise, generate_lm, extra_cflags
+    ks_str, entry_sn, torch_extension_name, vectorization, generate_lm, extra_cflags
 ):
     der = "rev" if generate_lm else "sufrev"
     bindings_to_generate = [
@@ -559,7 +561,7 @@ def ksc_string_to_module(
         ks_str,
         bindings_to_generate,
         torch_extension_name,
-        elementwise=elementwise,
+        vectorization=vectorization,
         use_aten=True,
         extra_cflags=extra_cflags,
     )
@@ -578,13 +580,13 @@ def cpp_string_to_module(
 
 
 def ksc_defs_to_autograd_function(
-    ksc_defs, entry_def, torch_extension_name, elementwise=False, generate_lm=True
+    ksc_defs, entry_def, torch_extension_name, vectorization=False, generate_lm=True
 ):
     mod = ksc_defs_to_module(
         ksc_defs,
         entry_def,
         torch_extension_name,
-        elementwise=elementwise,
+        vectorization=vectorization,
         generate_lm=generate_lm,
     )
     return make_KscAutogradFunction(mod)
@@ -601,7 +603,7 @@ def ksc_string_to_autograd_function(
         ks_str,
         entry_sn,
         torch_extension_name,
-        elementwise=False,
+        vectorization=False,
         generate_lm=generate_lm,
         extra_cflags=extra_cflags,
     )
@@ -627,8 +629,18 @@ def _tsmod2ksmod(
     torch_extension_name,
     example_inputs,
     generate_lm=True,
-    elementwise=False,
+    vectorization=Vectorization.NONE,
 ):
+    assert isinstance(example_inputs, tuple)
+
+    # Transform example inputs to match vectorization
+    if vectorization == Vectorization.VMAP:
+        assert len(example_inputs) == 1, "not implemented"
+        example_inputs = (example_inputs[0][0],)
+    elif vectorization == Vectorization.ELEMENTWISE:
+        assert len(example_inputs) == 1, "not implemented"
+        example_inputs = (1.1,)
+
     visitor = TorchScriptVisitor()
     ksc_defs = visitor.generate_defs_recursive(module, function_obj, example_inputs)
 
@@ -637,7 +649,7 @@ def _tsmod2ksmod(
         ksc_defs,
         entry_def,
         torch_extension_name,
-        elementwise=elementwise,
+        vectorization=vectorization,
         generate_lm=generate_lm,
     )
 
@@ -647,6 +659,7 @@ class KscStub:
     raw_f: Callable
     generate_lm: bool
     elementwise: bool
+    vmap: bool
     module: ModuleType
     compiled: Optional[KscAutogradFunction] = field(default=None)
 
@@ -684,7 +697,7 @@ class KscStub:
             torch_extension_name=torch_extension_name,
             example_inputs=example_inputs,
             generate_lm=self.generate_lm,
-            elementwise=self.elementwise,
+            vectorization=self._Vectorization_from_flags(),
         )
 
         return self.compiled
@@ -694,7 +707,8 @@ class KscStub:
             print(f"knossos.register: Compiling {self.raw_f.__name__}")
             torch_extension_name = (
                 "KscStub_"
-                + ("vmap_" if self.elementwise else "")
+                + ("elem_" if self.elementwise else "")
+                + ("vmap_" if self.vmap else "")
                 + ("lm_" if self.generate_lm else "")
                 + self.module.__name__
                 + "_"
@@ -703,6 +717,14 @@ class KscStub:
             if self.generate_lm:
                 torch_extension_name += "__generate_lm"
             self.compile(example_inputs, torch_extension_name)
+
+    def _Vectorization_from_flags(self):
+        assert not (self.elementwise and self.vmap)
+        if self.elementwise:
+            return Vectorization.ELEMENTWISE
+        if self.vmap:
+            return Vectorization.VMAP
+        return Vectorization.NONE
 
 
 def optional_arg_decorator(register):
@@ -724,7 +746,9 @@ def optional_arg_decorator(register):
 
 
 @optional_arg_decorator
-def register(f: Callable, module: ModuleType, generate_lm=False, vmap=False) -> KscStub:
+def register(
+    f: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
+) -> KscStub:
     """
     Main Knossos entry point.
 
@@ -745,7 +769,9 @@ def register(f: Callable, module: ModuleType, generate_lm=False, vmap=False) -> 
     when "f.compile()" is explicitly called.
     """
 
-    return KscStub(f, generate_lm=generate_lm, elementwise=vmap, module=module)
+    return KscStub(
+        f, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap, module=module
+    )
 
 
 @optional_arg_decorator
@@ -754,10 +780,11 @@ def vmap(f: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
     Knossos entry point for vmap.
     ```
        @knossos.vmap
-       def f(x : float) -> float:
+       def f(x : Tensor) -> Tensor:
            return x * sin(x)
     ```
-    Transforms f to have signature Tensor -> Tensor
+    Where the input is expects Tensors of rank N, and returns rank M
+    Transforms f to have signature Tensor [1+N] -> Tensor [1+M]
     TODO: handle multiple args and return types,
     e.g. transform (float, float, float) -> (float, float)
                 to (Tensor, Tensor, Tensor) -> (Tensor, Tensor)
@@ -767,7 +794,11 @@ def vmap(f: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
     """
     if isinstance(f, KscStub):
         # Copy the existing one, setting elementwise, and force recompilation
-        return replace(f, elementwise=True, compiled=None)
+        assert not f.elementwise
+        return replace(f, vmap=True, compiled=None)
     else:
         # F is a callable, do as register does
-        return KscStub(f, generate_lm=generate_lm, elementwise=True, module=module)
+        return KscStub(
+            f, generate_lm=generate_lm, elementwise=False, vmap=True, module=module
+        )
+
