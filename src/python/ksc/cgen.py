@@ -4,6 +4,22 @@ from enum import Enum
 
 
 class Vectorization(Enum):
+    """
+    Options for vectorization of knossos-registered functions.
+
+    Suppose a knossos function
+       def f(x : Tensor) -> Tensor 
+
+    is called with x a tensor of size [PxMxN].  
+    
+    The Vectorize enum decides how f is mapped over this argument as follows:
+    
+    NONE: f is compiled to take rank 3 tensors.
+    ELEMENTWISE: f is compiled to take floats (rank 0), and is computed elementwise
+    VMAP: f is compiled to take rank 2 tensors, and mapped over the first dimension.
+
+    """
+
     NONE = 1
     VMAP = 2
     ELEMENTWISE = 3
