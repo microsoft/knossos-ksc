@@ -657,10 +657,10 @@ def _tsmod2ksmod(
 @dataclass
 class KscStub:
     raw_f: Callable
+    module: ModuleType
     generate_lm: bool
     elementwise: bool
     vmap: bool
-    module: ModuleType
     compiled: Optional[KscAutogradFunction] = field(default=None)
 
     def __call__(self, *args):
@@ -727,6 +727,40 @@ class KscStub:
         return Vectorization.NONE
 
 
+def _register_core(
+    f: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
+) -> KscStub:
+
+    if isinstance(f, KscStub):
+        # Copy the existing KscStub, setting new flags, and force recompilation
+        return replace(
+            f,
+            generate_lm=generate_lm,
+            elementwise=elementwise,
+            vmap=vmap,
+            compiled=None,
+        )
+    else:
+        # Create a ksc stub
+        return KscStub(
+            raw_f=f,
+            module=module,
+            generate_lm=generate_lm,
+            elementwise=elementwise,
+            vmap=vmap,
+            compiled=None,
+        )
+
+
+# TODO: In Python 3.9, optional-argument decorators will be much simpler.
+# https://docs.python.org/3.9/reference/compound_stmts.html#function
+def register_direct(func: Callable, generate_lm=False, elementwise=False, vmap=False):
+    module = inspect.getmodule(inspect.currentframe().f_back)
+    return _register_core(
+        func, module, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap,
+    )
+
+
 def optional_arg_decorator(register):
     # https://stackoverflow.com/a/20966822
     def wrapped_decorator(*args, **kwargs):
@@ -747,7 +781,7 @@ def optional_arg_decorator(register):
 
 @optional_arg_decorator
 def register(
-    f: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
+    func: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
 ) -> KscStub:
     """
     Main Knossos entry point.
@@ -757,47 +791,59 @@ def register(
     derivatives.
     ```
        @knossos.register
-       def f(x : torch.Tensor) -> torch.Tensor:
+       def foo(x : torch.Tensor) -> torch.Tensor:
            return x * sin(x)
     ```
-    Endows f with the following behaviours
+    Endows `foo` with the following behaviours
     ```
-        y = f(x)       # Fast (C++/CUDA/...) computation of f(x)
-        vjp(f, x, dy)  # Fast computation of dot(dy, [df_i/dx_j])
+        y = foo(x)        # Fast (C++/CUDA/...) computation of f(x)
+        vjp(foo, x, dy)   # Fast computation of dot(dy, [df_i/dx_j])
     ```
     The implementation delays compilation until the first call, or 
-    when "f.compile()" is explicitly called.
+    when "foo.compile()" is explicitly called.
     """
-
-    return KscStub(
-        f, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap, module=module
+    return _register_core(
+        func, module, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap,
     )
 
 
 @optional_arg_decorator
-def vmap(f: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
+def vmap(func: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
     """
     Knossos entry point for vmap.
     ```
        @knossos.vmap
-       def f(x : Tensor) -> Tensor:
+       def foo(x : Tensor) -> Tensor:
            return x * sin(x)
     ```
-    Where the input is expects Tensors of rank N, and returns rank M
-    Transforms f to have signature Tensor [1+N] -> Tensor [1+M]
+    Where the expected input is a Tensor of rank N, and returns a Tensor of rank M
+    Transforms `foo` to have signature Tensor [1+N] -> Tensor [1+M]
     TODO: handle multiple args and return types,
-    e.g. transform (float, float, float) -> (float, float)
-                to (Tensor, Tensor, Tensor) -> (Tensor, Tensor)
+    e.g. transform (Tensor [2], Tensor [N], float) -> (float, Tensor [M])
+                to (Tensor [3], Tensor [1+N], Tensor [1]) -> (Tensor [1], Tensor [1+M])
     ```
     The implementation delays compilation until the first call, or
     when "f.compile()" is explicitly called.
     """
-    if isinstance(f, KscStub):
-        # Copy the existing one, setting elementwise, and force recompilation
-        assert not f.elementwise
-        return replace(f, vmap=True, compiled=None)
-    else:
-        # F is a callable, do as register does
-        return KscStub(
-            f, generate_lm=generate_lm, elementwise=False, vmap=True, module=module
-        )
+    return _register_core(
+        func, module, generate_lm=generate_lm, elementwise=False, vmap=True,
+    )
+
+
+@optional_arg_decorator
+def elementwise(func: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
+    """
+    Knossos entry point for elementwise.
+    ```
+       @knossos.elementwise
+       def foo(x : float) -> float:
+           return x * sin(x)
+    ```
+    Transforms `foo` to have signature Tensor -> Tensor, operating elementwise
+
+    The implementation delays compilation until the first call, or
+    when "f.compile()" is explicitly called.
+    """
+    return _register_core(
+        func, module, generate_lm=generate_lm, elementwise=True, vmap=False,
+    )
