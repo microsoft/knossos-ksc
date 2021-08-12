@@ -10,9 +10,7 @@
 
    About
    SYNTAX
-   Examples
-   Benchmarking
-   MLIR.md
+   relu3
    Glossary
 
 
