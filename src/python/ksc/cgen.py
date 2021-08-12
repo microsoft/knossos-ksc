@@ -17,7 +17,6 @@ class Vectorization(Enum):
     NONE: f is compiled to take rank 3 tensors.
     ELEMENTWISE: f is compiled to take floats (rank 0), and is computed elementwise
     VMAP: f is compiled to take rank 2 tensors, and mapped over the first dimension.
-
     """
 
     NONE = 1
