@@ -755,7 +755,10 @@ def _register_core(
 # TODO: In Python 3.9, optional-argument decorators will be much simpler.
 # https://docs.python.org/3.9/reference/compound_stmts.html#function
 def register_direct(func: Callable, generate_lm=False, elementwise=False, vmap=False):
-    module = inspect.getmodule(inspect.currentframe().f_back)
+    frame = inspect.currentframe()
+    assert frame
+    module = inspect.getmodule(frame.f_back)
+    assert module
     return _register_core(
         func, module, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap,
     )
