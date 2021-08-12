@@ -82,7 +82,7 @@ def sigmoid(x):
 
 
 # Gelu and activations
-@knossos.vmap
+@knossos.elementwise
 def vgelu(x: float) -> float:
     return 0.5 * x * (1.0 + erf(x / sqrt(2)))
 
