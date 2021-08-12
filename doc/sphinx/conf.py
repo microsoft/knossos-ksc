@@ -31,7 +31,7 @@ release = "0.7"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "recommonmark", 
+    "recommonmark",
     "sphinx_rtd_theme",
 ]
 
@@ -75,4 +75,5 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-source_suffix = ['.rst', '.md']
+source_suffix = [".rst", ".md"]
+
