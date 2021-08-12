@@ -7,7 +7,7 @@
 	     ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 
-module LangUtils (
+module Ksc.LangUtils (
   -- Functions over expressions
   isTrivial, splitTuple,
 
@@ -23,7 +23,7 @@ module LangUtils (
   notFreeIn, newVarNotIn, freeVarsOf,
 
   -- Tests
-  LangUtils.hspec, test_FreeIn,
+  Ksc.LangUtils.hspec, test_FreeIn,
 
   -- Symbol table
   GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
@@ -37,7 +37,7 @@ module LangUtils (
 
   ) where
 
-import Lang
+import Ksc.Lang
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
@@ -165,7 +165,7 @@ hspec = do
         newVarNotIn TypeFloat e2 `shouldBe` (var "_t2")
 
 test_FreeIn :: IO ()
-test_FreeIn = Test.Hspec.hspec LangUtils.hspec
+test_FreeIn = Test.Hspec.hspec Ksc.LangUtils.hspec
 
 
 -----------------------------------------------

@@ -1,10 +1,10 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Rules( RuleBase, tryRules, mkRuleBase ) where
+module Ksc.Rules( RuleBase, tryRules, mkRuleBase ) where
 
-import Lang
-import LangUtils ()
+import Ksc.Lang
+import Ksc.LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
 

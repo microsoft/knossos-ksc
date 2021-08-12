@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
 {-# LANGUAGE DataKinds  #-}
 
-module Cgen where
+module Ksc.Cgen where
 
 import           GHC.Stack
 import           Prelude                 hiding ( lines
@@ -20,8 +20,8 @@ import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
-import           Lang                    hiding ( (<>) )
-import qualified OptLet
+import           Ksc.Lang                hiding ( (<>) )
+import qualified Ksc.OptLet
 
 import Debug.Trace
 
@@ -340,7 +340,7 @@ params_withPackedParams param = case typeof param of
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
         packParams = mkLet param (Tuple (map Var params))
-    in (params, OptLet.ensureDon'tReuseParams params . packParams)
+    in (params, Ksc.OptLet.ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
 mkCTypedVar :: TVar -> String

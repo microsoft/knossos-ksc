@@ -7,8 +7,8 @@
 
 module Ksc.SUF.Rewrite (rewriteSUFFwdPass, rewriteSUFRevPass) where
 
-import Lang
-import Prim
+import Ksc.Lang
+import Ksc.Prim
 
 rewriteSUFFwdPass :: PrimFun -> TExpr -> Maybe TExpr
 rewriteSUFFwdPass (P_SelFun i n) arg

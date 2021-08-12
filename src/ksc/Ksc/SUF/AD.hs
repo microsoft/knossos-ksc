@@ -7,11 +7,11 @@ module Ksc.SUF.AD where
 
 import           Ksc.SUF (L2(L2), L3(L3), L4(L4), L8(L8))
 
-import           Lang
-import           LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
+import           Ksc.Lang
+import           Ksc.LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
                             freeVarsOf, lookupGblST, InScopeSet, mkInScopeSet,
                             extendInScopeSet)
-import           Prim
+import           Ksc.Prim
 
 import qualified Data.Set as S
 import           Data.Maybe (mapMaybe, catMaybes)

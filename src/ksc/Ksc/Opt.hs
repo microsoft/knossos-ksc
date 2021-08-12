@@ -8,15 +8,15 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
+module Ksc.Opt( optLets, optDef, optDefs, optE, Ksc.Opt.hspec, simplify, test_opt ) where
 
-import Lang
-import LangUtils
-import ANF
-import Prim
-import Rules
-import OptLet
-import KMonad
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.ANF
+import Ksc.Prim
+import Ksc.Rules
+import Ksc.OptLet
+import Ksc.KMonad
 import Ksc.Opt.Shape ( optShape )
 import qualified Ksc.SUF.Rewrite as SUF
 import Ksc.Traversal( traverseState, mapAccumLM )
@@ -1055,4 +1055,4 @@ hspec = do
             lmHCat [lmAdd l1 l2, lmScale TypeFloat f4]
 
 test_opt:: IO ()
-test_opt = Test.Hspec.hspec Opt.hspec
+test_opt = Test.Hspec.hspec Ksc.Opt.hspec

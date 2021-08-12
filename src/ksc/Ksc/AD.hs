@@ -3,12 +3,12 @@
 
 {-# LANGUAGE DataKinds #-}
 
-module AD where
+module Ksc.AD where
 
-import Lang
-import LangUtils
-import Prim
-import qualified OptLet
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.Prim
+import qualified Ksc.OptLet
 import GHC.Stack
 
 import Data.Maybe (mapMaybe, fromMaybe)
@@ -71,7 +71,7 @@ gradDefInner adp
     s_ty = typeof s
 
     -- See Note: [Shadowing after grad]
-    rhs' = OptLet.ensureDon'tReuseParams [params] rhs
+    rhs' = Ksc.OptLet.ensureDon'tReuseParams [params] rhs
 
     lets = [ (gradTVar adp s params,
               mkGradTuple adp (Var params) (lmOne (typeof params)))
