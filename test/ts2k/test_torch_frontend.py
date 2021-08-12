@@ -60,7 +60,7 @@ def test_ts2k_relux():
 
 
 def test_ts2k_relux_grad():
-    relux.ensure_compiled(2.0)  # TODO: when entry_vjp knows how to compile
+    relux.ensure_compiled((2.0,))  # TODO: remove when entry_vjp knows how to compile
     ks_ans = relux._entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
