@@ -3,10 +3,10 @@ Relu3 - An example kernel
 =========================
 
 
-.. literalinclude:: ../../examples/dl-relu3/relu3.py
+.. literalinclude:: ../../examples/dl-activations/relu3.py
      :language: Python
-     :start-after: BEGINDOC
-     :end-before: ENDDOC
+     :start-after: DOC-KS
+     :end-before: ENDDOC-KS
 
 .. figure:: relu3-plot.png
    :scale: 50 %

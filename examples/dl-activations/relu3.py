@@ -12,7 +12,7 @@ from ksc.torch_frontend import (
 )
 import ksc.torch_frontend as knossos
 
-# BEGINDOC
+# DOC-KS
 @knossos.elementwise
 def vrelu3(x: float) -> float:
     """
@@ -27,10 +27,11 @@ def vrelu3(x: float) -> float:
         return x - 2 / 3
 
 
-# ENDDOC
+# ENDDOC-KS
 
 
 # run-bench: PyTorch reference implementation
+# DOC-PTREF
 def vrelu3_pytorch(x: torch.Tensor):
     mask1_inf = x > 1.0
     mask0_1 = (x > 0.0) & ~mask1_inf
@@ -38,6 +39,9 @@ def vrelu3_pytorch(x: torch.Tensor):
     val_1_inf = x - 2 / 3
 
     return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+
+
+# ENDDOC-PTREF
 
 
 # run-bench: PyTorch "nice" implementation
