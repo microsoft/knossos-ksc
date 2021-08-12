@@ -801,4 +801,3 @@ def vmap(f: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
         return KscStub(
             f, generate_lm=generate_lm, elementwise=False, vmap=True, module=module
         )
-
