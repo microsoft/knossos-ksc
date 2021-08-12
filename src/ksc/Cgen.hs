@@ -275,13 +275,10 @@ cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 markAllocator :: String -> String -> String
-markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ allocVar ++ "->mark();"
+markAllocator bumpmark allocVar = "KS_MARK(" ++ allocVar ++ ", " ++ bumpmark ++ ");"
 
 resetAllocator :: String -> String -> String
-resetAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
-
-moveMark :: String -> String -> String
-moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
+resetAllocator bumpmark allocVar = "KS_RESET(" ++ allocVar ++ ", " ++ bumpmark ++ ");"
 
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
@@ -408,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
         (  [ cComment "Explicitly-requested copydown",
              markAllocator bumpmark allocatorParameterName ]
         ++ cdecl
-        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ generateCGRE cexpr ++ ");" ]
+        ++ [ cgenType ctype ++ " " ++ ret ++ " = KS_COPYDOWN(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", (" ++ generateCGRE cexpr ++ "));" ]
         )
         (CGREVar (Simple ret))
         ctype
