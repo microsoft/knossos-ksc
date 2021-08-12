@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 
-module KMonad where
+module Ksc.KMonad where
 
 import Control.Monad.State hiding (liftIO)
 import qualified Control.Monad.State

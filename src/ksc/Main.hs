@@ -4,13 +4,13 @@
 
 module Main where
 
-import Lang
-import LangUtils
-import Parse (parseE)
-import Opt
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.Parse (parseE)
+import Ksc.Opt
 import Ksc.Pipeline (displayCppGenAndCompile, genFuthark)
 import qualified Ksc.Pipeline
-import qualified Cgen
+import qualified Ksc.Cgen
 import qualified Control.Exception
 import qualified Data.Maybe
 import Data.List( intercalate )
@@ -28,9 +28,9 @@ import Text.Parsec hiding (option)
 
 hspec :: Spec
 hspec = do
-    Opt.hspec
-    Lang.hspec
-    LangUtils.hspec
+    Ksc.Opt.hspec
+    Ksc.Lang.hspec
+    Ksc.LangUtils.hspec
 
 -- | 'main' is the entry point of this module. It allows compiling
 -- @.ks@ files, running tests and profiling.
@@ -103,8 +103,8 @@ compileAndRun = parseErr p
 
           return $ do
             Ksc.Pipeline.displayCppGen Nothing cppincludefiles inputs ksout cppout
-            Cgen.compile compiler cppout exeout
-            output <- Cgen.runExe exeout
+            Ksc.Cgen.compile compiler cppout exeout
+            output <- Ksc.Cgen.runExe exeout
             putStrLn output
 
 satisfyS :: Monad m => (String -> Bool) -> ParsecT [String] u m String
@@ -238,7 +238,7 @@ futharkCompileKscPrograms ksFiles = do
                         ++ " because it is known not to work with Futhark")
          else do
             genFuthark ["src/runtime/prelude"] ksTest
-            Cgen.readProcessPrintStderrOnFail
+            Ksc.Cgen.readProcessPrintStderrOnFail
               "futhark-0.11.2-linux-x86_64/bin/futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
             return ()
@@ -311,8 +311,8 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  (exe, _) <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["prelude.h"] ["src/runtime/prelude"] source
-  Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
+  (exe, _) <- displayCppGenAndCompile (Ksc.Cgen.compileWithProfiling compiler) ".exe" Nothing ["prelude.h"] ["src/runtime/prelude"] source
+  Ksc.Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
                                                                }

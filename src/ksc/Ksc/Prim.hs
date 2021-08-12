@@ -5,10 +5,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Prim where
+module Ksc.Prim where
 
-import Lang
-import LangUtils (isTrivial)
+import Ksc.Lang
+import Ksc.LangUtils (isTrivial)
 import GHC.Stack (HasCallStack)
 import Data.Maybe (isJust)
 import Control.Monad (zipWithM)

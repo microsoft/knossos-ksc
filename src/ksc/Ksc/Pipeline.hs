@@ -6,24 +6,24 @@
 
 module Ksc.Pipeline where
 
-import Annotate (annotDecls, lintDefs)
-import AD (gradDef, applyDef)
-import qualified Cgen
-import CSE (cseDefs)
-import KMonad (KM, KMT, runKM,  banner)
+import Ksc.Annotate (annotDecls, lintDefs)
+import Ksc.AD (gradDef, applyDef)
+import qualified Ksc.Cgen
+import Ksc.CSE (cseDefs)
+import Ksc.KMonad (KM, KMT, runKM,  banner)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
+import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
-import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
+import qualified Ksc.Lang as L
+import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
 import qualified Ksc.Futhark
-import Parse (parseF)
-import Rules (mkRuleBase)
-import Opt (optDefs)
-import Shapes (shapeDefs)
+import Ksc.Parse (parseF)
+import Ksc.Rules (mkRuleBase)
+import Ksc.Opt (optDefs)
+import Ksc.Shapes (shapeDefs)
 import Ksc.SUF (sufDef)
 import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
@@ -55,7 +55,7 @@ displayCppGen verbosity cppincludefiles ksFiles ksofile cppfile =
   ; decls0 <- fmap concat (mapM parseF ksFiles)
   ; putStrLn "ksc: read decls"
   ; defs <- pipelineIO verbosity decls0
-  ; Cgen.cppGenWithFiles ksofile cppfile cppincludefiles defs
+  ; Ksc.Cgen.cppGenWithFiles ksofile cppfile cppincludefiles defs
   }
 
 displayCppGenAndCompile
@@ -90,8 +90,8 @@ displayCppGenCompileAndRun :: HasCallStack
                            -> IO (String, (String, String))
 displayCppGenCompileAndRun compilername verbosity cppincludefiles files file = do
   { (exefile, cpp_kso) <- displayCppGenAndCompile
-                          (Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
-  ; output <- Cgen.runExe exefile
+                          (Ksc.Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
+  ; output <- Ksc.Cgen.runExe exefile
   ; pure (output, cpp_kso)
   }
 
@@ -280,7 +280,7 @@ genFuthark files file = do
   prelude <- readFile "src/runtime/knossos.fut"
   defs <- futharkPipeline (files ++ [file])
   putStrLn $ "ksc: Writing to " ++ futfile
-  Cgen.createDirectoryWriteFile futfile $
+  Ksc.Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
     prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
   where futfile = "obj/" ++ file ++ ".fut"

@@ -8,12 +8,12 @@ import           Data.Int
 import           Data.List
 import           Prelude                 hiding ( (<>) )
 
-import qualified Cgen
-import qualified Lang                    as L
-import Lang (Pretty(..), text, render, empty, parensIf,
+import qualified Ksc.Cgen
+import qualified Ksc.Lang                as L
+import Ksc.Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
              integer, double, comma, PrimFun(..))
-import qualified LangUtils               as LU
+import qualified Ksc.LangUtils           as LU
 
 --------------------------
 -- Futhark AST definition
@@ -225,7 +225,7 @@ toTypedName = toTypedNameString . render . ppr
 -- TypeInteger] would give "ii" instead of "<ii>".
 toTypedNameString :: String -> L.TypeX -> Name
 toTypedNameString x ty =
-  escape (Cgen.mangleFun (x ++ "@" ++ Cgen.mangleType ty))
+  escape (Ksc.Cgen.mangleFun (x ++ "@" ++ Ksc.Cgen.mangleType ty))
 
 toFutharkType :: L.Type -> Type
 toFutharkType L.TypeInteger    = I32

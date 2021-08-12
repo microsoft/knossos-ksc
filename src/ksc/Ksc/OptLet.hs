@@ -4,7 +4,7 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module OptLet( optLets
+module Ksc.OptLet( optLets
              , Subst
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
@@ -13,9 +13,9 @@ module OptLet( optLets
              , ensureDon'tReuseParams )
              where
 
-import Lang
-import LangUtils
-import Prim
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.Prim
 import Ksc.Traversal (traverseState)
 import           Data.List (foldl')
 import qualified Data.Map as M

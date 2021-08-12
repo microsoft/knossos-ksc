@@ -1,7 +1,7 @@
 module Ksc.Opt.Shape where
 
-import Lang
-import Prim
+import Ksc.Lang
+import Ksc.Prim
 
 -- See Note [Compressed shape types]
 

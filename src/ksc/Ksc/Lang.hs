@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
 -- Pattern match exhaustiveness checker seems to be broken on synonyms
 
-module Lang where
+module Ksc.Lang where
 
 import           Prelude                 hiding ( (<>) )
 
@@ -20,7 +20,7 @@ import qualified Ksc.Traversal                  as T
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
-import           KMonad
+import           Ksc.KMonad
 
 import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
@@ -1283,7 +1283,7 @@ hspec = do
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
 
 test_Pretty :: IO ()
-test_Pretty = Test.Hspec.hspec Lang.hspec
+test_Pretty = Test.Hspec.hspec Ksc.Lang.hspec
 
 -----------------------------------------------
 --     Equality modulo alpha

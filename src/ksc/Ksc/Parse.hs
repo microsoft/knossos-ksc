@@ -4,7 +4,7 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module Parse  where
+module Ksc.Parse  where
 
 {- The language we parse
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,7 +97,7 @@ Notes:
 -}
 
 
-import Lang hiding (parens, brackets)
+import Ksc.Lang hiding (parens, brackets)
 import Ksc.Traversal ( over )
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
