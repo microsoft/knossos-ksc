@@ -69,7 +69,7 @@ def relux_pt(x: float):
     return (x < 0) * (0.1 * x) + (x > 0) * (x * x)
 
 
-vrelux = knossos.vmap(relux)
+vrelux = knossos.register_direct(relux, elementwise=True)
 
 
 def test_ts2k_vrelux():
