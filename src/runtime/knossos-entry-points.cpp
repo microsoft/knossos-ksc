@@ -14,8 +14,8 @@ size_t allocator_peak() { return g_alloc.peak(); }
 #else
 
 void reset_allocator() { }
-size_t allocator_top() { }
-size_t allocator_peak() { }
+size_t allocator_top() { return 0u; }
+size_t allocator_peak() { return 0u; }
 
 #endif
 
