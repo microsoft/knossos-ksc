@@ -140,7 +140,7 @@ def generate_cpp_entry_point(cpp_function_name, decl, vectorization, use_torch):
         return generate_cpp_elementwise_entry_point(cpp_function_name, decl)
     if vectorization == Vectorization.VMAP:
         if not use_torch:
-            raise ValueError("Elementwise operations only available when using torch")
+            raise ValueError("VMap only available when using torch")
         return generate_cpp_vmap_entry_point(cpp_function_name, decl)
 
     arg_types = arg_types_of_decl(decl)
