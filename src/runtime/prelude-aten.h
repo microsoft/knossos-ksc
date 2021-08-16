@@ -5,7 +5,7 @@
 
 namespace ks {
 
-tensor<1, Float> 
+KS_INLINE_FUNCTION tensor<1, Float> 
 aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,Float> const& M, tensor<1,Float> const& v)
 {
 	auto [r,c] = size(M);
@@ -16,7 +16,7 @@ aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,Float> const& M, tensor<1,Flo
 	return ret;
 }
 
-tensor<2, Float> 
+KS_INLINE_FUNCTION tensor<2, Float> 
 aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Float> const& B)
 {
 	auto [r,K] = size(A);
@@ -33,7 +33,7 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Flo
 	return ret;
 }
 
-Tuple<tensor<2,Float>,tensor<1,Float>> 
+KS_INLINE_FUNCTION Tuple<tensor<2,Float>,tensor<1,Float>> 
 rev$aten$8$8matmul$aT2fT1f(allocator * alloc, Tuple<tensor<2,Float>, tensor<1,Float>> const& M_v, tensor<1,Float> const& dr)
 {
 	auto [M, v] = M_v;
@@ -56,7 +56,7 @@ rev$aten$8$8matmul$aT2fT1f(allocator * alloc, Tuple<tensor<2,Float>, tensor<1,Fl
 }
 
 template <size_t Dim, class T>
-tensor<Dim, T>
+KS_INLINE_FUNCTION tensor<Dim, T>
 aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
 {
 	return elementwise_map(alloc, a, [i](T const& v) { return std::pow(v, i); });
@@ -76,7 +76,7 @@ typedef tensor<1, Float> Vec;
 (edef rev$aten::cat (Tuple (Tensor 1 Mat) (Tuple)) ((Tuple (Tensor 1 Mat) Integer) Mat))
 (edef shape$rev$aten::cat (Tuple (Tensor 1 (Tensor 2 (Tuple))) (Tuple)) ((Tuple (Tensor 1 Mat) Integer) Mat))
 */
-Mat
+KS_INLINE_FUNCTION Mat
 aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 {
 	int n = size(As);
@@ -114,13 +114,13 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 	KS_ASSERT(false)
 }
 
-Tuple<int, int>
+KS_INLINE_FUNCTION Tuple<int, int>
 shape$aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 {
 	KS_ASSERT(false)
 }
 
-Tuple<tensor<1, Mat>,Tuple<>>
+KS_INLINE_FUNCTION Tuple<tensor<1, Mat>,Tuple<>>
 rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	auto [As, dim] = arg;
@@ -151,7 +151,7 @@ rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg
 	KS_ASSERT(false)
 }
 
-Tuple<tensor<1, Tuple<int, int>>,Tuple<>>
+KS_INLINE_FUNCTION Tuple<tensor<1, Tuple<int, int>>,Tuple<>>
 shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	KS_ASSERT(false)
@@ -168,7 +168,7 @@ shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> cons
 ;                 (add (index (tuple i j) A) (index j b))))))))
 */
 
-Mat
+KS_INLINE_FUNCTION Mat
 addA1bt$aT2fT1f(allocator * alloc, Mat const& A, Vec const& b)
 {
 	auto [M, N] = size(A);
@@ -186,7 +186,7 @@ addA1bt$aT2fT1f(allocator * alloc, Mat const& A, Vec const& b)
 // dR = dA + 1 db' = [I, 1] * [dA, db] ??? TODO
 // [dA, db] = [dR, dR * 1]
 
-Tuple<Mat, Vec>
+KS_INLINE_FUNCTION Tuple<Mat, Vec>
 rev$addA1bt$aT2fT1f(allocator * alloc, Tuple<Mat, Vec> const& args, Mat const& dret)
 {
 	auto [M, N] = size(dret);
