@@ -1,9 +1,13 @@
+from typing import Any
+from enum import Enum
+from dataclasses import dataclass, field
+
 from ksc import utils
 from ksc.type import Type
-from enum import Enum
+from ksc.expr import Def
 
 
-class Vectorization(Enum):
+class VecSpec:
     """
     Options for vectorization of knossos-registered functions.
 
@@ -12,16 +16,38 @@ class Vectorization(Enum):
 
     is called with x a tensor of size [PxMxN].  
     
-    The Vectorize enum decides how f is mapped over this argument as follows:
+    The VecSpec_* derived class decides how f is mapped over this argument as follows:
     
-    NONE: f is compiled to take rank 3 tensors.
-    ELEMENTWISE: f is compiled to take floats (rank 0), and is computed elementwise
-    VMAP: f is compiled to take rank 2 tensors, and mapped over the first dimension.
+     None: f is compiled to take rank 3 tensors.
+     Elementwise: f is compiled to take floats (rank 0), and is computed elementwise.
+     VMap: f is compiled to take rank 2 tensors, and mapped over the first dimension.
     """
 
-    NONE = 1
-    VMAP = 2
-    ELEMENTWISE = 3
+    pass
+
+
+@dataclass
+class VecSpec_None(VecSpec):
+    pass
+
+    def str(self):
+        return "VSnone"
+
+
+@dataclass
+class VecSpec_Elementwise(VecSpec):
+    example_element: Any = field(default=1.1)
+
+    def str(self):
+        return "VSelem"
+
+
+@dataclass
+class VecSpec_VMap(VecSpec):
+    dims_to_strip: int = field(default=1)
+
+    def str(self):
+        return "VSvmap"
 
 
 scalar_type_to_cpp_map = {
@@ -133,12 +159,14 @@ def arg_types_of_decl(decl):
         return arg_types
 
 
-def generate_cpp_entry_point(cpp_function_name, decl, vectorization, use_torch):
-    if vectorization == Vectorization.ELEMENTWISE:
+def generate_cpp_entry_point(
+    cpp_function_name: str, decl: Def, vectorization: VecSpec, use_torch: bool
+):
+    if isinstance(vectorization, VecSpec_Elementwise):
         if not use_torch:
             raise ValueError("Elementwise operations only available when using torch")
         return generate_cpp_elementwise_entry_point(cpp_function_name, decl)
-    if vectorization == Vectorization.VMAP:
+    if isinstance(vectorization, VecSpec_VMap):
         if not use_torch:
             raise ValueError("VMap only available when using torch")
         return generate_cpp_vmap_entry_point(cpp_function_name, decl)

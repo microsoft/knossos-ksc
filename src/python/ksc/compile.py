@@ -13,7 +13,7 @@ from tempfile import gettempdir
 from torch.utils import cpp_extension
 
 from ksc import cgen, utils
-from ksc.cgen import Vectorization
+from ksc.cgen import VecSpec, VecSpec_None, VecSpec_Elementwise, VecSpec_VMap
 from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
@@ -189,7 +189,7 @@ def generate_cpp_for_py_module_from_ks(
     ks_str,
     bindings_to_generate,
     python_module_name,
-    vectorization=Vectorization.NONE,
+    vectorization=VecSpec_None,
     use_aten=True,
     use_torch=False,
 ):
@@ -268,7 +268,7 @@ PYBIND11_MODULE("""
 def build_py_module_from_ks(
     ks_str,
     bindings_to_generate,
-    vectorization=Vectorization.NONE,
+    vectorization: VecSpec = VecSpec_None,
     use_aten=False,
     use_torch=False,
 ):
@@ -299,7 +299,7 @@ def build_module_using_pytorch_from_ks(
     ks_str,
     bindings_to_generate,
     torch_extension_name,
-    vectorization=Vectorization.NONE,
+    vectorization: VecSpec = VecSpec_None,
     use_aten=False,
     extra_cflags=[],
 ):

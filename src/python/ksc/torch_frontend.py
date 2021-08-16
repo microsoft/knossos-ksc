@@ -16,7 +16,10 @@ from ksc.compile import (
     build_module_using_pytorch_from_ks,
     build_module_using_pytorch_from_cpp,
     default_cflags,
-    Vectorization,
+    VecSpec,
+    VecSpec_None,
+    VecSpec_Elementwise,
+    VecSpec_VMap,
 )
 
 from ksc.type import Type
@@ -629,17 +632,19 @@ def _tsmod2ksmod(
     torch_extension_name,
     example_inputs,
     generate_lm=True,
-    vectorization=Vectorization.NONE,
+    vectorization: VecSpec = VecSpec_None,
 ):
     assert isinstance(example_inputs, tuple)
 
     # Transform example inputs to match vectorization
-    if vectorization == Vectorization.VMAP:
+    if isinstance(vectorization, VecSpec_VMap):
         assert len(example_inputs) == 1, "not implemented"
         example_inputs = (example_inputs[0][0],)
-    elif vectorization == Vectorization.ELEMENTWISE:
+    elif isinstance(vectorization, VecSpec_Elementwise):
         assert len(example_inputs) == 1, "not implemented"
         example_inputs = (1.1,)
+    else:
+        assert isinstance(vectorization, VecSpec_None)
 
     visitor = TorchScriptVisitor()
     ksc_defs = visitor.generate_defs_recursive(module, function_obj, example_inputs)
@@ -659,8 +664,7 @@ class KscStub:
     raw_f: Callable
     module: ModuleType
     generate_lm: bool
-    elementwise: bool
-    vmap: bool
+    vectorization: VecSpec
     compiled: Optional[KscAutogradFunction] = field(default=None)
 
     def __call__(self, *args):
@@ -697,7 +701,7 @@ class KscStub:
             torch_extension_name=torch_extension_name,
             example_inputs=example_inputs,
             generate_lm=self.generate_lm,
-            vectorization=self._Vectorization_from_flags(),
+            vectorization=self.vectorization,
         )
 
         return self.compiled
@@ -707,8 +711,7 @@ class KscStub:
             print(f"knossos.register: Compiling {self.raw_f.__name__}")
             torch_extension_name = (
                 "KscStub_"
-                + ("elem_" if self.elementwise else "")
-                + ("vmap_" if self.vmap else "")
+                + self.vectorization.str() + "_"
                 + ("lm_" if self.generate_lm else "")
                 + self.module.__name__
                 + "_"
@@ -718,27 +721,24 @@ class KscStub:
                 torch_extension_name += "__generate_lm"
             self.compile(example_inputs, torch_extension_name)
 
-    def _Vectorization_from_flags(self):
-        assert not (self.elementwise and self.vmap)
-        if self.elementwise:
-            return Vectorization.ELEMENTWISE
-        if self.vmap:
-            return Vectorization.VMAP
-        return Vectorization.NONE
+
+def _Vectorization_from_flags(elementwise, vmap):
+    assert not (elementwise and vmap)
+    if elementwise:
+        return VecSpec_Elementwise()
+    if vmap:
+        return VecSpec_VMap()
+    return VecSpec_None()
 
 
 def _register_core(
-    f: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
+    f: Callable, module: ModuleType, generate_lm=False, vectorization=VecSpec_None()
 ) -> KscStub:
 
     if isinstance(f, KscStub):
         # Copy the existing KscStub, setting new flags, and force recompilation
         return replace(
-            f,
-            generate_lm=generate_lm,
-            elementwise=elementwise,
-            vmap=vmap,
-            compiled=None,
+            f, generate_lm=generate_lm, vectorization=vectorization, compiled=None,
         )
     else:
         # Create a ksc stub
@@ -746,8 +746,7 @@ def _register_core(
             raw_f=f,
             module=module,
             generate_lm=generate_lm,
-            elementwise=elementwise,
-            vmap=vmap,
+            vectorization=vectorization,
             compiled=None,
         )
 
@@ -759,8 +758,9 @@ def register_direct(func: Callable, generate_lm=False, elementwise=False, vmap=F
     assert frame
     module = inspect.getmodule(frame.f_back)
     assert module
+    vectorization = _Vectorization_from_flags(elementwise, vmap)
     return _register_core(
-        func, module, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap,
+        func, module, generate_lm=generate_lm, vectorization=vectorization,
     )
 
 
@@ -783,9 +783,7 @@ def optional_arg_decorator(register):
 
 
 @optional_arg_decorator
-def register(
-    func: Callable, module: ModuleType, generate_lm=False, elementwise=False, vmap=False
-) -> KscStub:
+def register(func: Callable, module: ModuleType, generate_lm=False) -> KscStub:
     """
     Main Knossos entry point.
 
@@ -805,9 +803,7 @@ def register(
     The implementation delays compilation until the first call, or 
     when "foo.compile()" is explicitly called.
     """
-    return _register_core(
-        func, module, generate_lm=generate_lm, elementwise=elementwise, vmap=vmap,
-    )
+    return _register_core(func, module, generate_lm=generate_lm,)
 
 
 @optional_arg_decorator
@@ -829,12 +825,17 @@ def vmap(func: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
     when "f.compile()" is explicitly called.
     """
     return _register_core(
-        func, module, generate_lm=generate_lm, elementwise=False, vmap=True,
+        func, module, generate_lm=generate_lm, vectorization=VecSpec_VMap(),
     )
 
 
 @optional_arg_decorator
-def elementwise(func: Union[Callable, KscStub], module: ModuleType, generate_lm=False):
+def elementwise(
+    func: Union[Callable, KscStub],
+    module: ModuleType,
+    generate_lm=False,
+    example_element=1.23,
+):
     """
     Knossos entry point for elementwise.
     ```
@@ -844,9 +845,23 @@ def elementwise(func: Union[Callable, KscStub], module: ModuleType, generate_lm=
     ```
     Transforms `foo` to have signature Tensor -> Tensor, operating elementwise
 
+    For more complex functions, operating on other than float, the `example_element`
+    parameter  
+    ```
+       @knossos.elementwise(example_element = torch.randn(3,4))
+       def foo(x : Tensor) -> Tensor:
+           return dot(x, sin(x)) * x
+    ```
+    Transforms `foo` to take tensors of shape (PxQx...xMxN), mapping over the last two
+    dimensions.  In this case, the precise sizes of the tensor are not used
+
     The implementation delays compilation until the first call, or
     when "f.compile()" is explicitly called.
     """
     return _register_core(
-        func, module, generate_lm=generate_lm, elementwise=True, vmap=False,
+        func,
+        module,
+        generate_lm=generate_lm,
+        vectorization=VecSpec_Elementwise(example_element),
     )
+
