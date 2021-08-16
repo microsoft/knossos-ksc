@@ -13,7 +13,7 @@ from ksc.torch_frontend import (
 import ksc.torch_frontend as knossos
 
 # BEGINDOC
-@knossos.register(elementwise=True)
+@knossos.elementwise
 def vrelu3(x: float) -> float:
     """
     Like ReLu, but smoother
