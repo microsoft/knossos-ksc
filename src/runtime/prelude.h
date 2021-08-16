@@ -140,33 +140,17 @@ inline Float max$aT1f(allocator * alloc, tensor<1, Float> const& v)
 
 inline Float rev$lgamma$af(allocator *, Float x, Float dr)
 {
-	std::cerr << "rev$lgamma unimp!\n" << std::endl;
-	throw "rev$gamma unimp!\n";
+	KS_ASSERT(false && "[rev lgamma] not implemented");
 }
 inline Float fwd$lgamma$af(allocator *, Float x, Float dx)
 {
-  if (dx == 0.0) {
-    return 0.0;
-  } else {
-    std::cerr << "fwd$lgamma unimp!\n" << std::endl;
-    throw "fwd$gamma unimp except at dx == 0!\n";
-  }
+	KS_ASSERT(dx == 0.0 && "[fwd lgamma] not implemented");
+	return 0.0;
 }
 
 inline Float pow$afi(allocator *, Float x, Integer e)
 {
     return std::pow(x,e);
-}
-
-inline Tuple<> fwd$gt(allocator *, Float a,Float b,Float d$a,Float d$b)
-{
-    return Tuple<>();
-}
-
-inline Tuple<Float,Float> rev$gt(allocator *, Float a,Float b, Tuple<> d$r)
-{
-	std::cerr << "rev$gt unimp!\n" << std::endl;
-	throw "rev$gt unimp!\n";
 }
 
 inline Float sub$aff(allocator *, Float t1, Float t2)
