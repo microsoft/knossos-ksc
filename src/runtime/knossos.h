@@ -729,6 +729,9 @@ namespace ks {
 		return ret;
 	}
 
+	// ===============================  Copydown  ==================================
+
+#ifdef KS_ALLOCATOR
 	// The number of bytes that would be required from the
 	// allocator to store an inflated copy of the given object
 	template<class T>
@@ -754,9 +757,6 @@ namespace ks {
 		return ret;
 	}
 
-	// ===============================  Copydown  ==================================
-
-#ifdef KS_ALLOCATOR
 	// Tests if any of the memory referred to by val overlaps the
 	// range [start, end)
 	template<class T>
