@@ -40,11 +40,22 @@ Each C++ function is annotated with one of the following macros:
 - KS_INTERFACE: a function which may be called from outside the generated code (e.g. to convert to/from ks types)
 */
 
+#ifdef KS_CUDA
+
+#define KS_DEF __device__
+#define KS_FUNCTION __device__
+#define KS_INTERFACE __host__ __device__
+
+#else
+
 #define KS_DEF
 #define KS_FUNCTION
 #define KS_INTERFACE
 
-#ifndef KS_NO_ALLOCATOR
+#endif
+
+
+#if !defined(KS_CUDA) && !defined(KS_NO_ALLOCATOR)
 #define KS_ALLOCATOR
 #endif
 
