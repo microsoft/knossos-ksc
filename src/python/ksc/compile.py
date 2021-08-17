@@ -189,7 +189,7 @@ def generate_cpp_for_py_module_from_ks(
     ks_str,
     bindings_to_generate,
     python_module_name,
-    vectorization=VecSpec_None,
+    vectorization: VecSpec = VecSpec_None,
     use_aten=True,
     use_torch=False,
 ):
