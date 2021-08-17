@@ -1255,7 +1255,7 @@ namespace ks {
 	   first iteration (using a copydown), then accumulating
 	   subsequent iterations into this result using inplace_add.
 
-	   e.g. for a 2-dimensional sumbuild, size {4, 3}, there is
+		   e.g. for a 2-dimensional sumbuild, size {4, 3}, there is
 	   the following sequence of calls to f (ignoring the allocator
 	   argument for simplicity):
 	   
