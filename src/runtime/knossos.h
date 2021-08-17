@@ -109,7 +109,8 @@ namespace ks {
 		Tuple<T4, Ts...> others;
 	};
 
-	template<typename ...Ts> KS_INTERFACE ks::Tuple<Ts...> make_Tuple(Ts ...ts) {
+	template<typename ...Ts>
+	KS_INTERFACE ks::Tuple<Ts...> make_Tuple(Ts ...ts) {
 		return ks::Tuple<Ts...>{ts...};
 	}
 
@@ -125,18 +126,23 @@ namespace ks {
 	template<> struct get_helper_t<2> { template<typename Tuple> static KS_INTERFACE auto const& get(Tuple const& t) { return t.t2; } };
 	template<> struct get_helper_t<3> { template<typename Tuple> static KS_INTERFACE auto const& get(Tuple const& t) { return t.t3; } };
 
-	template<typename T> KS_INTERFACE T& const_cast_deduce_type(T const& t) { return const_cast<T&>(t); }
+	template<typename T>
+	KS_INTERFACE T& const_cast_deduce_type(T const& t) { return const_cast<T&>(t); }
 
-	template<size_t I, typename ...Ts> KS_INTERFACE auto& get(Tuple<Ts...> & t) {
+	template<size_t I, typename ...Ts>
+	KS_INTERFACE auto& get(Tuple<Ts...> & t) {
 		return const_cast_deduce_type(get_helper_t<I>::get(t));
 	}
-	template<size_t I, typename ...Ts> KS_INTERFACE auto const& get(Tuple<Ts...> const& t) {
+	template<size_t I, typename ...Ts>
+	KS_INTERFACE auto const& get(Tuple<Ts...> const& t) {
 		return get_helper_t<I>::get(t);
 	}
-	template<size_t I, typename ...Ts> KS_INTERFACE auto&& get(Tuple<Ts...> && t) {
+	template<size_t I, typename ...Ts>
+	KS_INTERFACE auto&& get(Tuple<Ts...> && t) {
 		return std::move(ks::get<I>(t));
 	}
-	template<size_t I, typename ...Ts> KS_INTERFACE auto const&& get(Tuple<Ts...> const&& t) {
+	template<size_t I, typename ...Ts>
+	KS_INTERFACE auto const&& get(Tuple<Ts...> const&& t) {
 		return std::move(ks::get<I>(t));
 	}
 
@@ -543,11 +549,15 @@ namespace ks {
 	// Get the ith dimension of a tensor index object:
 	//   get_dimension<I>(Tuple<int, ..., int> t) = get<I>(t)
 	//   get_dimension<0>(int t) = t
-	template<size_t I, typename TupleType> KS_INTERFACE int get_dimension(TupleType const& t) { return ks::get<I>(t); }
-	template<size_t I> KS_INTERFACE int get_dimension(int val) { static_assert(I == 0); return val; }
+	template<size_t I, typename TupleType>
+	KS_INTERFACE int get_dimension(TupleType const& t) { return ks::get<I>(t); }
+	template<size_t I>
+	KS_INTERFACE int get_dimension(int val) { static_assert(I == 0); return val; }
 
-	template<size_t I, typename TupleType> KS_INTERFACE int& get_dimension(TupleType& t) { return ks::get<I>(t); }
-	template<size_t I> KS_INTERFACE int& get_dimension(int& val) { static_assert(I == 0); return val; }
+	template<size_t I, typename TupleType>
+	KS_INTERFACE int& get_dimension(TupleType& t) { return ks::get<I>(t); }
+	template<size_t I>
+	KS_INTERFACE int& get_dimension(int& val) { static_assert(I == 0); return val; }
 
 	template <size_t Dim, class T>
 	class tensor
