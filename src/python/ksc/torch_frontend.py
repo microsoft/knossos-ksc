@@ -711,7 +711,8 @@ class KscStub:
             print(f"knossos.register: Compiling {self.raw_f.__name__}")
             torch_extension_name = (
                 "KscStub_"
-                + self.vectorization.str() + "_"
+                + self.vectorization.str()
+                + "_"
                 + ("lm_" if self.generate_lm else "")
                 + self.module.__name__
                 + "_"
@@ -864,4 +865,3 @@ def elementwise(
         generate_lm=generate_lm,
         vectorization=VecSpec_Elementwise(example_element),
     )
-
