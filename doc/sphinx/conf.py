@@ -76,4 +76,3 @@ html_theme_options = {
 html_static_path = ["_static"]
 
 source_suffix = [".rst", ".md"]
-
