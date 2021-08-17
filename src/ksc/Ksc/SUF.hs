@@ -139,6 +139,8 @@ sufE avoid = \case
   -- SUF{dummy T} -> dummy T
   Dummy ty -> suf_many_and_dup L0 avoid (\L0 -> Dummy ty)
 
+  Checkpoint e -> suf_many_and_dup (L1 e) avoid (\(L1 e') -> Checkpoint e')
+
   -- SUF{assert cond e} -> SUF{e}
   Assert e1 e2 -> easyVersion
     where -- TODO: The easy version is just to ignore the assertion.

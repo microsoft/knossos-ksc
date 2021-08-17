@@ -190,6 +190,7 @@ data ExprX p
   | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
   | Dummy Type
+  | Checkpoint (ExprX p)
 
 deriving instance Eq (ExprX Parsed)
 deriving instance Eq (ExprX OccAnald)
@@ -680,6 +681,7 @@ instance HasType TExpr where
   typeof (Let _ _ e2)  = typeof e2
   typeof (Assert _ e)  = typeof e
   typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
+  typeof (Checkpoint e) = typeof e
 
 instance HasType Type where
   typeof t = t
@@ -1138,6 +1140,7 @@ pprExpr p (Assert e1 e2) =
 pprExpr _ (App e1 e2) =
   parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
+pprExpr _ (Checkpoint e) = parens (text "checkpoint" <+> ppr e)
 
 pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
@@ -1306,19 +1309,26 @@ cmpExpr e1
  = go e1 M.empty
  where
    go :: TExpr -> M.Map Var TVar -> TExpr -> Ordering
+   go (Checkpoint e1) _ e2
+     = case e2 of
+         Checkpoint e2' -> e1 `compare` e2'
+         _ -> LT
    go (Dummy t1) _ e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy t2 -> t1 `compare` t2
          _        -> LT
 
    go (Konst k1) _ e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst k2 -> k1 `compare` k2
          _        -> LT
 
    go (Var v1) subst e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst {} -> GT
          Var v2   -> v1 `compare` M.findWithDefault v2 (tVarVar v2) subst
@@ -1326,6 +1336,7 @@ cmpExpr e1
 
    go (Call f1 e1) subst e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst {} -> GT
          Var {}   -> GT
@@ -1334,6 +1345,7 @@ cmpExpr e1
 
    go (Tuple es1) subst e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst {} -> GT
          Var {}  -> GT
@@ -1343,6 +1355,7 @@ cmpExpr e1
 
    go (Lam b1 e1) subst e2
       = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst {}  -> GT
          Var {}    -> GT
@@ -1354,6 +1367,7 @@ cmpExpr e1
 
    go (App e1a e1b) subst e2
      = case e2 of
+         Checkpoint{} -> GT
          Dummy {} -> GT
          Konst {} -> GT
          Var {}   -> GT

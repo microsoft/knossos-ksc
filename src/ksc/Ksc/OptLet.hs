@@ -39,6 +39,8 @@ occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
 occAnalE (Var v)    = (Var v, M.singleton v 1)
 occAnalE (Konst k)  = (Konst k, M.empty)
 occAnalE (Dummy ty) = (Dummy ty, M.empty)
+occAnalE (Checkpoint e) = (Checkpoint e', vs)
+  where (e', vs) = occAnalE e
 
 occAnalE (App e1 e2)
   = (App e1' e2', unionOccMap vs1 vs2)
@@ -206,6 +208,7 @@ substExpr subst e
     go (Var tv)       = substVar subst tv
     go (Dummy ty)     = Dummy ty
     go (Konst k)      = Konst k
+    go (Checkpoint e) = Checkpoint (go e)
     go (Call f es)    = Call f (go es)
     go (If b t e)     = If (go b) (go t) (go e)
     go (Tuple es)     = Tuple (map go es)
@@ -275,6 +278,7 @@ optLetsE = go
 
     go subst (Var tv)       = substVar subst tv
     go _ubst (Dummy ty)     = Dummy ty
+    go subst (Checkpoint e) = Checkpoint (go subst e)
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call (coerceTFun f) (go subst es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)

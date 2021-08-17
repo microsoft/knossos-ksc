@@ -492,6 +492,8 @@ cgenExprWithoutResettingAlloc env = \case
       tybody
       (allocusagee1 <> allocusagebody)
 
+  Checkpoint e -> cgenExprR env e
+
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs

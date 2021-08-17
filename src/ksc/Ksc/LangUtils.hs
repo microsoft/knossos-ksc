@@ -99,6 +99,7 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
                                           substEMayCapture (subst M.\\ bindersAsMap v) b
   where bindersAsMap :: PatG TVar -> M.Map TVar ()
         bindersAsMap = M.fromList . map (\x -> (x, ())) . patVars
+substEMayCapture subst (Checkpoint e) = Checkpoint (substEMayCapture subst e)
 
 -----------------------------------------------
 --     Free variables
@@ -118,6 +119,7 @@ freeVarsOf = go
    go (Let v r b)    = go r `S.union` (go b S.\\ S.fromList (patVars v))
    go (Lam v e)      = S.delete v $ go e
    go (Assert e1 e2) = go e1 `S.union` go e2
+   go (Checkpoint e) = go e
 
 notFreeIn :: TVar -> TExpr -> Bool
 notFreeIn = go
@@ -133,6 +135,7 @@ notFreeIn = go
    go v (Let v2 r b) = go v r && (v `elem` patVars v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
+   go v (Checkpoint e) = go v e
 
 -----------------
 
@@ -403,3 +406,4 @@ noTupPatifyExpr in_scope = \case
      Konst k -> Konst k
      Var v   -> Var v
      Dummy d -> Dummy d
+     Checkpoint e -> Checkpoint (noTupPatifyExpr in_scope e)

@@ -10,6 +10,7 @@ optShape :: TExpr -> TExpr
 optShape (Dummy ty)
   | Just s_ty <- shapeType ty
   = Dummy s_ty
+optShape (Checkpoint e) =  pShape e
 optShape (Assert e1 e2) =  Assert e1 (pShape e2)
 optShape (If b t e)     =  If b (pShape t) (pShape e)
 optShape (Let v e1 e2)  =  Let v e1 (pShape e2)

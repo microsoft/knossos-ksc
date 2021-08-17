@@ -108,6 +108,19 @@ sufFwdRevPass gst subst = \case
 
                   dp = patToExpr (fmap deltaOfSimple p)
 
+  Checkpoint e ->
+    let vs = mkTuple (map Var (S.toList (freeVarsOf e)))
+        vsPat = mkPat @Typed (S.toList (freeVarsOf e))
+        bog = vs
+
+        sufRevPass_ avoid' dt b =
+          let (fwdpass, _, revpass) = sufFwdRevPass gst avoid' e
+              (avoid'2, revpass_lets) = revpass avoid' dt (Let vsPat b (pSnd fwdpass))
+
+          in (avoid'2, revpass_lets)
+
+    in (Tuple [e, vs], typeof bog, sufRevPass_)
+
   -- { TODO: We currently just ignore $inline and $trace.  We should
   -- decide what we do with them.
   Call f e | f `isThePrimFun` P_inline -> sufFwdRevPass gst subst e

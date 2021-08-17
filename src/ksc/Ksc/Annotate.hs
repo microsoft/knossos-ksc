@@ -269,6 +269,10 @@ tcExpr (Assert cond body)
          text "Predicate of 'assert' has non-boolean type"
        ; return (TE (Assert acond abody) tybody) }
 
+tcExpr (Checkpoint e)
+  = do { TE ae tye <- tcExpr e
+       ; return (TE (Checkpoint ae) tye) }
+
 tcExpr (App fun arg)
   = do { TE afun fun_ty <- tcExpr fun
        ; TE aarg arg_ty <- tcExpr arg
