@@ -45,6 +45,17 @@ def sqrl_bench_configs():
 vsqrl = knossos.vmap(sqrl)
 
 
+def vsqrl_pytorch(x):
+    """
+    Hand-vectorized pytorch implementation, assuming x is rank 3
+    """
+    y = torch.sum(x, (1, 2), keepdim=True)
+    y_lt_0 = (y < 0).repeat((1, *x.size()[1:]))
+    t = torch.where(y_lt_0, -0.125 * x, 1 / 2 * x ** 2)
+    tsint = torch.sin(t) * t
+    return torch.mean(tsint, (1, 2))
+
+
 # run-bench: Define a range of values at which to call the methods
 def vsqrl_bench_configs():
     yield torch.randn((10, 4, 4))
