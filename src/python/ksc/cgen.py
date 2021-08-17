@@ -270,10 +270,6 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
     return cpp_declaration, cpp
 
 
-def generate_cpp_vmap_entry_point(cpp_function_name, decl):
-    raise NotImplementedError("vmap")
-
-
 def generate_cpp_cuda_entry_point(cpp_function_name, decl):
     arg_types = arg_types_of_decl(decl)
     if not all(a == Type.Float for a in arg_types):
@@ -306,5 +302,107 @@ def generate_cpp_cuda_entry_point(cpp_function_name, decl):
         return {map_function_name}({join_args(', ', lambda i: f'arg{i}')}, functor_{cpp_function_name}{{}});
     }}
 """
-
     return cpp_declaration, cpp
+
+
+def generate_cpp_vmap_entry_point(cpp_function_name, decl):
+    def add_vmap_dimension(t: Type):
+        if t.is_scalar:
+            return Type.Tensor(1, t)
+        if t.is_tensor:
+            return Type.Tensor(t.tensor_rank + 1, t.tensor_elem_type)
+
+        # Not clear how to to the remainder -- let's see a use case before deciding
+        raise ValueError("Vmap understands only tensors for now")
+
+    in_arg_types = arg_types_of_decl(decl)
+
+    # Add a "vmap dimension" to each arg
+    arg_types = tuple(add_vmap_dimension(a) for a in in_arg_types)
+    ks_types = tuple(ks_cpp_type(a) for a in arg_types)
+
+    num_args = len(arg_types)
+
+    def join_args(callable, sep=", "):
+        return sep.join(callable(k) for k in range(num_args))
+
+    def concat_args(callable):
+        return "".join(callable(k) for k in range(num_args))
+
+    ks_name = utils.encode_name(decl.name.mangled())
+
+    # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
+    cpp_function = f"""
+torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')})
+    """
+
+    cpp_declaration = f"{cpp_function};\n"
+
+    cpp = f"""
+{cpp_function} {{
+    int64_t n = arg0.size(0);
+"""
+
+    # auto ks_arg0 = convert_argument<ks::tensor<2,float>>(arg0)
+    # ...
+    # auto ks_arg7 = convert_argument<ks::tensor<1,int>>(arg7)
+    for k in range(num_args):
+        cpp += f"""
+    KS_ASSERT(arg{k}.is_contiguous());
+    KS_ASSERT(arg{k}.scalar_type() == scalar_type_of_Float);
+    KS_ASSERT(arg{k}.size(0) == n);
+
+    auto ks_arg{k} = convert_argument<{ks_types[k]}>(arg{k});
+"""
+
+    # Difficulty: depending on the rank of ks_ret, ks_ret[i] returns either
+    #   Rank 1: a reference to the float at  index i
+    #   Rank 2: an rvalue representing a view on subtensor i.
+    # inplace add must act differently on each, so we switch on the return dimension here
+
+    ks_return_type = add_vmap_dimension(decl.return_type)
+    ks_return_dim = ks_return_type.tensor_rank
+    if ks_return_dim == 1:
+        cpp += f"""
+    // Create Torch return value
+    auto ret = torch::zeros({{n}});
+    ks::Float* ret_ptr = ret.data_ptr<ks::Float>();
+
+    for (int i = 0; i != n; ++i)
+        ret_ptr[i] = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[i]")});
+
+    return ret;
+}}
+"""
+    else:
+        ks_sizes = ", ".join([f"size{d}" for d in range(ks_return_dim - 1)])
+        cpp += f"""
+    KS_ASSERT(n > 0); // TODO: Zero-size tensors
+
+    // Make the first call to determine output size
+    auto ret0 = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[0]")});
+
+    // Create Torch return value
+    auto [{ks_sizes}] = ret0.size();
+    // TODO: use torch::empty here, and copydown below.
+    auto ret = torch::zeros({{n, {ks_sizes}}});
+    // And wrap it in ks - this is a view of the torch data, so convert_argument, not convert_return_value
+    auto ks_ret = convert_argument<ks::tensor<{ks_return_dim}, Float>>(ret);
+
+    // Place 0th value in the output
+    auto ks_ret0 = ks_ret[0];
+    inplace_add(&ks_ret0, ret0); // This would update a temporary in the 1D case
+
+    // And then place the rest
+    for (int i = 1; i != n; ++i) {{
+        auto val = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[i]")});
+        auto ks_ret_view = ks_ret[i];
+        inplace_add(&ks_ret_view, val);
+    }}
+
+    return ret;
+}}
+"""
+    print(cpp)
+    return cpp_declaration, cpp
+
