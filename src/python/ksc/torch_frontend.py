@@ -606,7 +606,7 @@ def ksc_string_to_autograd_function(
         ks_str,
         entry_sn,
         torch_extension_name,
-        vectorization=False,
+        vectorization=VecSpec_None,
         generate_lm=generate_lm,
         extra_cflags=extra_cflags,
     )
