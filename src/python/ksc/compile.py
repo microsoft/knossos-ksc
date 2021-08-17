@@ -1,16 +1,19 @@
+from dataclasses import dataclass
+from typing import List
+
 import atexit
 import os
 import subprocess
 import sysconfig
 import sys
-from dataclasses import dataclass
+
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
-from typing import List
 
 from torch.utils import cpp_extension
 
 from ksc import cgen, utils
+from ksc.cgen import VecSpec, VecSpec_None, VecSpec_Elementwise, VecSpec_VMap
 from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
@@ -186,7 +189,7 @@ def generate_cpp_for_py_module_from_ks(
     ks_str,
     bindings_to_generate,
     python_module_name,
-    elementwise=False,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=True,
     use_torch=False,
 ):
@@ -215,7 +218,7 @@ def generate_cpp_for_py_module_from_ks(
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
     ) = cgen.generate_cpp_entry_points(
-        bindings_to_generate, decls, elementwise=elementwise, use_torch=use_torch
+        bindings_to_generate, decls, vectorization=vectorization, use_torch=use_torch
     )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
@@ -263,14 +266,18 @@ PYBIND11_MODULE("""
 
 
 def build_py_module_from_ks(
-    ks_str, bindings_to_generate, elementwise=False, use_aten=False, use_torch=False
+    ks_str,
+    bindings_to_generate,
+    vectorization: VecSpec = VecSpec_None(),
+    use_aten=False,
+    use_torch=False,
 ):
 
     cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
         ks_str,
         bindings_to_generate,
         "PYTHON_MODULE_NAME",
-        elementwise=elementwise,
+        vectorization=vectorization,
         use_aten=use_aten,
         use_torch=use_torch,
     )
@@ -292,7 +299,7 @@ def build_module_using_pytorch_from_ks(
     ks_str,
     bindings_to_generate,
     torch_extension_name,
-    elementwise=False,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=False,
     extra_cflags=[],
 ):
@@ -312,7 +319,7 @@ def build_module_using_pytorch_from_ks(
         ks_str,
         bindings_to_generate,
         "TORCH_EXTENSION_NAME",
-        elementwise=elementwise,
+        vectorization=vectorization,
         use_aten=use_aten,
         use_torch=True,
     )

@@ -12,10 +12,8 @@ from ksc.torch_frontend import (
 )
 import ksc.torch_frontend as knossos
 
-import torch._vmap_internals
-
 # BEGINDOC
-@knossos.vmap
+@knossos.elementwise
 def vrelu3(x: float) -> float:
     """
     Like ReLu, but smoother
@@ -47,6 +45,7 @@ def vrelu3_pytorch(x: torch.Tensor):
 # RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
 # See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
 if False:
+    import torch._vmap_internals
 
     def relu3_pytorch_nice(x: float) -> float:
         if x < 0.0:

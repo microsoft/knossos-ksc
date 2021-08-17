@@ -1,5 +1,53 @@
+from typing import Any
+from enum import Enum
+from dataclasses import dataclass, field
+
 from ksc import utils
 from ksc.type import Type
+from ksc.expr import Def
+
+
+class VecSpec:
+    """
+    Options for vectorization of knossos-registered functions.
+
+    Suppose a knossos function
+       def f(x : Tensor) -> Tensor 
+
+    is called with x a tensor of size [PxMxN].  
+    
+    The VecSpec_* derived class decides how f is mapped over this argument as follows:
+    
+     None: f is compiled to take rank 3 tensors.
+     Elementwise: f is compiled to take floats (rank 0), and is computed elementwise.
+     VMap: f is compiled to take rank 2 tensors, and mapped over the first dimension.
+    """
+
+    pass
+
+
+@dataclass
+class VecSpec_None(VecSpec):
+    pass
+
+    def str(self):
+        return "VSnone"
+
+
+@dataclass
+class VecSpec_Elementwise(VecSpec):
+    example_element: Any = field(default=1.1)
+
+    def str(self):
+        return "VSelem"
+
+
+@dataclass
+class VecSpec_VMap(VecSpec):
+    dims_to_strip: int = field(default=1)
+
+    def str(self):
+        return "VSvmap"
 
 
 scalar_type_to_cpp_map = {
@@ -50,7 +98,7 @@ def entry_point_cpp_type(t, use_torch):
 
 
 def generate_cpp_entry_points(
-    bindings_to_generate, decls, elementwise=False, use_torch=False
+    bindings_to_generate, decls, vectorization, use_torch=False
 ):
     decls_by_name = {decl.name: decl for decl in decls}
 
@@ -64,7 +112,7 @@ def generate_cpp_entry_points(
             generate_cpp_entry_point(
                 binding_name,
                 lookup_decl(structured_name),
-                elementwise=elementwise,
+                vectorization=vectorization,
                 use_torch=use_torch,
             )
             for binding_name, structured_name in bindings_to_generate
@@ -111,11 +159,17 @@ def arg_types_of_decl(decl):
         return arg_types
 
 
-def generate_cpp_entry_point(cpp_function_name, decl, elementwise, use_torch):
-    if elementwise:
+def generate_cpp_entry_point(
+    cpp_function_name: str, decl: Def, vectorization: VecSpec, use_torch: bool
+):
+    if isinstance(vectorization, VecSpec_Elementwise):
         if not use_torch:
             raise ValueError("Elementwise operations only available when using torch")
         return generate_cpp_elementwise_entry_point(cpp_function_name, decl)
+    if isinstance(vectorization, VecSpec_VMap):
+        if not use_torch:
+            raise ValueError("VMap only available when using torch")
+        return generate_cpp_vmap_entry_point(cpp_function_name, decl)
 
     arg_types = arg_types_of_decl(decl)
     num_args = len(arg_types)
@@ -198,3 +252,7 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
 }}
 """
     return cpp_declaration, cpp
+
+
+def generate_cpp_vmap_entry_point(cpp_function_name, decl):
+    raise NotImplementedError("vmap")
