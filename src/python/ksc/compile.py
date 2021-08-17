@@ -189,7 +189,7 @@ def generate_cpp_for_py_module_from_ks(
     ks_str,
     bindings_to_generate,
     python_module_name,
-    vectorization: VecSpec = VecSpec_None,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=True,
     use_torch=False,
 ):
@@ -268,7 +268,7 @@ PYBIND11_MODULE("""
 def build_py_module_from_ks(
     ks_str,
     bindings_to_generate,
-    vectorization: VecSpec = VecSpec_None,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=False,
     use_torch=False,
 ):
@@ -299,7 +299,7 @@ def build_module_using_pytorch_from_ks(
     ks_str,
     bindings_to_generate,
     torch_extension_name,
-    vectorization: VecSpec = VecSpec_None,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=False,
     extra_cflags=[],
 ):

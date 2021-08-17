@@ -606,7 +606,7 @@ def ksc_string_to_autograd_function(
         ks_str,
         entry_sn,
         torch_extension_name,
-        vectorization=VecSpec_None,
+        vectorization=VecSpec_None(),
         generate_lm=generate_lm,
         extra_cflags=extra_cflags,
     )
@@ -632,7 +632,7 @@ def _tsmod2ksmod(
     torch_extension_name,
     example_inputs,
     generate_lm=True,
-    vectorization: VecSpec = VecSpec_None,
+    vectorization: VecSpec = VecSpec_None(),
 ):
     assert isinstance(example_inputs, tuple)
 
