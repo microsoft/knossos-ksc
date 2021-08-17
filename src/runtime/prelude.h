@@ -9,82 +9,82 @@ namespace ks {
 // We should probably come up with a better story for the
 // tests but at the time of writing I didn't want to hold back
 // edef support any longer.
-KS_INLINE_FUNCTION Float edef_example$af(allocator *, Float x) { return x; }
-KS_INLINE_FUNCTION Float fwd$edef_example$af(allocator *, Float x, Float dx) { return dx; }
-KS_INLINE_FUNCTION Float rev$edef_example$af(allocator *, Float x, Float ddr) { return ddr; }
-KS_INLINE_FUNCTION ks::Tuple<Float,ks::Tuple<>> suffwdpass$edef_example$af(allocator *, Float x) { return ks::make_Tuple(x, ks::make_Tuple()); }
-KS_INLINE_FUNCTION Float sufrevpass$edef_example$af(allocator *, Float ddr, ks::Tuple<>) { return ddr; }
+inline KS_FUNCTION Float edef_example$af(allocator *, Float x) { return x; }
+inline KS_FUNCTION Float fwd$edef_example$af(allocator *, Float x, Float dx) { return dx; }
+inline KS_FUNCTION Float rev$edef_example$af(allocator *, Float x, Float ddr) { return ddr; }
+inline KS_FUNCTION ks::Tuple<Float,ks::Tuple<>> suffwdpass$edef_example$af(allocator *, Float x) { return ks::make_Tuple(x, ks::make_Tuple()); }
+inline KS_FUNCTION Float sufrevpass$edef_example$af(allocator *, Float ddr, ks::Tuple<>) { return ddr; }
 
-KS_INLINE_FUNCTION Bool lt$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Bool lt$aff(allocator *, Float t1, Float t2)
 {
 	return t1 < t2;
 }
 
-KS_INLINE_FUNCTION Bool lt$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Bool lt$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 < t2;
 }
 
-KS_INLINE_FUNCTION Bool gt$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Bool gt$aff(allocator *, Float t1, Float t2)
 {
 	return t1 > t2;
 }
 
-KS_INLINE_FUNCTION Bool gt$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Bool gt$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 > t2;
 }
 
-KS_INLINE_FUNCTION Bool lte$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Bool lte$aff(allocator *, Float t1, Float t2)
 {
 	return t1 <= t2;
 }
 
-KS_INLINE_FUNCTION Bool lte$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Bool lte$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 <= t2;
 }
 
-KS_INLINE_FUNCTION Bool gte$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Bool gte$aff(allocator *, Float t1, Float t2)
 {
 	return t1 >= t2;
 }
 
-KS_INLINE_FUNCTION Bool gte$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Bool gte$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 >= t2;
 }
 
-KS_INLINE_FUNCTION Float add$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Float add$aff(allocator *, Float t1, Float t2)
 {
 	return t1 + t2;
 }
 
-KS_INLINE_FUNCTION Integer add$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Integer add$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 + t2;
 }
 
-KS_INLINE_FUNCTION Float mul$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Float mul$aff(allocator *, Float t1, Float t2)
 {
 	return t1 * t2;
 }
 
-KS_INLINE_FUNCTION Integer mul$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Integer mul$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 * t2;
 }
 
-KS_INLINE_FUNCTION Float abs$af(allocator *, Float d) { return d > 0 ? d : -d; }
+inline KS_FUNCTION Float abs$af(allocator *, Float d) { return d > 0 ? d : -d; }
 
-KS_INLINE_FUNCTION Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
+inline KS_FUNCTION Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
 
-KS_INLINE_FUNCTION Float dot$aT1fT1f(allocator *, tensor<1, Float> const& a, tensor<1, Float> const& b)
+inline KS_FUNCTION Float dot$aT1fT1f(allocator *, tensor<1, Float> const& a, tensor<1, Float> const& b)
 {
 	return ts_dot(a,b);
 }
 
-KS_INLINE_FUNCTION tensor<1, Float> mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const& v)
+inline KS_FUNCTION tensor<1, Float> mul$aT2fT1f(allocator * alloc, tensor<2, Float> const& M, tensor<1, Float> const& v)
 {
 	int r = M.outer_dimension();
 	auto ret = tensor<1, Float>::create(alloc, r);
@@ -93,7 +93,7 @@ KS_INLINE_FUNCTION tensor<1, Float> mul$aT2fT1f(allocator * alloc, tensor<2, Flo
 	return ret;
 }
 
-KS_INLINE_FUNCTION Tuple<tensor<2, Float>,tensor<1, Float>>
+inline KS_FUNCTION Tuple<tensor<2, Float>,tensor<1, Float>>
 rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Float>> const& M_v, tensor<1, Float> const& dr)
 {
 	auto [M, v] = M_v;
@@ -118,7 +118,7 @@ rev$mul$aT2fT1f(allocator * alloc, Tuple<tensor<2, Float>, tensor<1, Float>> con
 	return ks::make_Tuple(retM,retv);
 }
 
-KS_INLINE_FUNCTION size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
+inline KS_FUNCTION size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
 {
     KS_ASSERT(size(v) > 0);
     size_t imax = 0;
@@ -132,75 +132,75 @@ KS_INLINE_FUNCTION size_t imax$aT1f(allocator *, tensor<1, Float> const &v)
     return imax;
 }
 
-KS_INLINE_FUNCTION Float max$aT1f(allocator * alloc, tensor<1, Float> const& v)
+inline KS_FUNCTION Float max$aT1f(allocator * alloc, tensor<1, Float> const& v)
 {
     return v[imax$aT1f(alloc, v)];
 }
 
-KS_INLINE_FUNCTION Float rev$lgamma$af(allocator *, Float x, Float dr)
+inline KS_FUNCTION Float rev$lgamma$af(allocator *, Float x, Float dr)
 {
 	KS_ASSERT(false && "[rev lgamma] not implemented");
 }
-KS_INLINE_FUNCTION Float fwd$lgamma$af(allocator *, Float x, Float dx)
+inline KS_FUNCTION Float fwd$lgamma$af(allocator *, Float x, Float dx)
 {
 	KS_ASSERT(dx == 0.0 && "[fwd lgamma] not implemented");
 	return 0.0;
 }
 
-KS_INLINE_FUNCTION Float pow$afi(allocator *, Float x, Integer e)
+inline KS_FUNCTION Float pow$afi(allocator *, Float x, Integer e)
 {
     return std::pow(x,e);
 }
 
-KS_INLINE_FUNCTION Float sub$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Float sub$aff(allocator *, Float t1, Float t2)
 {
 	return t1 - t2;
 }
 
-KS_INLINE_FUNCTION Integer sub$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Integer sub$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 - t2;
 }
 
-KS_INLINE_FUNCTION Float div$aff(allocator *, Float t1, Float t2)
+inline KS_FUNCTION Float div$aff(allocator *, Float t1, Float t2)
 {
 	return t1 / t2;
 }
 
-KS_INLINE_FUNCTION Integer div$aii(allocator *, Integer t1, Integer t2)
+inline KS_FUNCTION Integer div$aii(allocator *, Integer t1, Integer t2)
 {
 	return t1 / t2;
 }
 
-KS_INLINE_FUNCTION Float neg$af(allocator *, Float t)
+inline KS_FUNCTION Float neg$af(allocator *, Float t)
 {
 	return -t;
 }
 
-KS_INLINE_FUNCTION Integer neg$ai(allocator *, Integer t)
+inline KS_FUNCTION Integer neg$ai(allocator *, Integer t)
 {
 	return -t;
 }
 
-KS_INLINE_FUNCTION Float exp$af(allocator *, Float d) { return exp(d); }
-KS_INLINE_FUNCTION Float log$af(allocator *, Float d) { return log(d); }
-KS_INLINE_FUNCTION Float sin$af(allocator *, Float d) { return sin(d); }
-KS_INLINE_FUNCTION Float cos$af(allocator *, Float d) { return cos(d); }
-KS_INLINE_FUNCTION Float cosh$af(allocator *, Float d) { return cosh(d); }
-KS_INLINE_FUNCTION Float tanh$af(allocator *, Float d) { return tanh(d); }
-KS_INLINE_FUNCTION Float lgamma$af(allocator *, Float d) { return lgamma(d); }
-KS_INLINE_FUNCTION Float erf$af(allocator *, Float d) { return erf(d); }
-KS_INLINE_FUNCTION Float sqrt$af(allocator *, Float d) { return sqrt(d); }
+inline KS_FUNCTION Float exp$af(allocator *, Float d) { return exp(d); }
+inline KS_FUNCTION Float log$af(allocator *, Float d) { return log(d); }
+inline KS_FUNCTION Float sin$af(allocator *, Float d) { return sin(d); }
+inline KS_FUNCTION Float cos$af(allocator *, Float d) { return cos(d); }
+inline KS_FUNCTION Float cosh$af(allocator *, Float d) { return cosh(d); }
+inline KS_FUNCTION Float tanh$af(allocator *, Float d) { return tanh(d); }
+inline KS_FUNCTION Float lgamma$af(allocator *, Float d) { return lgamma(d); }
+inline KS_FUNCTION Float erf$af(allocator *, Float d) { return erf(d); }
+inline KS_FUNCTION Float sqrt$af(allocator *, Float d) { return sqrt(d); }
 
-KS_INLINE_FUNCTION Float to_float$ai(allocator *, Integer d) { return d; }
+inline KS_FUNCTION Float to_float$ai(allocator *, Integer d) { return d; }
 
-KS_INLINE_FUNCTION Bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
-KS_INLINE_FUNCTION Bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
-KS_INLINE_FUNCTION Float bool_to_float$ab(allocator *, Bool b) { return b; }
+inline KS_FUNCTION Bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
+inline KS_FUNCTION Bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
+inline KS_FUNCTION Float bool_to_float$ab(allocator *, Bool b) { return b; }
 
 // ranhash functions from
 //     https://mathoverflow.net/questions/104915/pseudo-random-algorithm-allowing-o1-computation-of-nth-element
-KS_INLINE_FUNCTION uint64_t $ranhash(allocator *, uint64_t v) {
+inline KS_FUNCTION uint64_t $ranhash(allocator *, uint64_t v) {
 	v *= 3935559000370003845LL;
 	v += 2691343689449507681LL;
 	v ^= v >> 21; v ^= v << 37; v ^= v >> 4;
@@ -209,7 +209,7 @@ KS_INLINE_FUNCTION uint64_t $ranhash(allocator *, uint64_t v) {
 	return v;
 }
 
-KS_INLINE_FUNCTION Float $ranhashdoub$ai(allocator * alloc, int32_t v) {
+inline KS_FUNCTION Float $ranhashdoub$ai(allocator * alloc, int32_t v) {
 	return Float(5.42101086242752217E-20 * $ranhash(alloc, v));
 }
 
