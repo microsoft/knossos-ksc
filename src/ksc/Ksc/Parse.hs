@@ -391,7 +391,7 @@ pBaseFun :: Parser (BaseFun Parsed)
 pBaseFun = pPrimFun
        <|> pBaseUserFun
 
-pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
+pFunG :: forall p n. Parser (BaseFunId n p) -> Parser (DerivedFun n p)
 pFunG pBase = try (brackets $
             ((pDerivation "D" GradFun)
          <|> (pDerivation "fwd" (DrvFun Fwd))
