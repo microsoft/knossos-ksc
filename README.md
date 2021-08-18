@@ -197,7 +197,7 @@ i.e. to type check and apply ksc's heuristic optimisations, use the
 command line
 
 ```
-./build/bin/ksc --generate-cpp-without-diffs \
+./build/bin/ksc --generate-cpp \
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file input.ks \
   --ks-output-file output.ks \
