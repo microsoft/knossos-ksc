@@ -407,9 +407,6 @@ pFunG pBase = try (brackets $
 pUserFunTyped  :: Parser (UserFun Typed)
 pUserFunTyped = pFunG (pBaseUserFunWithType id)
 
-pFunTyped :: Parser (Fun Typed)
-pFunTyped = userFunToFun <$> pUserFunTyped
-
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun
 
@@ -464,9 +461,8 @@ pDerivation =
 pGDef :: Parser GDefX
 pGDef = do { pReserved "gdef"
            ; d <- pDerivation
-           ; f <- pFunTyped
-           ; mk_fun_f <- pIsUserFun f
-           ; pure (GDef d mk_fun_f)
+           ; f <- pUserFunTyped
+           ; pure (GDef d f)
            }
 
 
