@@ -408,7 +408,7 @@ pUserFunTyped  :: Parser (UserFun Typed)
 pUserFunTyped = pFunG (pBaseUserFunWithType id)
 
 pFunTyped :: Parser (Fun Typed)
-pFunTyped = pFunG (over baseFunName BaseUserFunName <$> pBaseUserFunWithType id)
+pFunTyped = userFunToFun <$> pUserFunTyped
 
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun
