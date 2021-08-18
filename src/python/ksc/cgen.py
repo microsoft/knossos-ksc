@@ -178,6 +178,10 @@ def generate_cpp_entry_point(
             return generate_cpp_cuda_entry_point(cpp_function_name, decl)
         else:
             return generate_cpp_elementwise_entry_point(cpp_function_name, decl)
+    if gpu:
+        raise ValueError(
+            "Only elementwise operations can be compiled for GPU"
+        )  # TODO: could also support vmap
     if isinstance(vectorization, VecSpec_VMap):
         if not use_torch:
             raise ValueError("VMap only available when using torch")
