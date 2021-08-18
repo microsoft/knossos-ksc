@@ -1,9 +1,10 @@
-from typing import Callable, List, Tuple, Optional, Union, Set
+from typing import Callable, List, Tuple, Optional, Union, Set, Dict
 from types import ModuleType
 from dataclasses import dataclass, field, replace
 from contextlib import contextmanager
 
 import functools
+import itertools
 import inspect
 import torch
 import torch.onnx
@@ -681,7 +682,7 @@ class KscStub:
     module: ModuleType
     generate_lm: bool
     vectorization: VecSpec
-    compiled: Optional[KscAutogradFunction] = field(default=None)
+    compiled: Dict[bool, KscAutogradFunction] = field(default_factory=dict)
 
     def __call__(self, *args):
         """
@@ -689,8 +690,7 @@ class KscStub:
         This calls the KscAutoGradFunction apply method, so is suitable 
         for use in the "forward/backward" pattern for gradient computation. 
         """
-        self.ensure_compiled(args)
-        return self.compiled.apply(*args)
+        return self.ensure_compiled(args).apply(*args)
 
     def _entry(self, *args):
         """
@@ -698,8 +698,7 @@ class KscStub:
         Does not wrap torch tensors, or reset memory allocator.
         For test use only
         """
-        self.ensure_compiled(args)
-        return self.compiled.py_mod.entry(*args)
+        return self.ensure_compiled(args).py_mod.entry(*args)
 
     def _entry_vjp(self, *args):
         """
@@ -707,11 +706,12 @@ class KscStub:
         Does not wrap torch tensors, or reset memory allocator.
         For test use only
         """
-        assert self.compiled  # TODO: infer call args from vjp args
-        return self.compiled.py_mod.entry_vjp(*args)
+        gpu = _input_is_gpu(args)
+        assert gpu in self.compiled  # TODO: infer call args from vjp args
+        return self.compiled[gpu].py_mod.entry_vjp(*args)
 
     def compile(self, example_inputs, torch_extension_name, gpu=False):
-        self.compiled = _tsmod2ksmod(
+        self.compiled[gpu] = _tsmod2ksmod(
             self.module,
             self.raw_f,
             torch_extension_name=torch_extension_name,
@@ -721,23 +721,38 @@ class KscStub:
             gpu=gpu,
         )
 
-        return self.compiled
+        return self.compiled[gpu]
 
     def ensure_compiled(self, example_inputs):
-        if not self.compiled:
-            print(f"knossos.register: Compiling {self.raw_f.__name__}")
-            torch_extension_name = (
-                "KscStub_"
-                + self.vectorization.str()
-                + "_"
-                + ("lm_" if self.generate_lm else "")
-                + self.module.__name__
-                + "_"
-                + self.raw_f.__name__
-            )
-            if self.generate_lm:
-                torch_extension_name += "__generate_lm"
-            self.compile(example_inputs, torch_extension_name)
+        gpu = _input_is_gpu(example_inputs)
+        compiled = self.compiled.get(gpu)
+        if compiled is not None:
+            return compiled
+        print(f"knossos.register: Compiling {self.raw_f.__name__}")
+        torch_extension_name = (
+            "KscStub_"
+            + ("CUDA_" if gpu else "")
+            + self.vectorization.str()
+            + "_"
+            + ("lm_" if self.generate_lm else "")
+            + self.module.__name__
+            + "_"
+            + self.raw_f.__name__
+        )
+        if self.generate_lm:
+            torch_extension_name += "__generate_lm"
+        return self.compile(example_inputs, torch_extension_name, gpu)
+
+
+def _input_is_gpu(example_inputs):
+    tensors = (x for x in example_inputs if isinstance(x, torch.Tensor))
+    first_tensor = next(tensors, None)
+    if first_tensor is None:
+        return False
+    gpu = first_tensor.is_cuda
+    if not all(t.is_cuda == gpu for t in tensors):
+        raise ValueError("Inputs contain a mixture of CUDA and non-CUDA tensors")
+    return gpu
 
 
 def _Vectorization_from_flags(elementwise, vmap):
@@ -756,7 +771,7 @@ def _register_core(
     if isinstance(f, KscStub):
         # Copy the existing KscStub, setting new flags, and force recompilation
         return replace(
-            f, generate_lm=generate_lm, vectorization=vectorization, compiled=None,
+            f, generate_lm=generate_lm, vectorization=vectorization, compiled=dict(),
         )
     else:
         # Create a ksc stub
@@ -765,7 +780,7 @@ def _register_core(
             module=module,
             generate_lm=generate_lm,
             vectorization=vectorization,
-            compiled=None,
+            compiled=dict(),
         )
 
 
