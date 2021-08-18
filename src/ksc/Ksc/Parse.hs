@@ -404,6 +404,9 @@ pFunG pBase = try (brackets $
    <|> Fun JustFun <$> pBase
   where pDerivation s d = pReserved s >> Fun d <$> pBase
 
+pUserFunTyped  :: Parser (UserFun Typed)
+pUserFunTyped = pFunG (pBaseUserFunWithType id)
+
 pFunTyped :: Parser (Fun Typed)
 pFunTyped = pFunG (over baseFunName BaseUserFunName <$> pBaseUserFunWithType id)
 
