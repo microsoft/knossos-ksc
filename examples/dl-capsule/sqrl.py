@@ -2,7 +2,7 @@ import torch
 import ksc.torch_frontend as knossos
 
 # run-bench: Knossos source, and "nice" PyTorch implementation
-# BEGINDOC
+# DOC-KS
 @knossos.register
 def sqrl(x: torch.Tensor):
     """
@@ -19,7 +19,7 @@ def sqrl(x: torch.Tensor):
     return torch.mean(torch.sin(t) * t)
 
 
-# ENDDOC
+# ENDDOC-KS
 
 # run-bench: PyTorch "fast" implementation
 def sqrl_pytorch(x: torch.Tensor):
