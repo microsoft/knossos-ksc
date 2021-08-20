@@ -12,7 +12,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from typing import Callable
 
-from ksc.torch_frontend import KscStub
+from ksc.torch_frontend import KscStub, CompileConfiguration
 from ksc.compile import VecSpec_Elementwise
 from ksc import utils
 
@@ -114,7 +114,7 @@ def functions_to_benchmark(
                 ks_compiled = fn_obj.compile(
                     torch_extension_name=torch_extension_name,
                     example_inputs=example_inputs,
-                    gpu=False,
+                    configuration=CompileConfiguration(gpu=False),
                 )
                 yield BenchmarkFunction("Knossos", ks_compiled.apply)
                 if (
@@ -126,7 +126,7 @@ def functions_to_benchmark(
                             "ksc", "ksc_cuda", 1
                         ),
                         example_inputs=example_inputs,
-                        gpu=True,
+                        configuration=CompileConfiguration(gpu=True),
                     )
                     yield BenchmarkFunction(
                         "Knossos CUDA", ks_compiled_cuda.apply, torch.device("cuda"),

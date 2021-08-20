@@ -676,13 +676,20 @@ def _tsmod2ksmod(
     )
 
 
+@dataclass(frozen=True)
+class CompileConfiguration:
+    gpu: bool = False
+
+
 @dataclass
 class KscStub:
     raw_f: Callable
     module: ModuleType
     generate_lm: bool
     vectorization: VecSpec
-    compiled: Dict[bool, KscAutogradFunction] = field(default_factory=dict)
+    compiled: Dict[CompileConfiguration, KscAutogradFunction] = field(
+        default_factory=dict
+    )
 
     def __call__(self, *args):
         """
@@ -706,32 +713,34 @@ class KscStub:
         Does not wrap torch tensors, or reset memory allocator.
         For test use only
         """
-        gpu = _input_is_gpu(args)
-        assert gpu in self.compiled  # TODO: infer call args from vjp args
-        return self.compiled[gpu].py_mod.entry_vjp(*args)
+        configuration = CompileConfiguration(gpu=_input_is_gpu(args))
+        assert configuration in self.compiled  # TODO: infer call args from vjp args
+        return self.compiled[configuration].py_mod.entry_vjp(*args)
 
-    def compile(self, example_inputs, torch_extension_name, gpu=False):
-        self.compiled[gpu] = _tsmod2ksmod(
+    def compile(
+        self, example_inputs, torch_extension_name, configuration=CompileConfiguration()
+    ):
+        self.compiled[configuration] = _tsmod2ksmod(
             self.module,
             self.raw_f,
             torch_extension_name=torch_extension_name,
             example_inputs=example_inputs,
             generate_lm=self.generate_lm,
             vectorization=self.vectorization,
-            gpu=gpu,
+            gpu=configuration.gpu,
         )
 
-        return self.compiled[gpu]
+        return self.compiled[configuration]
 
     def ensure_compiled(self, example_inputs):
-        gpu = _input_is_gpu(example_inputs)
-        compiled = self.compiled.get(gpu)
+        configuration = CompileConfiguration(gpu=_input_is_gpu(example_inputs))
+        compiled = self.compiled.get(configuration)
         if compiled is not None:
             return compiled
         print(f"knossos.register: Compiling {self.raw_f.__name__}")
         torch_extension_name = (
             "KscStub_"
-            + ("CUDA_" if gpu else "")
+            + ("CUDA_" if configuration.gpu else "")
             + self.vectorization.str()
             + "_"
             + ("lm_" if self.generate_lm else "")
@@ -741,7 +750,7 @@ class KscStub:
         )
         if self.generate_lm:
             torch_extension_name += "__generate_lm"
-        return self.compile(example_inputs, torch_extension_name, gpu)
+        return self.compile(example_inputs, torch_extension_name, configuration)
 
 
 def _input_is_gpu(example_inputs):
