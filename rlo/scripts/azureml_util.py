@@ -29,7 +29,7 @@ def combined_source_directory():
         )
         # Copy ksc in as a subdirectory. Note this does not include ts2ks.
         shutil.copytree(
-            os.path.join(root_dir, "knossos-ksc", "src", "python", "ksc"),
+            os.path.join(os.path.dirname(root_dir), "src", "python", "ksc"),
             os.path.join(tmpdir, "ksc"),
         )
         yield tmpdir
