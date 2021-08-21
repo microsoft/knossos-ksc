@@ -110,11 +110,11 @@ function CreatePool {
 }
 
 Write-Host Creating src.zip
-git archive --format=zip --output=src.zip HEAD .\src\ .\test\ .\datasets\
+git archive --format=zip --output=src.zip HEAD .\rlo\src\ .\rlo\test\ .\rlo\datasets\
 # git archive doesn't include the contents of the submodule. Add the files ourselves.
 Add-Type -Assembly System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open("src.zip", "update")
-Get-Childitem -Recurse -File .\knossos-ksc\src\python | Resolve-Path -Relative |% {
+Get-Childitem -Recurse -File .\src\python | Resolve-Path -Relative |% {
   [void]([System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_, $_.Replace("\", "/"), [System.IO.Compression.CompressionLevel]::Optimal))
 }
 $zip.Dispose()
