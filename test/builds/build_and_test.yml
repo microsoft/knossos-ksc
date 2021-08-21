@@ -1,4 +1,5 @@
 # Azure pipelines CI definition. See https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema
+name: $(Date:yyyyMMdd)-$(Rev:r)
 trigger: none
 
 jobs:
