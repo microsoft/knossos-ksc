@@ -9,9 +9,9 @@ import importlib
 @pytest.mark.parametrize(
     "module_file,bench_name",
     [
-        ("examples/dl-capsule/sqrl", "vsqrl"),
         ("examples/dl-activations/relu3", "vrelu3"),
         ("examples/dl-capsule/sqrl", "sqrl"),
+        ("examples/dl-capsule/sqrl", "vsqrl"),
     ],
 )
 def test_bench(module_file, bench_name):
