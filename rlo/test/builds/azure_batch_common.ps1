@@ -144,7 +144,7 @@ $VERBOSE_SAS_URL=az storage blob url --container-name "verbose" --name $BUILD --
 
 $containerSettings = @{
   # The tag here must match that of docker_tag.sh
-  "imageName" = "knossos.azurecr.io/rlo_linux_base:$(git rev-parse --short=10 $(git hash-object test/builds/Docker/Dockerfile))$(git rev-parse --short=10 $(git hash-object test/builds/conda-env.yaml))"
+  "imageName" = "knossos.azurecr.io/rlo_linux_base:$(git rev-parse --short=10 $(git hash-object rlo/test/builds/Docker/Dockerfile))$(git rev-parse --short=10 $(git hash-object rlo/test/builds/conda-env.yaml))"
   "registry" = @{
     "registryServer" = "knossos.azurecr.io"
     "username" = "knossos"
