@@ -28,10 +28,6 @@
  (LM (Tuple (Vec Float) (Vec Float)) Float)
  ((Vec Float) (Vec Float)))
 (edef
- Dt$dotv
- (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
- ((Vec Float) (Vec Float)))
-(edef
  R$dotv
  (LM Float (Tuple (Vec Float) (Vec Float)))
  ((Vec Float) (Vec Float)))
@@ -47,7 +43,6 @@
 (edef D$lgamma (LM Float Float) (Float))
 (edef fwd$lgamma Float (Float Float))
 (edef rev$lgamma Float (Float Float))
-(edef Dt$lgamma (Tuple Float (LM Float Float)) (Float))
 (def
  dotvv Float
  ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
@@ -58,11 +53,6 @@
 (edef
  D$mul$Mat$Vec
  (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
- ((Vec (Vec Float)) (Vec Float)))
-(edef
- Dt$mul$Mat$Vec
- (Tuple (Vec Float)
-        (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
  ((Vec (Vec Float)) (Vec Float)))
 (edef
  R$mul$Mat$Vec

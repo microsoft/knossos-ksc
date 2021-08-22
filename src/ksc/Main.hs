@@ -49,8 +49,6 @@ main = do
       "--proffunctions", proffunctions,
       "--proflines", proflines ]
       -> profileArgs source proffile proffunctions proflines
-    "--generate-cpp-without-diffs":rest
-      -> generateCppWithoutDiffs rest
     "--generate-cpp":rest
       -> generateCpp rest
     "--compile-and-run":rest
@@ -64,21 +62,6 @@ main = do
 
 parseErr :: Parsec [String] () a -> [String] -> a
 parseErr p s = either (error . show) id (parse p "" s)
-
-generateCppWithoutDiffs :: [String] -> IO ()
-generateCppWithoutDiffs = parseErr p
-  where p = do
-          input  <- many (option "ks-source-file")
-          ksout  <- option "ks-output-file"
-          cppincludefiles <- many (option "cpp-include")
-          cppout <- option "cpp-output-file"
-
-          return (putStrLn "DEPRECATION WARNING:"
-                 >> putStrLn "--generate-cpp-without-diffs is no longer supported"
-                 >> putStrLn "Use --generate-cpp instead and use gdef to enable or suppress generated derivatives"
-                 >> Ksc.Pipeline.displayCppGen
-                   Nothing cppincludefiles input ksout cppout
-                 >> pure ())
 
 generateCpp :: [String] -> IO ()
 generateCpp = parseErr p

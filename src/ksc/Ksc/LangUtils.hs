@@ -267,7 +267,7 @@ notInScope v in_scope
     (str, rebuild) = case v of
             Simple s -> (s, Simple)
             Delta  s -> (s, Delta)
-            Grad s m -> (s, \s' -> Grad s' m)
+            Grad s   -> (s, Grad)
 
     try :: Int -> Var
     try n | var' `S.member` in_scope = try (n+1)

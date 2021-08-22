@@ -6,7 +6,6 @@
 (edef [D to_float] (LM Integer Float) (Integer))
 (def [fwd to_float] Float ((x : Integer) (dx : (Tuple))) 0.0)
 (def [rev to_float] (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
-(edef [Dt to_float] (Tuple Float (LM Integer Float)) (Integer))
 (def [suffwdpass to_float] (Tuple Float (Tuple)) (x : Integer)
      (tuple (to_float x) (tuple)))
 (def [sufrevpass [to_float Integer]] (Tuple) ((d_dto_float : Float) (bog : Tuple)) (tuple))
@@ -23,7 +22,6 @@
 ;; neg x = -x
 (edef neg Float (Float))
 (edef [D neg] (LM Float Float) (Float))
-(edef [Dt neg] (Tuple Float (LM Float Float)) (Float))
 (def [fwd neg] Float ((x : Float) (dx : Float))
      (neg dx))
 (def [rev neg] Float ((x : Float) (d_dneg : Float))
@@ -36,7 +34,6 @@
 
 (edef neg Integer (Integer))
 (edef [D neg] (LM Integer Integer) (Integer))
-(edef [Dt neg] (Tuple Integer (LM Integer Integer)) (Integer))
 (def [fwd neg] (Tuple) ((x : Integer) (dx : (Tuple)))
      (tuple))
 (def [rev neg] (Tuple) ((x : Integer) (d_dneg : (Tuple)))
@@ -51,7 +48,6 @@
 ;; add (x, y) = x + y
 (edef add Float (Tuple Float Float))
 (edef [D add] (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef [Dt add] (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 (def
  [fwd add] Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -71,7 +67,6 @@
 
 (edef add Integer (Tuple Integer Integer))
 (edef [D add] (LM (Tuple Integer Integer) Integer) (Tuple Integer Integer))
-(edef [Dt add] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Tuple Integer Integer))
 (def
  [fwd add] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -90,7 +85,6 @@
 ;; sub (x, y) = x - y
 (edef sub Float (Tuple Float Float))
 (edef [D sub] (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef [Dt sub] (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 (def
  [fwd sub] Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -111,7 +105,6 @@
 
 (edef sub Integer (Tuple Integer Integer))
 (edef [D sub] (LM (Tuple Integer Integer) Integer) (Tuple Integer Integer))
-(edef [Dt sub] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Tuple Integer Integer))
 (def
  [fwd sub] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -146,7 +139,6 @@
 ;; mul (x, y) = x * y
 (edef mul Float (Tuple Float Float))
 (edef [D mul] (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef [Dt mul] (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 (def [fwd mul] Float ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
       (let ((x1 x2) xt)
       (let ((dx1 dx2) dxt)
@@ -167,7 +159,6 @@
 
 (edef mul Integer (Tuple Integer Integer))
 (edef [D mul] (LM (Tuple Integer Integer) Integer) (Tuple Integer Integer))
-(edef [Dt mul] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Tuple Integer Integer))
 (def
  [fwd mul] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -201,8 +192,6 @@
 
 (edef [D mul] (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float))
           (Tuple (Tensor 2 Float) (Vec Float)))
-(edef [Dt mul] (Tuple (Vec Float) (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
-          (Tuple (Tensor 2 Float) (Vec Float)))
 
 (def [fwd mul] (Vec Float)
           ((M_v : (Tuple (Tensor 2 Float) (Vec Float))) (dM_dv : (Tuple (Tensor 2 Float) (Vec Float))))
@@ -225,7 +214,6 @@
 ;; div (x, y) = x / y
 (edef div Float (Tuple Float Float))
 (edef [D div] (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef [Dt div] (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 (def
  [fwd div] Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -253,7 +241,6 @@
 
 (edef div Integer (Tuple Integer Integer))
 (edef [D div] (LM (Tuple Integer Integer) Integer) (Tuple Integer Integer))
-(edef [Dt div] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Tuple Integer Integer))
 (def
  [fwd div] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -272,7 +259,6 @@
 ;; pow (x, y) = x ^ y
 (edef pow Float (Tuple Float Integer))
 (edef [D pow] (LM (Tuple Float Integer) Float) (Tuple Float Integer))
-(edef [Dt pow] (Tuple Float (LM (Tuple Float Integer) Float)) (Tuple Float Integer))
 (def revpow Float ((x : Float) (n : Integer) (d : Float))
      (mul d (mul (to_float n) (pow x (sub n 1)))))
 
@@ -306,7 +292,6 @@
 ; ;; eq (x, y) = x == y
 ; (edef eq Bool (Tuple Float Float))
 ; (edef [D eq] (LM (Tuple Float Float) Bool) (Tuple Float Float))
-; (edef [Dt eq] (Tuple Bool (LM (Tuple Float Float) Bool)) (Tuple Float Float))
 ; (def
 ;  [fwd eq] (Tuple)
 ;  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -318,7 +303,6 @@
 
 ; (edef eq Bool (Tuple Integer Integer))
 ; (edef [D eq] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
-; (edef [Dt eq] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Tuple Integer Integer))
 ; (def
 ;  [fwd eq] (Tuple)
 ;  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -332,7 +316,6 @@
 ;; gt (x, y) = x > y
 (edef gt Bool (Tuple Float Float))
 (edef [D gt] (LM (Tuple Float Float) Bool) (Tuple Float Float))
-(edef [Dt gt] (Tuple Bool (LM (Tuple Float Float) Bool)) (Tuple Float Float))
 (def
  [fwd gt] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -349,7 +332,6 @@
 
 (edef gt Bool (Tuple Integer Integer))
 (edef [D gt] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
-(edef [Dt gt] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Tuple Integer Integer))
 (def
  [fwd gt] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -368,7 +350,6 @@
 ;; lt (x, y) = x < y
 (edef lt Bool (Tuple Float Float))
 (edef [D lt] (LM (Tuple Float Float) Bool) (Tuple Float Float))
-(edef [Dt lt] (Tuple Bool (LM (Tuple Float Float) Bool)) (Tuple Float Float))
 (def
  [fwd lt] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -385,7 +366,6 @@
 
 (edef lt Bool (Tuple Integer Integer))
 (edef [D lt] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
-(edef [Dt lt] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Tuple Integer Integer))
 (def
  [fwd lt] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -404,7 +384,6 @@
 ;; lte (x, y) = x <= y
 (edef lte Bool (Tuple Float Float))
 (edef [D lte] (LM (Tuple Float Float) Bool) (Tuple Float Float))
-(edef [Dt lte] (Tuple Bool (LM (Tuple Float Float) Bool)) (Tuple Float Float))
 (def
  [fwd lte] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -416,7 +395,6 @@
 
 (edef lte Bool (Tuple Integer Integer))
 (edef [D lte] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
-(edef [Dt lte] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Tuple Integer Integer))
 (def
  [fwd lte] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -430,7 +408,6 @@
 ;; gte (x, y) = x >= y
 (edef gte Bool (Tuple Float Float))
 (edef [D gte] (LM (Tuple Float Float) Bool) (Tuple Float Float))
-(edef [Dt gte] (Tuple Bool (LM (Tuple Float Float) Bool)) (Tuple Float Float))
 (def
  [fwd gte] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -447,7 +424,6 @@
 
 (edef gte Bool (Tuple Integer Integer))
 (edef [D gte] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
-(edef [Dt gte] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Tuple Integer Integer))
 (def
  [fwd gte] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -466,7 +442,6 @@
 (edef [D log] (LM Float Float) (Float))
 (def [fwd log] Float ((x : Float) (dx : Float)) (div dx x))
 (def [rev log] Float ((x : Float) (d_dlog : Float)) (div d_dlog x))
-(edef [Dt log] (Tuple Float (LM Float Float)) (Float))
 
 (def [suffwdpass log] (Tuple Float Float) (x : Float)
      (tuple (log x) x))
@@ -477,7 +452,6 @@
 (edef [D exp] (LM Float Float) (Float))
 (def [fwd exp] Float ((x : Float) (dx : Float)) (mul (exp x) dx))
 (def [rev exp] Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
-(edef [Dt exp] (Tuple Float (LM Float Float)) (Float))
 
 (def [suffwdpass exp] (Tuple Float Float) (x : Float)
      (let (exp_x (exp x))
@@ -501,12 +475,10 @@
 (def [suffwdpass sin] (Tuple Float Float) (x : Float) (tuple (sin x) x))
 (def [sufrevpass [sin Float]] Float ((d_dsin : Float) (bog : Float))
      (mul (cos bog) d_dsin))
-(edef [Dt sin] (Tuple Float (LM Float Float)) (Float))
 
 (edef [D cos] (LM Float Float) (Float))
 (def [fwd cos] Float ((x : Float) (dx : Float)) (neg (mul (sin x) dx)))
 (def [rev cos] Float ((x : Float) (d_dcos : Float)) (neg (mul (sin x) d_dcos)))
-(edef [Dt cos] (Tuple Float (LM Float Float)) (Float))
 (def [suffwdpass cos] (Tuple Float Float) (x : Float) (tuple (cos x) x))
 (def [sufrevpass [cos Float]] Float ((d_dcos : Float) (bog : Float))
      (neg (mul (sin bog) d_dcos)))
@@ -523,7 +495,6 @@
      (let (cosh_x_2 (mul cosh_x cosh_x))
        (div d_dr cosh_x_2))))
 (edef [D tanh] (LM Float Float) (Float))
-(edef [Dt tanh] (Tuple Float (LM Float Float)) (Float))
 (def [suffwdpass tanh] (Tuple Float Float) (x : Float)
      (tuple (tanh x) x))
 (def [sufrevpass [tanh Float]] Float ((d_dtanh : Float) (x : Float))
@@ -533,12 +504,10 @@
 
 (edef max Float (Tuple Float Float))
 (edef [D max] (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef [Dt max] (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 
 (edef imax Integer ((Tensor 1 Float)))
 (edef max Float ((Tensor 1 Float)))
 (edef [D max] (LM (Tensor 1 Float) Float) ((Tensor 1 Float)))
-(edef [Dt max] (Tuple Float (LM (Tensor 1 Float) Float)) ((Tensor 1 Float)))
 (def [fwd max] Float ((x : (Tensor 1 Float)) (dx : (Tensor 1 Float)))
   (index (imax x) dx))
 (def [rev max] (Tensor 1 Float) ((x : (Tensor 1 Float)) (d_dr : Float))
@@ -553,7 +522,6 @@
 (edef [D $ranhashdoub] (LM Integer Float) (Integer))
 (def [fwd $ranhashdoub] Float ((x : Integer) (dx : (Tuple))) 0.0)
 (def [rev $ranhashdoub] (Tuple) ((x : Integer) (d_dranhashdoub : Float)) (tuple))
-(edef [Dt $ranhashdoub] (Tuple Float (LM Integer Float)) (Integer))
 
 (def [suffwdpass $ranhashdoub] (Tuple Float (Tuple)) (x : Integer)
      (tuple ($ranhashdoub x) (tuple)))
@@ -565,13 +533,11 @@
 (def [fwd abs] Float ((x : Float) (dx : Float)) (if (gt x 0.0) dx (neg dx)))
 (def [rev abs] Float ((x : Float) (d_dabs : Float))
      (if (gt x 0.0) d_dabs (neg d_dabs)))
-(edef [Dt abs] (Tuple Float (LM Float Float)) (Float))
 
 (edef lgamma Float (Float))
 (edef [D lgamma] (LM Float Float) (Float))
 (edef [fwd lgamma] Float (Tuple Float Float))
 (edef [rev lgamma] Float (Tuple Float Float))
-(edef [Dt lgamma] (Tuple Float (LM Float Float)) (Float))
 
 (def [suffwdpass lgamma] (Tuple Float Float) (x : Float)
      (tuple (lgamma x) x))
@@ -580,7 +546,6 @@
 
 (edef or Bool (Tuple Bool Bool))
 (edef [D or] (LM (Tuple Bool Bool) Bool) (Tuple Bool Bool))
-(edef [Dt or] (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Tuple Bool Bool))
 (def [fwd or] (Tuple)
      ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
      (tuple))
@@ -595,7 +560,6 @@
 
 (edef and Bool (Tuple Bool Bool))
 (edef [D and] (LM (Tuple Bool Bool) Bool) (Tuple Bool Bool))
-(edef [Dt and] (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Tuple Bool Bool))
 (def [fwd and] (Tuple)
      ((xt : Tuple Bool Bool) (dxt : Tuple (Tuple) (Tuple)))
      (tuple))

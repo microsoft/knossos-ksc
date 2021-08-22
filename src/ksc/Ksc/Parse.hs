@@ -58,7 +58,7 @@ x : Tensor 1 (Tensor 2 Float)
         | "[" <derivation> <sname> "]"
         | "[" <var> <type> "]"
 
-<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "Dt" | "suffwdpass" | "sufrevpass"
+<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "suffwdpass" | "sufrevpass"
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
@@ -393,12 +393,9 @@ pBaseFun = pPrimFun
 
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
 pFunG pBase = try (brackets $
-            ((pDerivation "D" (GradFun BasicAD))
-         <|> (pDerivation "Dt" (GradFun TupleAD))
-         <|> (pDerivation "fwd" (DrvFun (AD BasicAD Fwd)))
-         <|> (pDerivation "fwdt" (DrvFun (AD TupleAD Fwd)))
-         <|> (pDerivation "rev"  (DrvFun (AD BasicAD Rev)))
-         <|> (pDerivation "revt" (DrvFun (AD TupleAD Rev)))
+            ((pDerivation "D" GradFun)
+         <|> (pDerivation "fwd" (DrvFun Fwd))
+         <|> (pDerivation "rev"  (DrvFun Rev))
          <|> (pDerivation "CL" CLFun)
          <|> (pDerivation "suffwdpass" SUFFwdPass)
          <|> (pDerivation "sufrevpass" SUFRevPass)
@@ -453,8 +450,8 @@ pEdef = do { pReserved "edef"
 
 pDerivation :: Parser Derivation
 pDerivation =
-      (pReserved "fwd" $> DerivationDrvFun (AD BasicAD Fwd))
-  <|> (pReserved "rev" $> DerivationDrvFun (AD BasicAD Rev))
+      (pReserved "fwd" $> DerivationDrvFun Fwd)
+  <|> (pReserved "rev" $> DerivationDrvFun Rev)
   <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
   <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)

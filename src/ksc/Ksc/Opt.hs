@@ -216,8 +216,8 @@ rewriteCall _ fun (If e1 e2 e3)
 rewriteCall env (TFun _ (Fun JustFun fun)) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (Fun (GradFun adm) f)) arg
-  = optGradFun (optEnvInScope env) adm ty f arg
+rewriteCall env (TFun ty (Fun GradFun f)) arg
+  = optGradFun (optEnvInScope env) ty f arg
 
 rewriteCall _ (TFun _ (Fun (DrvFun adm) f)) arg
   = optDrvFun adm f arg
@@ -401,10 +401,8 @@ optPrimFun _ P_sum         arg           = optSum arg
 optPrimFun _ P_shape       arg           = Just $ optShape arg
 optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ P_sumbuild    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
-optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env (AD BasicAD Fwd) e1 e2
-optPrimFun env P_lmApplyR  (Tuple [e1,e2])        = optLMApply env (AD BasicAD Rev) e2 e1
-optPrimFun env P_lmApplyT  (Tuple [e1,e2])        = optLMApply env (AD TupleAD Fwd) e1 e2
-optPrimFun env P_lmApplyTR (Tuple [e1,e2])        = optLMApply env (AD TupleAD Rev) e2 e1
+optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env Fwd e1 e2
+optPrimFun env P_lmApplyR  (Tuple [e1,e2])        = optLMApply env Rev e2 e1
 optPrimFun _ P_lmCompose   (Tuple [f,g])  = optLMCompose f g
 
 optPrimFun _ P_lmVCat (Tuple es)
@@ -658,26 +656,15 @@ optSumBuild _ _ _ = Nothing
 
 -----------------------
 -- See Note [Automatic differentiation documentation]
-optGradFun :: HasCallStack => InScopeSet -> ADPlan
+optGradFun :: HasCallStack => InScopeSet
                            -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (BaseFunId (BaseUserFunName {}) _) _
+optGradFun _ _ (BaseFunId (BaseUserFunName {}) _) _
   = Nothing
 
 -- From here on we have primitives or selection
 
-optGradFun env TupleAD ty f args
-  | TypeTuple [res_ty, lm_ty] <- ty
-  , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
-  = Just $
-    mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun JustFun f)) new_args, opt_grad ]
-  | otherwise
-  = Nothing
-  where
-    (binds, [new_args]) = makeAtomic False env [args]
-
-optGradFun _ BasicAD ty (PrimFunT f)  args = optGradPrim ty f args
+optGradFun _ ty (PrimFunT f)  args = optGradPrim ty f args
 
 type TBinds = [(TVar, TExpr)]
 
@@ -769,8 +756,8 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 
 -----------------------
 -- See Note [Automatic differentiation documentation]
-optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
-optDrvFun (AD BasicAD dir) (PrimFunT f) args = optDrvPrim dir f args
+optDrvFun :: HasCallStack => ADDir -> BaseFun p -> TExpr -> Maybe TExpr
+optDrvFun dir (PrimFunT f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
 -- See Note [Automatic differentiation documentation]
@@ -799,47 +786,40 @@ optDrvPrim _ _ _ = Nothing
 -- See Note [Automatic differentiation documentation]
 --
 -- Called for (lmApply lm dx)
-optLMApply :: InScopeSet -> ADMode -> TExpr -> TExpr -> Maybe TExpr
+optLMApply :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 
 optLMApply _ adm (Assert e1 e2) dx
-  = Just (Assert e1 (lmApply_AD adm e2 dx))
+  = Just (Assert e1 (lmApply_Dir adm e2 dx))
 
 optLMApply _ adm (Let v rhs body) dx
-  = Just $ Let v rhs $ lmApply_AD adm body dx
+  = Just $ Let v rhs $ lmApply_Dir adm body dx
 
 optLMApply _ adm (If b et ef) dx
-  = Just $ If b (lmApply_AD adm et dx) (lmApply_AD adm ef dx)
-
--- lmApplyT  (r, lm) dx ===> lmApply  lm dx
--- lmApplyTR dr (r, lm) ===> lmApplyR dr lm
-optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
-  = Just (lmApply_Dir dir lm dx)
+  = Just $ If b (lmApply_Dir adm et dx) (lmApply_Dir adm ef dx)
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun JustFun (PrimFunT f))) es) dx
+optLMApply env dir (Call (TFun _ (Fun JustFun (PrimFunT f))) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (Fun (GradFun adp2) f)) es) dx
-  | adp1 == adp2
+optLMApply _ Fwd (Call (TFun (TypeLM _ t) (Fun GradFun f)) es) dx
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType t) (Fun (DrvFun (AD adp1 Fwd)) f)
+    grad_fun = TFun (tangentType t) (Fun (DrvFun Fwd) f)
     es_dx = Tuple [es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (Fun (GradFun adp2) f)) es) dx
-  | adp1 == adp2
+optLMApply _ Rev (Call (TFun (TypeLM s _) (Fun GradFun f)) es) dx
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType s) (Fun (DrvFun (AD adp1 Rev)) f)
+    grad_fun = TFun (tangentType s) (Fun (DrvFun Rev) f)
     es_dx = Tuple [es, dx]
 
 {-

@@ -271,7 +271,6 @@ If you prefer block comments then use pairs of #| and |#
 ; manual derivatives (i.e. using "def") for your function.
 (edef my_log Float (Float))
 (edef [D [my_log Float]] (LM Float Float) (Float)) ; External definition of Jacobian
-(edef [Dt my_log] (Tuple Float (LM Float Float)) (Float)) ; and its transpose
 
 ;; KS-visible definition of forward derivative
 (def [fwd [my_log Float]] Float ((x : Float) (dx : Float)) 

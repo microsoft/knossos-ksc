@@ -103,11 +103,6 @@ def infer_fn_type_from_derived_fn_args(sname: StructuredName, argtype: Type) -> 
             S = argtype
             return infer_fn_type_from_derived_fn_args(sname.se[1], S)
 
-        # [Dt f] : S -> LM dT dS
-        if derivation == "Dt":
-            S = argtype
-            return infer_fn_type_from_derived_fn_args(sname.se[1], S)
-
         # [shape f] : S -> shapeType(S)
         if derivation == "shape":
             S = argtype

@@ -94,12 +94,22 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         print(e.stderr.decode("ascii"))
         decls = list(parse_ks_filename(fkso.name))
     except subprocess.CalledProcessError as e:
-        print(f"Command failed:\n{' '.join(ksc_command)}")
-        print(f"files {fks.name} {fkso.name} {fcpp.name}")
+        ksc_command_str = " ".join(ksc_command)
+        print(f"Command failed:\n{ksc_command_str}")
+        print(f"KSC files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
+        print("KSC output:\n")
         print(e.output.decode("ascii"))
-        print(e.stderr.decode("ascii"))
-        raise
+        ksc_stderr = e.stderr.decode("ascii")
+        ksc_stderr_filtered = "> " + "\n> ".join(ksc_stderr.split("\n")[:-1])
+        print(ksc_stderr_filtered + "\n")
+        raise Exception(
+            f"Command failed:\n"
+            f"{ksc_command_str}\n"
+            f"KSC output:\n"
+            f"{ksc_stderr_filtered}\n"
+            f"See additional information in stdout"
+        ) from e
 
     # Read from CPP back to string
     with open(fcpp.name) as f:

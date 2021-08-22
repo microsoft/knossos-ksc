@@ -13,8 +13,6 @@
 (edef dot Float (Tuple (Vec Float) (Vec Float)))
 (edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
              (Tuple (Vec Float) (Vec Float)))
-(edef [Dt dot] (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
-              (Tuple (Vec Float) (Vec Float)))
 (edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) (Tuple (Vec Float) (Vec Float)))
 (def [fwd dot] Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (let ((a b) a_b)
