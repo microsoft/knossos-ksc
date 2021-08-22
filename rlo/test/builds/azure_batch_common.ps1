@@ -110,7 +110,9 @@ function CreatePool {
 }
 
 Write-Host Creating src.zip
-git archive --format=zip --output=src.zip HEAD .\rlo\src\ .\rlo\test\ .\rlo\datasets\
+cd rlo
+git archive --format=zip --output=..\src.zip HEAD .\src\ .\test\ .\datasets\
+cd ..
 # git archive doesn't include the contents of the submodule. Add the files ourselves.
 Add-Type -Assembly System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open("src.zip", "update")
