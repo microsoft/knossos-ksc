@@ -139,7 +139,7 @@ def bench(module_file, bench_name):
         ):
             print(pt_value)
             print(ks_value)
-            raise ValueError("Knossos != torch!")
+            raise ValueError("Knossos != torch")
 
         pt_loss = pt_value.sum()
         pt_grad = torch.autograd.grad(pt_loss, pt_arg)[0]
@@ -161,7 +161,7 @@ def bench(module_file, bench_name):
             )
 
             print(pd.DataFrame(cols, columns=["ARG", "PT", "KS", "Diff"]))
-            raise ValueError("Knossos != torch!")
+            raise ValueError("Knossos != torch")
 
         # ptfast should always work, and be the timing reference
         timeit(bench_name + " PyTorch fast", pt_fast, arg)
