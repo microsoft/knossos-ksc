@@ -110,9 +110,7 @@ function CreatePool {
 }
 
 Write-Host Creating src.zip
-cd rlo
-git archive --format=zip --output=..\src.zip HEAD .\src\ .\test\ .\datasets\
-cd ..
+git archive --format=zip --output=src.zip HEAD .\rlo\src\ .\rlo\test\ .\rlo\datasets\
 # git archive doesn't include the contents of the submodule. Add the files ourselves.
 Add-Type -Assembly System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open("src.zip", "update")
@@ -183,7 +181,7 @@ function StdErrUploader {
 function CreateDockerSrcTask {
   Param($cmds, $props, $job=$BUILD)
   # TF_DETERMINISTIC_OPS here is exposed by the NVidia NGC Docker container.
-  $props["commandLine"] = "/bin/bash -c 'unzip src.zip; sh ./test/builds/free_memory.sh & python3 src/rlo/diagnostics.py; export TF_DETERMINISTIC_OPS=1; $cmds'"
+  $props["commandLine"] = "/bin/bash -c 'unzip src.zip; sh ./rlo/test/builds/free_memory.sh & python3 rlo/src/rlo/diagnostics.py; export TF_DETERMINISTIC_OPS=1; $cmds'"
   $props["containerSettings"] = $containerSettings
   $props["resourceFiles"] = @( $srcZipResource )
   AzBatchCreate "task" $props --job-id $job

@@ -276,11 +276,10 @@ jobs:
     - task: AzureCLI@1
       displayName: 'Azure CLI azure_batch_single.ps1'
       inputs:
-        workingDirectory: rlo
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
         inlineScript: >
-          powershell -ExecutionPolicy bypass -File test\builds\azure_batch_single.ps1 -b test-$(Build.BuildNumber) "bash ./test/azure_batch_test.sh"
+          powershell -ExecutionPolicy bypass -File rlo\test\builds\azure_batch_single.ps1 -b test-$(Build.BuildNumber) "bash ./rlo/test/azure_batch_test.sh"
       # dockerPassword is defined in the Azure DevOps build definition 'variables' (not in source control)
       env:
         DOCKER_PASSWORD: $(dockerPassword)
@@ -288,7 +287,6 @@ jobs:
       displayName: Stop Azure Batch if cancelled
       condition: canceled()
       inputs:
-        workingDirectory: rlo
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
         inlineScript: 'az batch job stop --job-id test-%BUILD_BUILDNUMBER%'
