@@ -5,6 +5,7 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+	
 
 
 		{
@@ -39,6 +40,7 @@
 				"-m",
 				"pytest",
 				"src/bench/",
+				"-v",
 				"--modulepath=examples/dl-capsule/sqrl",
 				"--benchmarkname=sqrl",
 			],
