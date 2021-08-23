@@ -74,11 +74,15 @@ Each C++ function is annotated with one of the following macros:
 #define COMMENT(x)
 
 // KS_ASSERT
+#ifdef KS_CUDA
+#define KS_ASSERT(expr) assert(expr);
+#else
 #define KS_ASSERT(expr)                     \
     if (expr)                               \
         ;                                   \
     else                                    \
         ks::fail(__FILE__, __LINE__, #expr);
+#endif
 
 namespace ks {
 	inline void fail [[noreturn]] (char const* file, int line, char const* expr)

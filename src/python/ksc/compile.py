@@ -202,6 +202,7 @@ def generate_cpp_for_py_module_from_ks(
     vectorization: VecSpec = VecSpec_None(),
     use_aten=True,
     use_torch=False,
+    gpu=False,
 ):
     """Returns two strings of C++ code:
        The first string contains definitions of all ksc-generated functions and entry points.
@@ -228,7 +229,11 @@ def generate_cpp_for_py_module_from_ks(
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
     ) = cgen.generate_cpp_entry_points(
-        bindings_to_generate, decls, vectorization=vectorization, use_torch=use_torch
+        bindings_to_generate,
+        decls,
+        vectorization=vectorization,
+        use_torch=use_torch,
+        gpu=gpu,
     )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
@@ -312,6 +317,7 @@ def build_module_using_pytorch_from_ks(
     vectorization: VecSpec = VecSpec_None(),
     use_aten=False,
     extra_cflags=[],
+    gpu=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -332,10 +338,14 @@ def build_module_using_pytorch_from_ks(
         vectorization=vectorization,
         use_aten=use_aten,
         use_torch=True,
+        gpu=gpu,
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        [("ksc-main.cpp", cpp_definitions), ("ksc-pybind.cpp", cpp_pybind)],
+        [
+            ("ksc-main.cu" if gpu else "ks-main.cpp", cpp_definitions),
+            ("ksc-pybind.cpp", cpp_pybind),
+        ],
         torch_extension_name,
         extra_cflags,
     )
@@ -391,6 +401,7 @@ def build_module_using_pytorch_from_cpp_backend(
         sources=[source_path(filename) for filename, _ in cpp_strs],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=extra_cflags,
+        extra_cuda_cflags=extra_cflags + ["-DKS_CUDA"],
         build_directory=build_directory,
         verbose=verbose,
     )
