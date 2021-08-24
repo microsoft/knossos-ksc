@@ -12,7 +12,7 @@ from ksc.torch_frontend import (
 )
 import ksc.torch_frontend as knossos
 
-# BEGINDOC
+# DOC-KS
 @knossos.elementwise
 def vrelu3(x: float) -> float:
     """
@@ -27,10 +27,11 @@ def vrelu3(x: float) -> float:
         return x - 2 / 3
 
 
-# ENDDOC
+# ENDDOC-KS
 
 
 # run-bench: PyTorch reference implementation
+# DOC-PTREF
 def vrelu3_pytorch(x: torch.Tensor):
     mask1_inf = x > 1.0
     mask0_1 = (x > 0.0) & ~mask1_inf
@@ -38,6 +39,9 @@ def vrelu3_pytorch(x: torch.Tensor):
     val_1_inf = x - 2 / 3
 
     return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+
+
+# ENDDOC-PTREF
 
 
 # run-bench: PyTorch "nice" implementation
@@ -49,15 +53,19 @@ if False:
 
     def relu3_pytorch_nice(x: float) -> float:
         if x < 0.0:
-            return torch.zeros_like(
-                x
-            )  # Needed for PyTorch, not for Knossos [Note: zeros]
+            return torch.zeros_like(x)  # [Note: zeros for PyTorch]
         elif x < 1.0:
             return 1 / 3 * x ** 3
         else:
             return x - 2 / 3
 
     vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
+
+    # Note: Zeros for PyTorch
+    # For PyTorch, a function which wants to use a zero as an intermediate needs to make
+    # sure it's a zero tensor, a plain float zero will not propagate gradients.
+    # This is something of a long story, related to tracing.
+    # Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
 
 
 embedded_cflags = ksc.compile.default_cflags
@@ -560,12 +568,6 @@ def vrelu3_bench_configs():
 
 
 # yield torch.randn((256,256)) too slow to bench...
-
-
-# Note: zeros
-# Need to multiply by x for pytorch to get the gradient back through x.
-# This is something of a long story, related to tracing.
-# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
 
 
 def plot_relu3(filename):
