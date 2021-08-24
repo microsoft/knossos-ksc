@@ -9,4 +9,5 @@ BENCH="pytest src/bench/ \
 
 # $BENCH --modulepath=examples/dl-activations/relu3 --benchmarkname=vrelu3
 $BENCH --modulepath=examples/dl-capsule/sqrl --benchmarkname=sqrl
+$BENCH --modulepath=examples/dl-capsule/sqrl --benchmarkname=vsqrl
 $BENCH --modulepath=examples/dl-activations/gelu --benchmarkname=vgelu
