@@ -23,12 +23,12 @@ def sqrl(x: torch.Tensor):
 
 # run-bench: PyTorch "fast" implementation
 def sqrl_pytorch(x: torch.Tensor):
-    return sqrl(x)
+    return sqrl.raw_f(x)
 
 
 # run-bench: PyTorch "nice" implementation
 def sqrl_pytorch_nice(x: torch.Tensor):
-    return sqrl(x)
+    return sqrl.raw_f(x)
 
 
 # run-bench: Define a range of values at which to call the methods
