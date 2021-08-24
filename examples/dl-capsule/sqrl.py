@@ -42,7 +42,7 @@ def sqrl_bench_configs():
 # vsqrl - vectorized sqrl
 #
 
-vsqrl = knossos.vmap(sqrl)
+vsqrl = knossos.register_direct(sqrl, vmap=True, generate_lm=True)  # TODO: Carbuncle
 
 
 def vsqrl_pytorch(x):
