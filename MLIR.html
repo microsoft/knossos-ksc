@@ -1,0 +1,314 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>MLIR integration &mdash; Knossos 0.7 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Knossos Glossary" href="Glossary.html" />
+    <link rel="prev" title="Benchmarking" href="Benchmarking.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #333" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Knossos
+          
+
+          
+            
+            <img src="_static/knossos-logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/relu3.html">Relu3 - An example kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sqrl.html">SQRL - An example non-elementwise kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">MLIR integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Glossary.html">Knossos Glossary</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Knossos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>MLIR integration</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/MLIR.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mlir-integration">
+<h1>MLIR integration<a class="headerlink" href="#mlir-integration" title="Permalink to this headline">¶</a></h1>
+<p># Knossos MLIR libraries</p>
+<p>This tree aims to implement two libraries: a Knossos file reader that emits MLIR,
+and an API providing introspection into an MLIR graph for heuristics search.</p>
+<p>## MLIR back-end</p>
+<p>The MLIR back-end parsers Knossos IR and emits MLIR using as much as possible of
+the MLIR core/affine/linalg dialects.</p>
+<p>This back-end prints out an MLIR graph (text, binary) when requested, or it
+feeds into the introspection API library for further processing.</p>
+<p>The library should also be able to import MLIR graphs, for round-trip testing
+and interacting with other MLIR tools.</p>
+<p><strong>Partial implementation. See TODO below.</strong></p>
+<p>## MLIR Heuristics Introspection Engine</p>
+<p>Provides a stable way to query MLIR graphs for the purpose of heuristics
+searches. We may need a Knossos-specific dialect.</p>
+<p>If we do, we’ll need to be able to annotate generic MLIR graph with Knossos
+dialect, as well as read Knossos IR into MLIR into that dialect.</p>
+<p><strong>Not implemented yet.</strong></p>
+<p># Knossos MLIR Dialect</p>
+<p>This is a stub for the Knossos [MLIR](<a class="reference external" href="https://mlir.llvm.org/">https://mlir.llvm.org/</a>) dialect along with a tool to operate on that dialect.</p>
+<p>We may in the future decide to use the [Rise](<a class="reference external" href="https://github.com/rise-lang/mlir">https://github.com/rise-lang/mlir</a>) dialect. But the decision should be orthogonal with the decision to use the [Elevate](<a class="reference external" href="https://arxiv.org/pdf/2002.02268.pdf">https://arxiv.org/pdf/2002.02268.pdf</a>) rewrite description on either dialect.</p>
+<p>## Building Ksc-MLIR</p>
+<p>This setup assumes that you have built a specific checkout of LLVM and MLIR in <cite>$BUILD_DIR</cite>.
+See instructions below.</p>
+<p>To build and launch the tests, run</p>
+<p><a href="#id1"><span class="problematic" id="id2">``</span></a><a href="#id3"><span class="problematic" id="id4">`</span></a>sh
+# Prepare
+$ cd &lt;&lt;path/to/knossos-ksc&gt;&gt;
+$ cp user.cmake.template user.cmake
+EDIT user.cmake to add path to LLVM
+$ mkdir -p build &amp;&amp; cd build</p>
+<p># Build
+$ cmake -G Ninja ..
+$ ninja ksc-mlir</p>
+<p># Test
+$ ninja check-ksc</p>
+<p># Use
+$ ./bin/ksc-mlir TEST -vvv # Runs the unit tests
+$ ./bin/ksc-mlir AST foo.ks # Spits out AST
+$ ./bin/ksc-mlir MLIR foo.ks # Spits out MLIR
+$ ./bin/ksc-mlir LLVM foo.ks # Spits out LLVM IR
+$ lli foo.ll ; echo $? # Run llvm and echo exit code
+<a href="#id5"><span class="problematic" id="id6">``</span></a><a href="#id7"><span class="problematic" id="id8">`</span></a></p>
+<dl class="simple">
+<dt><strong>Tested with:</strong></dt><dd><ul class="simple">
+<li><p>Compilers: Clang 6 and 9, GCC 7.4 and 9.2</p></li>
+<li><p>Linkers: GNU and LLD</p></li>
+<li><p>OS: Ubuntu 18 and 19</p></li>
+</ul>
+</dd>
+</dl>
+<p>Should work with any compiler, linker and OS LLVM works with.</p>
+<p>## Building LLVM/MLIR
+See <a class="reference external" href="https://mlir.llvm.org/getting_started">https://mlir.llvm.org/getting_started</a> for more,
+but this is a useful summary.
+<em>Note that you need to checkout the right commit as below.</em></p>
+<p><a href="#id9"><span class="problematic" id="id10">``</span></a><a href="#id11"><span class="problematic" id="id12">`</span></a>bash
+# Prepare
+$ apt install clang ninja-build cmake lld
+$ git clone <a class="reference external" href="mailto:git&#37;&#52;&#48;github&#46;com">git<span>&#64;</span>github<span>&#46;</span>com</a>:llvm/llvm-project.git</p>
+<p># Make sure you got the right commit
+# Be sure to update this line when that changes
+$ KNOSSOS=&lt;&lt;path to knossos&gt;&gt;
+$ cd llvm-project
+$ git checkout -b ksc <cite>cat $KNOSSOS/etc/llvm-branch.txt</cite></p>
+<p>$ mkdir -p build &amp;&amp; cd build</p>
+<p># Build
+$ . $KNOSSOS/mlir/run-cmake-in-llvm.sh
+$ ninja check-mlir
+<a href="#id13"><span class="problematic" id="id14">``</span></a><a href="#id15"><span class="problematic" id="id16">`</span></a></p>
+<p># Implementation Details</p>
+<p>The Lexer/Tokeniser creates two different kinds of tokens: values and non-values.
+This is consistent with existing continuation compilers.</p>
+<p>The expected sequence of value and non-value tokens and the token’s value will
+determine which kind of AST node we’re parsing.</p>
+<p>The Parser reads the Token tree and creates the AST, which is then used by the
+MLIR back end to generate a module. The module can be optimised and LLVM IR
+generated from it.</p>
+<p>In the future, the heuristics engine will use the MLIR module to optimise the
+graph, and there will be the option of either running the result in a JIT or
+lowering to specific hardware.</p>
+<dl class="simple">
+<dt><strong>Back-end TODO:</strong></dt><dd><ul class="simple">
+<li><p>Add support for local variables (context) &amp; finish Knossos IR support.</p></li>
+<li><p>Run through multiple Ksc examples, add FileCheck validation.</p></li>
+</ul>
+</dd>
+<dt><strong>Engine TODO:</strong></dt><dd><ul class="simple">
+<li><p>Cost Model: liveness analysis, target-specific hooks, PGO, etc.</p></li>
+<li><p>Navigation: find users/ops, dominance analysis, control flow, patterns, etc.</p></li>
+<li><p>Rewrite dialect: known transformations representation, heuristics costs.</p></li>
+<li><p>Heuristics: query/add/change heuristics values based on cost and predictions.</p></li>
+<li><p>Traversal: allows sub-trees to be selected, pruned, cloned, modified, etc.</p></li>
+<li><p>Lowering: either to a JIT execution engine or to specific hardware languages.</p></li>
+</ul>
+</dd>
+</dl>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="Glossary.html" class="btn btn-neutral float-right" title="Knossos Glossary" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="Benchmarking.html" class="btn btn-neutral float-left" title="Benchmarking" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Microsoft.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

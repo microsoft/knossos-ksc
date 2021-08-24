@@ -1,0 +1,263 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Knossos Glossary &mdash; Knossos 0.7 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="MLIR integration" href="MLIR.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #333" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Knossos
+          
+
+          
+            
+            <img src="_static/knossos-logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/relu3.html">Relu3 - An example kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sqrl.html">SQRL - An example non-elementwise kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Benchmarking.html">Benchmarking</a></li>
+<li class="toctree-l1"><a class="reference internal" href="MLIR.html">MLIR integration</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Knossos Glossary</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#kinaufl-knossos-is-not-a-user-facing-language">KINAUFL: Knossos is not a user-facing language.</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#otp-one-theorem-prover">OTP: One theorem prover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#suf-single-use-form">SUF: Single use form</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#otos-optimized-for-time-or-space">OtOs: Optimized for time or space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#idtw-if-that-didn-t-work">IDTW: If that didn’t work</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#general-concepts-from-related-work">General concepts from related work</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Knossos</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Knossos Glossary</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/Glossary.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="knossos-glossary">
+<h1>Knossos Glossary<a class="headerlink" href="#knossos-glossary" title="Permalink to this headline">¶</a></h1>
+<p>Concepts that arise throughout the documentation</p>
+<div class="section" id="kinaufl-knossos-is-not-a-user-facing-language">
+<h2>KINAUFL: Knossos is not a user-facing language.<a class="headerlink" href="#kinaufl-knossos-is-not-a-user-facing-language" title="Permalink to this headline">¶</a></h2>
+<p>The IR as been designed to be ultra-lightweight, in order to simplify interop with a wide range of source languages and backends.  Wherever that light weight causes runtime slowdown, we expect to recover it using rewrite rules.  At the same time, the IR is very strongly designed to be 1-1 with its text representation, to keep compiler passes honest, and to facilitate debugging.  So we tread a tightrope – it is a merit that it’s human readable and writeable, but we want to eschew festoonage.</p>
+</div>
+<div class="section" id="otp-one-theorem-prover">
+<h2>OTP: One theorem prover<a class="headerlink" href="#otp-one-theorem-prover" title="Permalink to this headline">¶</a></h2>
+<p>Greenspun’s 10th rule: “Any sufficiently complicated program contains an ad hoc, informally-specified, bug-ridden, slow implementation of half of Common Lisp.”</p>
+<p>And Fitzgibbon’s conjecture: “Any sufficiently complicated Common Lisp compiler contains an ad-hoc, informally-specified, bug-ridden, slow implementation of half of a theorem prover.”</p>
+<p>And Fitzgibbon’s related axiom: “Any system should contain at most one theorem prover.”</p>
+<p>Knossos <em>is</em> a theorem prover, so any point at which typechecking or cost computation becomes like half a theorem prover, we aim to re-express it just using the rewrite system.  It’s a powerful razor, so when someone invokes “OTP”, your mission is to show that your proposed change cannot be done using the existing rewrites.</p>
+</div>
+<div class="section" id="suf-single-use-form">
+<h2>SUF: Single use form<a class="headerlink" href="#suf-single-use-form" title="Permalink to this headline">¶</a></h2>
+<p>An extension of ANF where every variable has exactly one use.  Useful for functional AD and beyond (see https://tminka.github.io/papers/acmll2019/, and https://github.com/microsoft/knossos-ksc/issues/377</p>
+</div>
+<div class="section" id="otos-optimized-for-time-or-space">
+<h2>OtOs: Optimized for time or space<a class="headerlink" href="#otos-optimized-for-time-or-space" title="Permalink to this headline">¶</a></h2>
+<p>Many functions have a choice of space or time efficient implementations, which might be named <code class="docutils literal notranslate"><span class="pre">foo$Ot</span></code> or <code class="docutils literal notranslate"><span class="pre">foo$Os</span></code>.  It’s the optimizer’s job to choose between them.</p>
+</div>
+<div class="section" id="idtw-if-that-didn-t-work">
+<h2>IDTW: If that didn’t work<a class="headerlink" href="#idtw-if-that-didn-t-work" title="Permalink to this headline">¶</a></h2>
+<p>On a list of tasks, describe increasingly desperate alternatives. E.g.</p>
+<ul class="simple">
+<li><p>Likely option</p></li>
+<li><p>Reasonable option</p></li>
+<li><p>ITDW: now it’s fun</p></li>
+<li><p>ITDW: rocket surgery time</p></li>
+</ul>
+</div>
+<div class="section" id="general-concepts-from-related-work">
+<h2>General concepts from related work<a class="headerlink" href="#general-concepts-from-related-work" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>CSE: Common subexpression elimination</p></li>
+<li><p>DCE: Dead code elimination</p></li>
+<li><p>ANF: A-Normal Form</p></li>
+<li><p>BNF: Backus-Naur Form</p></li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="MLIR.html" class="btn btn-neutral float-left" title="MLIR integration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Microsoft.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
