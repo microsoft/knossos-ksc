@@ -45,6 +45,21 @@ def sqrl_bench_configs():
 vsqrl = knossos.register_direct(sqrl, vmap=True, generate_lm=True)  # TODO: Carbuncle
 
 
+def sqrl_pytorch_where(x):
+    """
+    Replace "if" with "where" to get torch.vmap to work
+    """
+    y = torch.sum(x)
+    t = torch.where(y < 0, -0.125 * x, 1 / 2 * x ** 2)
+    tsint = torch.sin(t) * t
+    return torch.mean(tsint)
+
+
+import torch._vmap_internals
+
+vsqrl_pytorch_nice = torch._vmap_internals.vmap(sqrl_pytorch_where)
+
+
 def vsqrl_pytorch(x):
     """
     Hand-vectorized pytorch implementation, assuming x is rank 3
