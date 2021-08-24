@@ -2,6 +2,7 @@ export PYTHONPATH="./src/python"
 
 # TODO: this should be a makefile.  fred.csv: fred.py etc
 BENCH="pytest src/bench/ \
+        -v\
         --benchmark-autosave --benchmark-max-time=5.0\
         --benchmark-name=short --benchmark-sort=name --benchmark-group-by=group,func\
         --benchmark-columns=median,iqr,outliers,mean,stddev,min,max,iterations,rounds"
