@@ -21,6 +21,8 @@ Current transformers:
  * KSC: Various Autodiff and optimization transforms, in Haskell
  * RLO: A rewriting-based optimizer using reinforcement learning
 
+Docs are built to https://microsoft.github.io/knossos-ksc/
+
 ### KS-Lisp: A low-sugar IR
 
 The text form of the IR is "low sugar", focused more on simplicity than user-friendliness.
