@@ -22,6 +22,7 @@ executable ksc
                  Ksc.Pipeline
                  Ksc.Parse
                  Ksc.Prim
+                 Ksc.Prune
                  Ksc.Rules
                  Ksc.Shapes
                  Ksc.SUF
