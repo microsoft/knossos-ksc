@@ -985,7 +985,6 @@ pprPrimFun = \case
   P_constVec -> text "constVec"
   P_lmApply -> text "lmApply"
   P_lmApplyR -> text "lmApplyR"
-  P_lmApplyT -> text "lmApplyT"
   P_lmVCat -> text "lmVCat"
   P_lmHCat -> text "lmHCat"
   P_lmVCatV -> text "lmVCatV"
@@ -997,7 +996,6 @@ pprPrimFun = \case
   P_lmDot -> text "lmDot"
   P_lmZero -> text "lmZero"
   P_lmOne -> text "lmOne"
-  P_lmApplyTR -> text "lmApplyTR"
   P_lmDummyFold -> text "P_lmDummyFold"
   P_lmFold -> text "P_lmFold"
   P_FFold -> text "FFold"
@@ -1421,7 +1419,6 @@ data PrimFun = P_inline
              | P_constVec
              | P_lmApply
              | P_lmApplyR
-             | P_lmApplyT
              | P_lmVCat
              | P_lmHCat
              | P_lmVCatV
@@ -1436,7 +1433,6 @@ data PrimFun = P_inline
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
              | P_dup Int
              | P_elim
-             | P_lmApplyTR
              | P_lmFold
              | P_FFold
              | P_RFold
@@ -1478,7 +1474,6 @@ toPrimFun = \case
   "constVec" -> Just P_constVec
   "lmApply" -> Just P_lmApply
   "lmApplyR" -> Just P_lmApplyR
-  "lmApplyT" -> Just P_lmApplyT
   "lmVCat" -> Just P_lmVCat
   "lmHCat" -> Just P_lmHCat
   "lmVCatV"-> Just P_lmVCatV

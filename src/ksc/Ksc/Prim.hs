@@ -424,10 +424,6 @@ lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
 lmApply_Dir Rev e dt = lmApplyR dt e
 
-lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
-lmApplyT_Dir Fwd e ds = mkPrimCall1 P_lmApplyT  (Tuple [e, ds])
-lmApplyT_Dir Rev e dt = mkPrimCall1 P_lmApplyTR (Tuple [dt, e])
-
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT n b = lmHCatV (pBuild n b)
 
@@ -841,10 +837,6 @@ primFunCallResultTy_maybe fun args
            -- Linar map apply:  lmApply :: (s -o t) -> ds -> dt
       (P_lmApplyR , TypeTuple [t1, TypeLM s t2]) | t1 `eqType` tangentType t2 -> Just (tangentType s)
            -- Reverse apply:  lmApplyR :: dt -> (s -o t) -> ds
-
-      (P_lmApplyT , TypeTuple [TypeTuple [_, TypeLM s1 t], s2])
-                                | tangentType s1 `eqType` s2 -> Just (tangentType t)
-           -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
 
       -- The argument tuple to ksc's primitive function "lmVCat" must
       -- have two or more components else we can't deduce its return
