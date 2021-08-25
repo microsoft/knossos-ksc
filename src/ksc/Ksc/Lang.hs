@@ -996,7 +996,6 @@ pprPrimFun = \case
   P_lmDot -> text "lmDot"
   P_lmZero -> text "lmZero"
   P_lmOne -> text "lmOne"
-  P_lmDummyFold -> text "P_lmDummyFold"
   P_lmFold -> text "P_lmFold"
   P_FFold -> text "FFold"
   P_RFold -> text "RFold"
@@ -1436,7 +1435,6 @@ data PrimFun = P_inline
              | P_lmFold
              | P_FFold
              | P_RFold
-             | P_lmDummyFold
              | P_lmVariant
              | P_suffwdpass_map
              | P_sufrevpass_map
