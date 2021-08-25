@@ -327,13 +327,6 @@ pPrimFunIdentifier = pSelFunIdentifier
                             Nothing -> unexpected (f ++ " is not a PrimFun")
                         }
 
-pBasePrimFunWithType :: (Type -> BaseArgTy p) -> Parser (BasePrimFun p)
-pBasePrimFunWithType add =
-     brackets (do { f  <- pPrimFunIdentifier
-                  ; ty <- pType
-                  ; pure (BaseFunId f (add ty))
-                  })
-
 pBasePrimFunWithoutType :: Parser (BasePrimFun Parsed)
 pBasePrimFunWithoutType =
          do { f <- pPrimFunIdentifier

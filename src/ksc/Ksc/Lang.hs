@@ -581,9 +581,6 @@ mkVar = Simple
 mkTVar :: TypeX -> String -> TVarX
 mkTVar ty = TVar ty . mkVar
 
-resVar :: Var
-resVar = Simple "ksc$resVar"
-
 argVar :: Var
 argVar = Simple "ksc$argVar"
 
