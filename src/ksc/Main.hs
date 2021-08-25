@@ -6,7 +6,7 @@ module Main where
 
 import Ksc.Lang
 import Ksc.LangUtils
-import Ksc.Parse (parseE)
+import Ksc.Parse (parseE, pUserFunTyped, runParser)
 import Ksc.Opt
 import Ksc.Pipeline (displayCppGenAndCompile, genFuthark)
 import qualified Ksc.Pipeline
@@ -70,9 +70,25 @@ generateCpp = parseErr p
           ksout  <- option "ks-output-file"
           cppincludefiles <- many (option "cpp-include")
           cppout <- option "cpp-output-file"
+          roots  <- pRoots
 
-          return (Ksc.Pipeline.displayCppGen Nothing cppincludefiles input ksout cppout
+          return (Ksc.Pipeline.displayCppGen roots Nothing cppincludefiles input ksout cppout
                  >> pure ())
+
+pRoots :: Parsec [String] u Ksc.Pipeline.Roots
+pRoots = do
+          switch "all-defs"
+          pure Nothing
+          <|>
+          do
+            switch "remove-unused"
+            Just <$> (many $ do
+              { switch "used"
+              ; rootName <- satisfyS (const True)
+              ; case Ksc.Parse.runParser pUserFunTyped rootName of
+                      Left _ -> unexpected "Couldn't parse UserFun"
+                      Right u -> pure u
+              })
 
 compileAndRun :: [String] -> IO ()
 compileAndRun = parseErr p
@@ -81,11 +97,12 @@ compileAndRun = parseErr p
           ksout    <- option "ks-output-file"
           cppincludefiles <- many (option "cpp-include")
           cppout   <- option "cpp-output-file"
+          roots    <- pRoots
           compiler <- option "c++"
           exeout   <- option "exe-output-file"
 
           return $ do
-            Ksc.Pipeline.displayCppGen Nothing cppincludefiles inputs ksout cppout
+            Ksc.Pipeline.displayCppGen roots Nothing cppincludefiles inputs ksout cppout
             Ksc.Cgen.compile compiler cppout exeout
             output <- Ksc.Cgen.runExe exeout
             putStrLn output
@@ -238,7 +255,7 @@ testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
   (output, (_, ksoContents)) <-
       Ksc.Pipeline.displayCppGenCompileAndRun
-      compiler Nothing ["prelude.h"] ["src/runtime/prelude"] ksTest
+      Nothing compiler Nothing ["prelude.h"] ["src/runtime/prelude"] ksTest
 
   _ <- case parseE ksoContents of
           Left e -> error ("Generated .kso failed to parse:\n"
@@ -294,7 +311,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  (exe, _) <- displayCppGenAndCompile (Ksc.Cgen.compileWithProfiling compiler) ".exe" Nothing ["prelude.h"] ["src/runtime/prelude"] source
+  (exe, _) <- displayCppGenAndCompile Nothing (Ksc.Cgen.compileWithProfiling compiler) ".exe" Nothing ["prelude.h"] ["src/runtime/prelude"] source
   Ksc.Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out

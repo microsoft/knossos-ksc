@@ -86,6 +86,7 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         *(opt for header in prelude_headers for opt in ("--cpp-include", header)),
         "--cpp-output-file",
         fcpp.name,
+        "--all-defs",
     ]
 
     try:

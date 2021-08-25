@@ -1,5 +1,5 @@
 ; Hand-munged from running
-; ./build/bin/ksc --generate-cpp --ks-source-file src/runtime/prelude.ks --ks-source-file gelu.ks --ks-output-file obj/test/gelu.kso --cpp-output-file obj/test/gelu.cpp
+; ./build/bin/ksc --generate-cpp --ks-source-file src/runtime/prelude.ks --ks-source-file gelu.ks --ks-output-file obj/test/gelu.kso --cpp-output-file obj/test/gelu.cpp --all-defs
 ; Where gelu.ks contained '(def gelu ...)' exactly as below, plus '(gdef rev [gelu Float])'
 ; This file was then manually converted from gelu.kso by extracting only the relevant defs and mangling the names.
 

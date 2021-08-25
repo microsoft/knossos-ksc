@@ -1,5 +1,6 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -19,6 +20,7 @@ import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              ppr, renderSexp, (<+>))
 import qualified Ksc.Lang as L
 import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
+import qualified Ksc.Prune
 import qualified Ksc.Futhark
 import Ksc.Parse (parseF)
 import Ksc.Rules (mkRuleBase)
@@ -30,6 +32,7 @@ import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 import Data.Maybe (maybeToList)
 import Data.List (intercalate)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import GHC.Stack (HasCallStack)
 
 -------------------------------------
@@ -42,25 +45,26 @@ import GHC.Stack (HasCallStack)
 demoF :: [String] -> IO ()
 demoF files = do
   decls <- fmap concat (mapM parseF files)
-  _ <- pipelineIO (Just 999) decls
+  _ <- pipelineIO Nothing (Just 999) decls
   pure ()
 
 -------------------------------------
 -- Main compiler driver
 -------------------------------------
 
-displayCppGen :: Maybe Int -> [String] -> [String] -> String -> String -> IO (String, String)
-displayCppGen verbosity cppincludefiles ksFiles ksofile cppfile =
+displayCppGen :: Roots -> Maybe Int -> [String] -> [String] -> String -> String -> IO (String, String)
+displayCppGen roots verbosity cppincludefiles ksFiles ksofile cppfile =
   do {
   ; decls0 <- fmap concat (mapM parseF ksFiles)
   ; putStrLn "ksc: read decls"
-  ; defs <- pipelineIO verbosity decls0
+  ; defs <- pipelineIO roots verbosity decls0
   ; Ksc.Cgen.cppGenWithFiles ksofile cppfile cppincludefiles defs
   }
 
 displayCppGenAndCompile
   :: HasCallStack
-  => (String -> String -> IO a)
+  => Roots
+  -> (String -> String -> IO a)
   -> String
   -> Maybe Int
   -> [String]
@@ -68,7 +72,7 @@ displayCppGenAndCompile
   -> String
   -> IO (a, (String, String))
 displayCppGenAndCompile
-  compile ext verbosity cppincludefiles files file = do {
+  roots compile ext verbosity cppincludefiles files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -76,44 +80,47 @@ displayCppGenAndCompile
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; outputFileContents <- displayCppGen verbosity cppincludefiles (ksFiles ++ [ksFile]) ksofile cppfile
+  ; outputFileContents <- displayCppGen roots verbosity cppincludefiles (ksFiles ++ [ksFile]) ksofile cppfile
   ; compilerResult <- compiler cppfile exefile
   ; pure (compilerResult, outputFileContents)
   }
 
+type Roots = Maybe [L.UserFun L.Typed]
+
 displayCppGenCompileAndRun :: HasCallStack
-                           => String
+                           => Roots
+                           -> String
                            -> Maybe Int
                            -> [String]
                            -> [String]
                            -> String
                            -> IO (String, (String, String))
-displayCppGenCompileAndRun compilername verbosity cppincludefiles files file = do
+displayCppGenCompileAndRun roots compilername verbosity cppincludefiles files file = do
   { (exefile, cpp_kso) <- displayCppGenAndCompile
-                          (Ksc.Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
+                          roots (Ksc.Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
   ; output <- Ksc.Cgen.runExe exefile
   ; pure (output, cpp_kso)
   }
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> [String] -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compilername verbosity cppincludefiles files file = do
-  { (output, _) <- displayCppGenCompileAndRun compilername verbosity cppincludefiles files file
+displayCppGenCompileAndRunWithOutput :: HasCallStack => Roots -> String -> Maybe Int -> [String] -> [String] -> String -> IO ()
+displayCppGenCompileAndRunWithOutput roots compilername verbosity cppincludefiles files file = do
+  { (output, _) <- displayCppGenCompileAndRun roots compilername verbosity cppincludefiles files file
   ; putStrLn "Done"
   ; putStr output
   }
 
 doall :: HasCallStack => Maybe Int -> [String] -> [String] -> String -> IO ()
-doall = displayCppGenCompileAndRunWithOutput "g++-7"
+doall = displayCppGenCompileAndRunWithOutput Nothing "g++-7"
 
 -------------------------------------
 -- Main compiler pipeline
 -------------------------------------
 
-pipelineIO :: Maybe Int -> [Decl] -> IO [TDef]
-pipelineIO v d = runKM (pipeline v d)
+pipelineIO :: Roots -> Maybe Int -> [Decl] -> IO [TDef]
+pipelineIO mroots v d = runKM (pipeline mroots v d)
 
-pipeline :: Maybe Int -> [Decl] -> KM [TDef]
-pipeline verbosity decls = do
+pipeline :: Roots -> Maybe Int -> [Decl] -> KM [TDef]
+pipeline mroots verbosity decls = do
   { (env, concat->decls) <- mapAccumLM annotAndDeriveDecl emptyGblST decls
   ; displayPassMNoLint verbosity "generated decls" decls
   ; let (rules, defs) = partitionDecls decls
@@ -123,6 +130,9 @@ pipeline verbosity decls = do
   ; displayPassM verbosity "opt decls" env defs
   ; (_env, defs) <- cseDefs rulebase env defs
   ; displayPassM verbosity "CSE decls" env defs
+  ; defs <- pure $ case mroots of
+      Nothing -> defs
+      Just roots -> Ksc.Prune.prune defs (Set.fromList roots)
   ; pure defs
   }
 
@@ -261,7 +271,7 @@ futharkPipeline :: [FilePath] -> IO [TDef]
 futharkPipeline files
   = do
   { decls0 <- fmap concat (mapM (parseF . (++ ".ks")) files)
-  ; pipelineIO Nothing decls0
+  ; pipelineIO Nothing Nothing decls0
   }
 
 -- | Read source code from specified input file, optimise,
