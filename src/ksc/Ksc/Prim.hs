@@ -517,9 +517,6 @@ pDot   = mkPrimCall2 P_ts_dot
 pAdd1 :: TExpr -> TExpr
 pAdd1 = mkPrimCall1 P_ts_add
 
-pNeg :: HasCallStack => TExpr -> TExpr
-pNeg = mkPrimCall1 P_ts_neg
-
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 P_build
 
