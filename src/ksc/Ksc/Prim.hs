@@ -436,9 +436,6 @@ pFFold = mkPrimCall6 P_FFold
 pRFold :: HasCallStack => Type -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 pRFold = mkPrimCall7 P_RFold . mkDummy
 
-lmDummyFold :: HasCallStack => Type -> TExpr
-lmDummyFold = mkPrimCall1 P_lmDummyFold . mkDummy
-
 isThePrimFun :: TFun p -> PrimFun -> Bool
 isThePrimFun (TFun _ (Fun JustFun (PrimFunT f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
@@ -813,9 +810,6 @@ primFunCallResultTy_maybe P_FFold args
   | TypeTuple [_f,_acc,_v,_df,dacc,_dv] <- args
   = Just dacc
   | otherwise = Nothing
-
-primFunCallResultTy_maybe P_lmDummyFold args
-  = Just args
 
 primFunCallResultTy_maybe (P_SelFun i n) (TypeTuple arg_tys)
   | i <= length arg_tys
