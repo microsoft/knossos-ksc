@@ -15,6 +15,7 @@
 #include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Parser.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -685,6 +686,7 @@ unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & l
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
   }
+  pm.addPass(mlir::createLowerToCFGPass());  // convert SCF to std
   pm.addPass(mlir::createLowerToLLVMPass());
 
   // First lower to LLVM dialect
