@@ -16,7 +16,7 @@
           (tuple (build 0 (lam (i : Integer) 0.0)) 0.0)
           xs)))
 
-(def shape$cumsum (Vec (Tuple)) (xs : (Vec Float))
+(def [shape cumsum] Integer (xs : (Vec Float))
     (shape xs))
 
 (def cumsum_aux (Tuple (Vec Float) Float)
