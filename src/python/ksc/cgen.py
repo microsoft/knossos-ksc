@@ -405,4 +405,3 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
 """
     print(cpp)
     return cpp_declaration, cpp
-
