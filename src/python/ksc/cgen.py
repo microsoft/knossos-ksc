@@ -368,8 +368,12 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     auto ret = torch::zeros({{n}});
     ks::Float* ret_ptr = ret.data_ptr<ks::Float>();
 
-    for (int i = 0; i != n; ++i)
+    KS_MARK(&g_alloc, mark);
+    for (int i = 0; i != n; ++i) {{
         ret_ptr[i] = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[i]")});
+        // We have copied the return value, can reset allocator
+        KS_RESET(&g_alloc, mark);
+    }}
 
     return ret;
 }}
@@ -394,10 +398,13 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     inplace_add(&ks_ret0, ret0); // This would update a temporary in the 1D case
 
     // And then place the rest
+    KS_MARK(&g_alloc, mark);
     for (int i = 1; i != n; ++i) {{
         auto val = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[i]")});
         auto ks_ret_view = ks_ret[i];
         inplace_add(&ks_ret_view, val);
+        // We have copied the return value, can reset allocator
+        KS_RESET(&g_alloc, mark);
     }}
 
     return ret;
