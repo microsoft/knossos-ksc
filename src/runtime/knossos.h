@@ -60,8 +60,8 @@ Each C++ function is annotated with one of the following macros:
 #endif
 
 #ifdef KS_ALLOCATOR
-#define KS_MARK(alloc, markvar) ks::alloc_mark_t markvar = alloc->mark();
-#define KS_RESET(alloc, markvar) alloc->reset(markvar);
+#define KS_MARK(alloc, markvar) ks::alloc_mark_t markvar = (alloc)->mark();
+#define KS_RESET(alloc, markvar) (alloc)->reset(markvar);
 #define KS_COPYDOWN(alloc, markvar, expr) ks::copydown(alloc, markvar, expr)
 #else
 #define KS_MARK(alloc, markvar)
