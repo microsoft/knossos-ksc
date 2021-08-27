@@ -95,7 +95,7 @@ def timeit(msg, fn, arg):
     mem_used = mem_used_end - mem_used_start
     shape_str = "x".join([str(x) for x in arg.shape])
     msg = (
-        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls:4d} | Inference: {inference_timer.ms:10.3f} ms |"
+        f"{msg:20} {csum:12.5e} Runs: {inference_timer.ncalls:4d} | Inference: {inference_timer.ms:10.3f} ms |"
         f" Forward: {forward_timer.ms:10.3f} ms |"
         f" Backward {backward_timer.ms:10.3f} ms |"
         f" Memory {mem_used:10.3f} MB |"
