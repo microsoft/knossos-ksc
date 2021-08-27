@@ -1,4 +1,6 @@
 import time
+import os
+import psutil
 import torch
 
 
@@ -52,6 +54,9 @@ def fun_and_grad_matches(f, g, arg):
     return True
 
 
+all_messages = []
+
+
 def timeit(msg, fn, arg):
     MAX_TIME = 5  # No no need to run beyond MAX_TIME sec to get accurate benchmarks
     end_time = time.time() + MAX_TIME
@@ -59,6 +64,10 @@ def timeit(msg, fn, arg):
     forward_timer = time_sampler()
     backward_timer = time_sampler()
     nruns = 5000
+
+    mem_used_start = psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2
+    print(f"run-bench: Memory {mem_used_start} before {msg}")
+
     for _ in range(nruns):
         inference_timer.mark()
         with torch.no_grad():
@@ -75,16 +84,25 @@ def timeit(msg, fn, arg):
         backward_timer.record()
 
         if time.time() > end_time:
-            print(f"# Ran to timeout: {fn} {msg} ")
+            print(f"# Ran to timeout: {msg} ")
             break
 
     csum = grad[0].sum()
 
-    print(
-        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} | Inference: {inference_timer.ms:10.3f} ms |"
+    mem_used_end = psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2
+    print(f"run-bench: Memory {mem_used_end} after {msg}")
+
+    mem_used = mem_used_end - mem_used_start
+    shape_str = "x".join([str(x) for x in arg.shape])
+    msg = (
+        f"{msg:20} {csum:12.5e} Runs: {inference_timer.ncalls:4d} | Inference: {inference_timer.ms:10.3f} ms |"
         f" Forward: {forward_timer.ms:10.3f} ms |"
-        f" Backward {backward_timer.ms:10.3f} ms | {arg.shape}"
+        f" Backward {backward_timer.ms:10.3f} ms |"
+        f" Memory {mem_used:10.3f} MB |"
+        f" {shape_str}"
     )
+    print(msg)
+    all_messages.append(msg)
 
 
 def bench(module_file, bench_name):
@@ -103,7 +121,7 @@ def bench(module_file, bench_name):
     module_dir, module_name = os.path.split(module_file)
     sys.path.append(module_dir)
     mod = importlib.import_module(module_name)
-    for fn in inspect.getmembers(mod, inspect.isfunction):
+    for fn in inspect.getmembers(mod):
         fn_name, fn_obj = fn
         if fn_name == bench_name + "_bench_configs":
             configs = list(fn_obj())
@@ -139,7 +157,7 @@ def bench(module_file, bench_name):
         ):
             print(pt_value)
             print(ks_value)
-            raise ValueError("Knossos != torch!")
+            raise ValueError("Knossos != torch")
 
         pt_loss = pt_value.sum()
         pt_grad = torch.autograd.grad(pt_loss, pt_arg)[0]
@@ -148,7 +166,7 @@ def bench(module_file, bench_name):
         ks_grad = torch.autograd.grad(ks_loss, ks_arg)[0]
 
         if (
-            not torch.isclose(pt_grad, ks_grad, rtol=1e-05, atol=1e-06, equal_nan=False)
+            not torch.isclose(pt_grad, ks_grad, rtol=1e-05, atol=1e-05, equal_nan=False)
             .all()
             .numpy()
         ):
@@ -161,7 +179,7 @@ def bench(module_file, bench_name):
             )
 
             print(pd.DataFrame(cols, columns=["ARG", "PT", "KS", "Diff"]))
-            raise ValueError("Knossos != torch!")
+            raise ValueError("Knossos != torch")
 
         # ptfast should always work, and be the timing reference
         timeit(bench_name + " PyTorch fast", pt_fast, arg)
@@ -195,3 +213,6 @@ if __name__ == "__main__":
         print("run-bench: Will preserve temporary files")
         ksc.utils.preserve_temporary_files = True
     bench(args.module, args.bench)
+
+    print("==================================")
+    print(*all_messages, sep="\n")

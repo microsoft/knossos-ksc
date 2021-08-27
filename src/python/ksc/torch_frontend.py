@@ -699,6 +699,9 @@ class KscStub:
         """
         return self.ensure_compiled(args).apply(*args)
 
+    def _reset_allocator(self, *args):
+        self.ensure_compiled(args).py_mod.reset_allocator()
+
     def _entry(self, *args):
         """
         Directly call the Knossos compiled function.

@@ -60,8 +60,8 @@ Each C++ function is annotated with one of the following macros:
 #endif
 
 #ifdef KS_ALLOCATOR
-#define KS_MARK(alloc, markvar) ks::alloc_mark_t markvar = alloc->mark();
-#define KS_RESET(alloc, markvar) alloc->reset(markvar);
+#define KS_MARK(alloc, markvar) ks::alloc_mark_t markvar = (alloc)->mark();
+#define KS_RESET(alloc, markvar) (alloc)->reset(markvar);
 #define KS_COPYDOWN(alloc, markvar, expr) ks::copydown(alloc, markvar, expr)
 #else
 #define KS_MARK(alloc, markvar)
@@ -1255,7 +1255,7 @@ namespace ks {
 	   first iteration (using a copydown), then accumulating
 	   subsequent iterations into this result using inplace_add.
 
-	   e.g. for a 2-dimensional sumbuild, size {4, 3}, there is
+		   e.g. for a 2-dimensional sumbuild, size {4, 3}, there is
 	   the following sequence of calls to f (ignoring the allocator
 	   argument for simplicity):
 	   

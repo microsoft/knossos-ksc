@@ -149,7 +149,7 @@ def func_namer(benchmark_func):
 
 
 def config_namer(config):
-    return str(config.shape)
+    return "x".join([str(x) for x in config.shape])
 
 
 def pytest_configure(config):
