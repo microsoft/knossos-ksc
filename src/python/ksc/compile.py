@@ -60,7 +60,7 @@ def subprocess_run(cmd, env=None):
     )
 
 
-def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
+def generate_cpp_from_ks(ks_str, ks_entry_points, preludes, prelude_headers):
     ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -86,7 +86,12 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         *(opt for header in prelude_headers for opt in ("--cpp-include", header)),
         "--cpp-output-file",
         fcpp.name,
-        "--all-defs",
+        "--remove-unused",
+        *(
+            opt
+            for entry_point in ks_entry_points
+            for opt in ("--used", str(entry_point))
+        ),
     ]
 
     try:
@@ -225,7 +230,9 @@ def generate_cpp_for_py_module_from_ks(
 
     preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
     prelude_headers = ["prelude.h"] + (["prelude-aten.h"] if use_aten else [])
-    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
+    cpp_ks_functions, decls = generate_cpp_from_ks(
+        ks_str, [sn for _, sn in bindings_to_generate], preludes, prelude_headers
+    )
     (
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
