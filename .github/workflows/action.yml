@@ -20,4 +20,4 @@ jobs:
         with:
           name: AD.pdf
           path: AD.pdf
-          retention-days: 300
+          retention-days: 90
