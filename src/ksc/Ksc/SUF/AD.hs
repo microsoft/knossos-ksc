@@ -536,21 +536,14 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
                         , def_res_ty = t_ty
                         }
   = let
+      (rhs', bog_ty, mkRev) =
+        sufFwdRevPass gst (mkInScopeSet (patVars s)) rhs
+
       fwd = Def { def_fun    = Fun SUFFwdPass f
                 , def_pat    = s
                 , def_rhs    = UserRhs rhs'
                 , def_res_ty = TypeTuple [t_ty, bog_ty]
                 }
-
-      deltaVarsOfPat :: Pat -> S.Set Var
-      deltaVarsOfPat = S.fromList . map (tVarVar . deltaOfSimple) . patVars
-
-      (rhs', bog_ty, mkRev) =
-        sufFwdRevPass gst (mkInScopeSet (patVars s)) rhs
-
-      (_, lets_) = mkRev avoid (Var dt) (Var bog)
-
-      lets e = foldr (uncurry Let) e lets_
 
       rev = Def { def_fun    = Fun SUFRevPass f
                 , def_pat    = TupPat [ dt, bog ]
@@ -558,15 +551,17 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
                 , def_res_ty = ds_ty
                 }
        where
+        bog  = TVar bog_ty (Simple "bog_arg")
+        dt = TVar dt_ty (Simple "dt_arg")
+        ds_ty = tangentType (patType s)
+        dt_ty = tangentType t_ty
         rhs'' = lets (patToExpr (fmap deltaOfSimple s))
+          where (_, lets_) = mkRev avoid (Var dt) (Var bog)
+                lets e = foldr (uncurry Let) e lets_
+                avoid = deltaVarsOfPat s `S.union` S.fromList (map tVarVar [dt, bog])
 
-      bog  = TVar bog_ty (Simple "bog_arg")
-      dt = TVar dt_ty (Simple "dt_arg")
-
-      ds_ty = tangentType (patType s)
-      dt_ty = tangentType t_ty
-
-      avoid = deltaVarsOfPat s `S.union` S.fromList (map tVarVar [dt, bog])
+                deltaVarsOfPat :: Pat -> S.Set Var
+                deltaVarsOfPat = S.fromList . map (tVarVar . deltaOfSimple) . patVars
 
       gst' = (stInsertFun rev . stInsertFun fwd) gst
   in (Just fwd, Just rev, gst')
