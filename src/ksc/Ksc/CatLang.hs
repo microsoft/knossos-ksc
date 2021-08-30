@@ -1,3 +1,6 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 {-# LANGUAGE DataKinds #-}
 
 -- Ksc.CatLang: Language for compilation to categories

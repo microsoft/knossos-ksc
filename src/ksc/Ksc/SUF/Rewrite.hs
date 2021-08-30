@@ -1,3 +1,6 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 -- | Contains the rules for rewriting 'Lang.SUFFwdPass' and
 -- 'Lang.SUFRevPass' derived functions of 'Lang.PrimFun's to
 -- expressions that don't contain any derived functions.  This saves
