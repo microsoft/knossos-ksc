@@ -86,7 +86,7 @@ sufFwdRevPass gst subst = \case
                                     (TVar (typeof rhs) (Simple "p_var"))
                                     (TVar body_bog_ty (Simple "b_body")))
 
-          subst3 = foldr (\v s -> extendInScopeSet v s) subst2 p
+          subst3 = foldr extendInScopeSet subst2 p
 
           (fwdpass_rhs, rhs_bog_ty, revpass_rhs) = sufFwdRevPass gst subst3 rhs
           (fwdpass_body, body_bog_ty, revpass_body) = sufFwdRevPass gst subst3 body
