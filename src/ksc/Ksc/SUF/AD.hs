@@ -89,7 +89,6 @@ sufFwdRevPass gst subst = \case
                                     (TVar (typeof rhs) (Simple "p_var"))
                                     (TVar body_bog_ty (Simple "b_body")))
 
-          p' = p
           subst3 = foldr (\v s -> extendInScopeSet v s) subst2 p
 
           (fwdpass_rhs, rhs_bog_ty, revpass_rhs) = sufFwdRevPass gst subst3 rhs
@@ -98,7 +97,7 @@ sufFwdRevPass gst subst = \case
           bog = mkBog [b_rhs, b_body]
 
           gradf_let = Let (TupPat [p'var, b_rhs]) fwdpass_rhs
-                    $ Let p' (Var p'var)
+                    $ Let p (Var p'var)
                     $ Let (TupPat [bodyv, b_body]) fwdpass_body
                     $ Tuple [Var bodyv, bog]
 
