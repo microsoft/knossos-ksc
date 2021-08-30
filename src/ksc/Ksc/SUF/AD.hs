@@ -14,7 +14,7 @@ import           Ksc.LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
 import           Ksc.Prim
 
 import qualified Data.Set as S
-import           Data.Maybe (mapMaybe, catMaybes)
+import           Data.Maybe (mapMaybe)
 import           Data.Traversable (mapAccumL)
 
 type SUFFwdRevPass =
@@ -511,13 +511,6 @@ possiblyEmptyBogExpr v = if typeof v `eqType` TypeTuple []
 
 mkLets_ :: [(Pat, TExpr)] -> TExpr -> TExpr
 mkLets_ t e = foldr (uncurry Let) e t
-
-sufFwdRevPassDefs :: GblSymTab -> [TDef] -> [TDef]
-sufFwdRevPassDefs gst__ = catMaybes . concat . snd . sufRevPassDefsMaybe gst__
-      where sufRevPassDefsMaybe gst' defs__ =
-              mapAccumL (\gst_ a ->
-                           let (mtdef1, mtdef, gst_') = sufFwdRevPassDef gst_ a
-                           in ( gst_', [mtdef1, mtdef])) gst' defs__
 
 -- f : S -> T
 --
