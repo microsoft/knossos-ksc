@@ -47,7 +47,16 @@ type SUFRevPass =
 
 -- Generate the SUF/BOG-AD foward and reverse pass from an expression
 -- already in Single Use Form (see Ksc.SUF for more details on Single
--- Use Form).
+-- Use Form).  The type invariants are
+--
+-- * If G |- e :: T, then
+--
+-- * BOG_e is a type which depends on (the structure of) e
+--
+-- * G |- FWD{e} :: (T, BOG_e)
+--
+-- * If dt :: dT, b :: BOG_e, then REV{e} dt b is a set of bindings
+--   which, for every free variable x : X in G, binds dx : dX.
 --
 -- See Note [Automatic differentiation documentation]
 sufFwdRevPass :: SUFFwdRevPass
