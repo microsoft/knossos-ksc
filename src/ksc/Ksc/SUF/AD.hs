@@ -83,7 +83,7 @@ sufFwdRevPass gst subst = \case
   --                                ++ REV{body} dt   b_body
   --                                ++ REV{rhs}  dpat b_rhs
   Let p rhs body -> (gradf_let, typeof bog, sufRevPass_)
-    where (subst2, L4 bodyv b_rhs p'var b_body) =
+    where (subst2, L4 bodyv b_rhs p_var b_body) =
             notInScopeTVs subst (L4 (TVar (typeof body) (Simple "body"))
                                     (TVar rhs_bog_ty (Simple "b_rhs"))
                                     (TVar (typeof rhs) (Simple "p_var"))
@@ -96,8 +96,8 @@ sufFwdRevPass gst subst = \case
 
           bog = mkBog [b_rhs, b_body]
 
-          gradf_let = Let (TupPat [p'var, b_rhs]) fwdpass_rhs
-                    $ Let p (Var p'var)
+          gradf_let = Let (TupPat [p_var, b_rhs]) fwdpass_rhs
+                    $ Let p (Var p_var)
                     $ Let (TupPat [bodyv, b_body]) fwdpass_body
                     $ Tuple [Var bodyv, bog]
 
