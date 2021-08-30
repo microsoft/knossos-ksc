@@ -550,7 +550,7 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
 
       (_, lets_) = mkRev avoid (Var dt) (Var bog)
 
-      lets = foldr (\(p, er) rest -> Let p er . rest) id lets_
+      lets e = foldr (uncurry Let) e lets_
 
       rev = Def { def_fun    = Fun SUFRevPass f
                 , def_pat    = TupPat [ dt, bog ]
