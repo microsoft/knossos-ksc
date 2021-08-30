@@ -223,12 +223,9 @@ sufFwdRevPass gst subst = \case
 
                   rest = concat rests
 
-  -- N.B. Until we have proper sum types we use products with a dummy
-  -- component to simulate sums.
-  --
   -- FWD{if cond then t else f} = let (cond_v, b_cond) = FWD{cond}
-  --                              in if cond_v then let (t_v, b_t) = FWD{t} in (t_v, (b_cond, cond, b_t, dummy))
-  --                                           else let (f_v, b_f) = FWD{f} in (t_f, (b_cond, cond, dummy, b_f))
+  --                              in if cond_v then let (t_v, b_t) = FWD{t} in (t_v, (b_cond, Left b_t))
+  --                                           else let (f_v, b_f) = FWD{f} in (t_f, (b_cond, Right b_f))
   --
   -- REV{if cond then t else f} dt b = { (b_cond, cond, b_t, b_f) = b
   --                                   ; dvs = if cond then let REV{t} dt b_t in dvs
@@ -238,6 +235,13 @@ sufFwdRevPass gst subst = \case
   -- (vs is the list of variables that occur free in each branch of
   -- the if.  N.B. the Single Use Property implies that the free
   -- variable set is the same for each branch.)
+  --
+  -- N.B. Until we have proper sum types we use products with a dummy
+  -- component to simulate sums.  Specifically, we use the following
+  -- encodings:
+  --
+  -- (b_cond, Left b_t)   -> (b_cond, cond, b_t, dummy)
+  -- (b_cond, Right b_f)  -> (b_cond, cond, dummy, b_f)
   If econd et ef ->
     let (fwdpass_cond, cond_bog_ty, sufRevPassecond) = sufFwdRevPass gst subst econd
 
