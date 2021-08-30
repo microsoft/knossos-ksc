@@ -545,9 +545,8 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
         dt = TVar dt_ty (Simple "dt_arg")
         ds_ty = tangentType (patType s)
         dt_ty = tangentType t_ty
-        rhs'' = lets (patToExpr (fmap deltaOfSimple s))
+        rhs'' = mkLets_ lets_ (patToExpr (fmap deltaOfSimple s))
           where (_, lets_) = mkRev avoid (Var dt) (Var bog)
-                lets e = foldr (uncurry Let) e lets_
                 avoid = deltaVarsOfPat s `S.union` S.fromList (map tVarVar [dt, bog])
 
                 deltaVarsOfPat :: Pat -> S.Set Var
