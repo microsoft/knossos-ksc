@@ -1,9 +1,10 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
 -- ^ Some problem with pattern synonym exhaustiveness checking
 
--- Copyright (c) Microsoft Corporation.
--- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
              PatternSynonyms,
 	     ScopedTypeVariables #-}
