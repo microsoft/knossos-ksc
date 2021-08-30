@@ -187,17 +187,17 @@ sufFwdRevPass gst subst = \case
             subst ts
 
           as = Tuple (map (Var . fst4) binds_tys)
+            where fst4 (a, _, _, _, _) = a
+
           bs = mkBog (map bogVar binds_tys)
             where bogVar (_, b, _, _, _) = b
 
           lets_list = map thd4 binds_tys
+            where thd4 (_, _, a, _, _) = a
 
           lets = foldr (.) id lets_list
 
           es = lets (Tuple [as, bs])
-
-          fst4 (a, _, _, _, _) = a
-          thd4 (_, _, a, _, _) = a
 
           sufRevPass_ avoid' dt b = (avoid'4, lets_ ++ rest)
             where (avoid'3, revpass_e_bs_) =
