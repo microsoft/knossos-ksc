@@ -54,12 +54,14 @@ def f(x: float):
 
 
 def test_ts2k_relux():
+    relux._reset_allocator(2.0)
     ks_ans = relux._entry(2.0)
     ans = relux.raw_f(2.0)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
 def test_ts2k_relux_grad():
+    relux._reset_allocator((1.3,))  # TODO: remove when entry_vjp knows how to compile
     ks_ans = relux._entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
@@ -69,7 +71,7 @@ def relux_pt(x: float):
     return (x < 0) * (0.1 * x) + (x > 0) * (x * x)
 
 
-vrelux = knossos.vmap(relux)
+vrelux = knossos.register_direct(relux, elementwise=True)
 
 
 def test_ts2k_vrelux():
@@ -112,11 +114,13 @@ def test_bar():
     a, x = 1, 12.34
 
     # Check primal
+    bar._reset_allocator(a, x)
     ks_ans = bar._entry(a, x)
     ans = bar.raw_f(a, x)
     assert pytest.approx(ks_ans, 1e-5) == ans
 
     # Check grad
+    bar._reset_allocator(a, x)
     ks_ans = bar._entry_vjp((a, x), 1.0)
     ans = grad_bar(a, x)
     assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
@@ -137,6 +141,7 @@ def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
 
+    far._reset_allocator(x, y)
     ks_ans = far._entry(x, y)
     ans = far.raw_f(x, y)
     assert pytest.approx(ks_ans, 1e-5) == ans.item()

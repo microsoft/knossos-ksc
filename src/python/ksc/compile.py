@@ -1,16 +1,19 @@
+from dataclasses import dataclass
+from typing import List
+
 import atexit
 import os
 import subprocess
 import sysconfig
 import sys
-from dataclasses import dataclass
+
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
-from typing import List
 
 from torch.utils import cpp_extension
 
 from ksc import cgen, utils
+from ksc.cgen import VecSpec, VecSpec_None, VecSpec_Elementwise, VecSpec_VMap
 from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
@@ -57,7 +60,7 @@ def subprocess_run(cmd, env=None):
     )
 
 
-def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
+def generate_cpp_from_ks(ks_str, ks_entry_points, preludes, prelude_headers):
     ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -83,6 +86,12 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         *(opt for header in prelude_headers for opt in ("--cpp-include", header)),
         "--cpp-output-file",
         fcpp.name,
+        "--remove-unused",
+        *(
+            opt
+            for entry_point in ks_entry_points
+            for opt in ("--used", str(entry_point))
+        ),
     ]
 
     try:
@@ -91,12 +100,22 @@ def generate_cpp_from_ks(ks_str, preludes, prelude_headers):
         print(e.stderr.decode("ascii"))
         decls = list(parse_ks_filename(fkso.name))
     except subprocess.CalledProcessError as e:
-        print(f"Command failed:\n{' '.join(ksc_command)}")
-        print(f"files {fks.name} {fkso.name} {fcpp.name}")
+        ksc_command_str = " ".join(ksc_command)
+        print(f"Command failed:\n{ksc_command_str}")
+        print(f"KSC files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
+        print("KSC output:\n")
         print(e.output.decode("ascii"))
-        print(e.stderr.decode("ascii"))
-        raise
+        ksc_stderr = e.stderr.decode("ascii")
+        ksc_stderr_filtered = "> " + "\n> ".join(ksc_stderr.split("\n")[:-1])
+        print(ksc_stderr_filtered + "\n")
+        raise Exception(
+            f"Command failed:\n"
+            f"{ksc_command_str}\n"
+            f"KSC output:\n"
+            f"{ksc_stderr_filtered}\n"
+            f"See additional information in stdout"
+        ) from e
 
     # Read from CPP back to string
     with open(fcpp.name) as f:
@@ -186,9 +205,10 @@ def generate_cpp_for_py_module_from_ks(
     ks_str,
     bindings_to_generate,
     python_module_name,
-    elementwise=False,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=True,
     use_torch=False,
+    gpu=False,
 ):
     """Returns two strings of C++ code:
        The first string contains definitions of all ksc-generated functions and entry points.
@@ -210,12 +230,18 @@ def generate_cpp_for_py_module_from_ks(
 
     preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
     prelude_headers = ["prelude.h"] + (["prelude-aten.h"] if use_aten else [])
-    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, preludes, prelude_headers)
+    cpp_ks_functions, decls = generate_cpp_from_ks(
+        ks_str, [sn for _, sn in bindings_to_generate], preludes, prelude_headers
+    )
     (
         cpp_entry_point_declarations,
         cpp_entry_point_definitions,
     ) = cgen.generate_cpp_entry_points(
-        bindings_to_generate, decls, elementwise=elementwise, use_torch=use_torch
+        bindings_to_generate,
+        decls,
+        vectorization=vectorization,
+        use_torch=use_torch,
+        gpu=gpu,
     )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
@@ -263,14 +289,18 @@ PYBIND11_MODULE("""
 
 
 def build_py_module_from_ks(
-    ks_str, bindings_to_generate, elementwise=False, use_aten=False, use_torch=False
+    ks_str,
+    bindings_to_generate,
+    vectorization: VecSpec = VecSpec_None(),
+    use_aten=False,
+    use_torch=False,
 ):
 
     cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
         ks_str,
         bindings_to_generate,
         "PYTHON_MODULE_NAME",
-        elementwise=elementwise,
+        vectorization=vectorization,
         use_aten=use_aten,
         use_torch=use_torch,
     )
@@ -292,9 +322,10 @@ def build_module_using_pytorch_from_ks(
     ks_str,
     bindings_to_generate,
     torch_extension_name,
-    elementwise=False,
+    vectorization: VecSpec = VecSpec_None(),
     use_aten=False,
     extra_cflags=[],
+    gpu=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -312,13 +343,17 @@ def build_module_using_pytorch_from_ks(
         ks_str,
         bindings_to_generate,
         "TORCH_EXTENSION_NAME",
-        elementwise=elementwise,
+        vectorization=vectorization,
         use_aten=use_aten,
         use_torch=True,
+        gpu=gpu,
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        [("ksc-main.cpp", cpp_definitions), ("ksc-pybind.cpp", cpp_pybind)],
+        [
+            ("ksc-main.cu" if gpu else "ks-main.cpp", cpp_definitions),
+            ("ksc-pybind.cpp", cpp_pybind),
+        ],
         torch_extension_name,
         extra_cflags,
     )
@@ -374,6 +409,7 @@ def build_module_using_pytorch_from_cpp_backend(
         sources=[source_path(filename) for filename, _ in cpp_strs],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=extra_cflags,
+        extra_cuda_cflags=extra_cflags + ["-DKS_CUDA"],
         build_directory=build_directory,
         verbose=verbose,
     )

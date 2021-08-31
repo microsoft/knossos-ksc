@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
 -- Pattern match exhaustiveness checker seems to be broken on synonyms
 
-module Lang where
+module Ksc.Lang where
 
 import           Prelude                 hiding ( (<>) )
 
@@ -20,7 +20,7 @@ import qualified Ksc.Traversal                  as T
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
-import           KMonad
+import           Ksc.KMonad
 
 import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
@@ -32,14 +32,12 @@ import           Test.Hspec
 --  The main data types
 -----------------------------------------------
 
-mkGradType :: ADPlan -> Type -> Type -> Type
-mkGradType BasicAD s ty = TypeLM s ty
-mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+mkGradType :: Type -> Type -> Type
+mkGradType s ty = TypeLM s ty
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
-mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
-mkGradTuple BasicAD _ lm = lm
-mkGradTuple TupleAD p lm = Tuple [p, lm]
+mkGradTuple :: TExpr -> TExpr -> TExpr
+mkGradTuple _ lm = lm
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -85,7 +83,7 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data Derivation = DerivationDrvFun ADMode
+data Derivation = DerivationDrvFun ADDir
                 | DerivationCLFun
                 | DerivationShapeFun
                 | DerivationSUFFwdPass
@@ -419,8 +417,8 @@ pattern PrimFunT p <- BaseFunId (BasePrimFunName p) _
 
 data Derivations
   = JustFun        -- The function              f(x)
-  | GradFun ADPlan -- Full Jacobian Df(x)
-  | DrvFun ADMode  -- Derivative derivative f'(x,dx)
+  | GradFun        -- Full Jacobian Df(x)
+  | DrvFun ADDir   -- Derivative derivative f'(x,dx)
                    --   Rev <=> reverse mode f`(x,dr)
   | CLFun          -- f(x), roundtripped through CatLang
   | ShapeFun Derivations
@@ -507,12 +505,6 @@ isSelFun = \case
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun (Fun _ baseFun) = baseFun
 
-data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
-  deriving( Eq, Ord, Show )
-
-data ADPlan = BasicAD | TupleAD
-  deriving( Eq, Ord, Show )
-
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
@@ -532,14 +524,14 @@ data Var
   = Simple String         -- x
   | Delta  String         -- The 'dx' or 'dr' argument to
                           -- forward or backward versions of f
-  | Grad   String ADPlan  -- Derivative of x
+  | Grad   String         -- Derivative of x
   deriving( Eq, Ord, Show )
 
 nameOfVar :: Var -> String
 nameOfVar = \case
   Simple s -> s
   Delta s  -> s
-  Grad s _ -> s
+  Grad s   -> s
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KFloat   Double    -- :: TypeFloat
@@ -589,9 +581,6 @@ mkVar = Simple
 mkTVar :: TypeX -> String -> TVarX
 mkTVar ty = TVar ty . mkVar
 
-resVar :: Var
-resVar = Simple "ksc$resVar"
-
 argVar :: Var
 argVar = Simple "ksc$argVar"
 
@@ -630,11 +619,6 @@ mkTupleTy ts  = TypeTuple ts
 mkPat :: [VarX p] -> PatG (VarX p)
 mkPat [v] = VarPat v
 mkPat vs  = TupPat vs
-
-dropLast :: [a] -> [a]
--- Drop the last element of a list.
--- No-op for empty list
-dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
@@ -908,9 +892,6 @@ instance InPhase OccAnald where
 
   baseUserFunArgTy g t = g (Just t)
 
-pprTFun :: InPhase p => TFun p -> SDoc
-pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
-
 
 class Pretty a where
   ppr     :: a -> SDoc
@@ -936,21 +917,14 @@ instance Pretty a => Pretty (Maybe a) where
 instance (Pretty a, Pretty b) => Pretty (a,b) where
   ppr (x,y) = parens (sep [ ppr x <> comma, ppr y])
 
-instance Pretty ADMode where
-  ppr (AD p d) = ppr p <> ppr d
-
 instance Pretty ADDir where
   ppr Fwd = char 'f'
   ppr Rev = char 'r'
 
-instance Pretty ADPlan where
-  ppr BasicAD = empty
-  ppr TupleAD = char 't'
-
 instance Pretty Var where
   ppr (Simple s) = text s
   ppr (Delta  d) = text "d$" <> text d
-  ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
+  ppr (Grad   g) = char 'g' <> char '$' <> text g
 
 instance InPhase p => Pretty (BaseFun p) where
   ppr = pprBaseFun
@@ -1008,7 +982,6 @@ pprPrimFun = \case
   P_constVec -> text "constVec"
   P_lmApply -> text "lmApply"
   P_lmApplyR -> text "lmApplyR"
-  P_lmApplyT -> text "lmApplyT"
   P_lmVCat -> text "lmVCat"
   P_lmHCat -> text "lmHCat"
   P_lmVCatV -> text "lmVCatV"
@@ -1020,8 +993,6 @@ pprPrimFun = \case
   P_lmDot -> text "lmDot"
   P_lmZero -> text "lmZero"
   P_lmOne -> text "lmOne"
-  P_lmApplyTR -> text "lmApplyTR"
-  P_lmDummyFold -> text "P_lmDummyFold"
   P_lmFold -> text "P_lmFold"
   P_FFold -> text "FFold"
   P_RFold -> text "RFold"
@@ -1039,9 +1010,9 @@ pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (BaseFunId funid p -> SDoc) -> DerivedFun funid p -> SDoc
 pprDerivedFun f (Fun JustFun s)               = f s
-pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (Fun GradFun   s)             = brackets (char 'D'   <+> f s)
+pprDerivedFun f (Fun (DrvFun   Fwd) s)        = brackets (text "fwd" <+> f s)
+pprDerivedFun f (Fun (DrvFun   Rev) s)        = brackets (text "rev" <+> f s)
 pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
 pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
 pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
@@ -1179,10 +1150,8 @@ instance Pretty GDefX where
 
 instance Pretty Derivation where
   ppr = \case
-    DerivationDrvFun (AD BasicAD Fwd) -> text "fwd"
-    DerivationDrvFun (AD BasicAD Rev) -> text "rev"
-    DerivationDrvFun (AD TupleAD Fwd) -> text "fwdt"
-    DerivationDrvFun (AD TupleAD Rev) -> text "revt"
+    DerivationDrvFun Fwd -> text "fwd"
+    DerivationDrvFun Rev -> text "rev"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
     DerivationSUFFwdPass -> text "suffwdpass"
@@ -1237,9 +1206,6 @@ instance InPhase p => Pretty (RuleX p) where
 printK :: SDoc -> KM ()
 printK d = liftIO (putStrLn (render d))
 
-display :: Pretty p => p -> KM ()
-display p = printK (ppr p)
-
 displayN :: Pretty p => [p] -> KM ()
 displayN ps = printK (vcat $ intersperse (text "") $ map ppr ps)
 
@@ -1281,9 +1247,6 @@ hspec = do
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
-
-test_Pretty :: IO ()
-test_Pretty = Test.Hspec.hspec Lang.hspec
 
 -----------------------------------------------
 --     Equality modulo alpha
@@ -1452,7 +1415,6 @@ data PrimFun = P_inline
              | P_constVec
              | P_lmApply
              | P_lmApplyR
-             | P_lmApplyT
              | P_lmVCat
              | P_lmHCat
              | P_lmVCatV
@@ -1467,11 +1429,9 @@ data PrimFun = P_inline
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
              | P_dup Int
              | P_elim
-             | P_lmApplyTR
              | P_lmFold
              | P_FFold
              | P_RFold
-             | P_lmDummyFold
              | P_lmVariant
              | P_suffwdpass_map
              | P_sufrevpass_map
@@ -1509,7 +1469,6 @@ toPrimFun = \case
   "constVec" -> Just P_constVec
   "lmApply" -> Just P_lmApply
   "lmApplyR" -> Just P_lmApplyR
-  "lmApplyT" -> Just P_lmApplyT
   "lmVCat" -> Just P_lmVCat
   "lmHCat" -> Just P_lmHCat
   "lmVCatV"-> Just P_lmVCatV

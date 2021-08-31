@@ -7,19 +7,13 @@
 namespace ks {
 namespace entry_points {
 
+#ifdef KS_ALLOCATOR
 extern ks::allocator g_alloc;
+#endif
+
 void reset_allocator();
 size_t allocator_top();
 size_t allocator_peak();
-
-// Convert functor to one which takes a first argument g_alloc,
-// and optionally logs inputs and outputs to cerr
-template<typename RetType, typename... ParamTypes>
-auto with_ks_allocator(const char * tracingMessage, RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f, tracingMessage](ParamTypes... params) {
-    return f(&g_alloc, params...);
-  };
-}
 
 template<typename KSType, typename EntryPointType>
 KSType convert_argument(EntryPointType arg);

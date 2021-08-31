@@ -1,3 +1,7 @@
+#### Making the sphinx docs
+
+Run make.sh in doc
+
 #### Getting the PDF
 
 The latest PDF can be obtained by following these instructions:

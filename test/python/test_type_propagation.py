@@ -20,7 +20,7 @@ def test_type_propagate_prelude_and_primer():
     decls_file = list(parse_ks_filename("test/ksc/syntax-primer.ks"))
     type_propagate_decls(decls_file, symtab)
     assert parse_structured_name(
-        s_exps_from_string("[Dt [my_log Float]]", __file__)[0]
+        s_exps_from_string("[D [my_log Float]]", __file__)[0]
     ) in [d.name for d in decls_file]
 
 

@@ -20,10 +20,10 @@ shape$f may itself involve allocating memory in the heap.
 
 {-# LANGUAGE DataKinds #-}
 
-module Shapes where
+module Ksc.Shapes where
 
-import Lang
-import Prim
+import Ksc.Lang
+import Ksc.Prim
 import GHC.Stack
 import Data.Maybe(mapMaybe)
 

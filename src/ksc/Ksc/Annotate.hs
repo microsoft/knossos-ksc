@@ -5,15 +5,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Annotate (
+module Ksc.Annotate (
   annotDecls, lintDefs
   ) where
 
-import Lang
-import LangUtils
-import KMonad
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.KMonad
 import Ksc.Traversal ( traverseOf )
-import Prim
+import Ksc.Prim
 import qualified Data.Map   as Map
 import GHC.Stack
 import Control.Monad( ap )

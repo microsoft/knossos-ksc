@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
 {-# LANGUAGE DataKinds  #-}
 
-module Cgen where
+module Ksc.Cgen where
 
 import           GHC.Stack
 import           Prelude                 hiding ( lines
@@ -20,8 +20,8 @@ import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
-import           Lang                    hiding ( (<>) )
-import qualified OptLet
+import           Ksc.Lang                hiding ( (<>) )
+import qualified Ksc.OptLet
 
 import Debug.Trace
 
@@ -275,13 +275,10 @@ cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 markAllocator :: String -> String -> String
-markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ allocVar ++ "->mark();"
+markAllocator bumpmark allocVar = "KS_MARK(" ++ allocVar ++ ", " ++ bumpmark ++ ");"
 
 resetAllocator :: String -> String -> String
-resetAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
-
-moveMark :: String -> String -> String
-moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
+resetAllocator bumpmark allocVar = "KS_RESET(" ++ allocVar ++ ", " ++ bumpmark ++ ");"
 
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
@@ -343,7 +340,7 @@ params_withPackedParams param = case typeof param of
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
         packParams = mkLet param (Tuple (map Var params))
-    in (params, OptLet.ensureDon'tReuseParams params . packParams)
+    in (params, Ksc.OptLet.ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
 mkCTypedVar :: TVar -> String
@@ -361,7 +358,7 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       cftypealias = "ty$" ++ cf
       cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
   in (  [ "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";",
-          cftypealias `spc` cf ++ "(" ++ cparams ++ ") {" ]
+          "KS_DEF " ++ cftypealias `spc` cf ++ "(" ++ cparams ++ ") {" ]
      ++ indent cbody
      ++ [ "}" ]
      )
@@ -408,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
         (  [ cComment "Explicitly-requested copydown",
              markAllocator bumpmark allocatorParameterName ]
         ++ cdecl
-        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ generateCGRE cexpr ++ ");" ]
+        ++ [ cgenType ctype ++ " " ++ ret ++ " = KS_COPYDOWN(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", (" ++ generateCGRE cexpr ++ "));" ]
         )
         (CGREVar (Simple ret))
         ctype
@@ -628,10 +625,8 @@ cgenFun :: HasCallStack
 cgenFun cgenBaseFun f = case f of
   Fun JustFun baseFun   -> cgenBaseFun baseFun
   Fun GradFun{}  s  -> "D$" ++ cgenBaseFun s
-  Fun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ cgenBaseFun s
-  Fun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ cgenBaseFun s
-  Fun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ cgenBaseFun s
-  Fun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ cgenBaseFun s
+  Fun (DrvFun Fwd) s -> "fwd$" ++ cgenBaseFun s
+  Fun (DrvFun Rev) s -> "rev$" ++ cgenBaseFun s
   Fun (ShapeFun ds) ff   -> "shape$" ++ cgenFun cgenBaseFun (Fun ds ff)
   Fun CLFun s       -> "CL$" ++ cgenBaseFun s
   Fun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s

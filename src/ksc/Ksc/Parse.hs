@@ -4,7 +4,7 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module Parse  where
+module Ksc.Parse  where
 
 {- The language we parse
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -58,7 +58,7 @@ x : Tensor 1 (Tensor 2 Float)
         | "[" <derivation> <sname> "]"
         | "[" <var> <type> "]"
 
-<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "Dt" | "suffwdpass" | "sufrevpass"
+<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "suffwdpass" | "sufrevpass"
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
@@ -97,7 +97,7 @@ Notes:
 -}
 
 
-import Lang hiding (parens, brackets)
+import Ksc.Lang hiding (parens, brackets)
 import Ksc.Traversal ( over )
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
@@ -114,18 +114,9 @@ import Text.Read ( readMaybe )
 
 
 ---------------------
-testParse :: Pretty a => Parser a -> String -> IO ()
-testParse  p s = case runParser p s of
-                   Left err -> putStrLn ("ksc: Failed: " ++ show err)
-                   Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
 runParser p = parse p ""
-
-runParserOrPanic :: Parser a -> String -> a
-runParserOrPanic p s = case runParser p s of
-                        Left err -> error $ show err
-                        Right r -> r
 
 parseF :: String -> IO [Decl]
 parseF file = do
@@ -336,13 +327,6 @@ pPrimFunIdentifier = pSelFunIdentifier
                             Nothing -> unexpected (f ++ " is not a PrimFun")
                         }
 
-pBasePrimFunWithType :: (Type -> BaseArgTy p) -> Parser (BasePrimFun p)
-pBasePrimFunWithType add =
-     brackets (do { f  <- pPrimFunIdentifier
-                  ; ty <- pType
-                  ; pure (BaseFunId f (add ty))
-                  })
-
 pBasePrimFunWithoutType :: Parser (BasePrimFun Parsed)
 pBasePrimFunWithoutType =
          do { f <- pPrimFunIdentifier
@@ -391,14 +375,11 @@ pBaseFun :: Parser (BaseFun Parsed)
 pBaseFun = pPrimFun
        <|> pBaseUserFun
 
-pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
+pFunG :: forall p n. Parser (BaseFunId n p) -> Parser (DerivedFun n p)
 pFunG pBase = try (brackets $
-            ((pDerivation "D" (GradFun BasicAD))
-         <|> (pDerivation "Dt" (GradFun TupleAD))
-         <|> (pDerivation "fwd" (DrvFun (AD BasicAD Fwd)))
-         <|> (pDerivation "fwdt" (DrvFun (AD TupleAD Fwd)))
-         <|> (pDerivation "rev"  (DrvFun (AD BasicAD Rev)))
-         <|> (pDerivation "revt" (DrvFun (AD TupleAD Rev)))
+            ((pDerivation "D" GradFun)
+         <|> (pDerivation "fwd" (DrvFun Fwd))
+         <|> (pDerivation "rev"  (DrvFun Rev))
          <|> (pDerivation "CL" CLFun)
          <|> (pDerivation "suffwdpass" SUFFwdPass)
          <|> (pDerivation "sufrevpass" SUFRevPass)
@@ -407,8 +388,8 @@ pFunG pBase = try (brackets $
    <|> Fun JustFun <$> pBase
   where pDerivation s d = pReserved s >> Fun d <$> pBase
 
-pFunTyped :: Parser (Fun Typed)
-pFunTyped = pFunG (over baseFunName BaseUserFunName <$> pBaseUserFunWithType id)
+pUserFunTyped  :: Parser (UserFun Typed)
+pUserFunTyped = pFunG (pBaseUserFunWithType id)
 
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun
@@ -453,8 +434,8 @@ pEdef = do { pReserved "edef"
 
 pDerivation :: Parser Derivation
 pDerivation =
-      (pReserved "fwd" $> DerivationDrvFun (AD BasicAD Fwd))
-  <|> (pReserved "rev" $> DerivationDrvFun (AD BasicAD Rev))
+      (pReserved "fwd" $> DerivationDrvFun Fwd)
+  <|> (pReserved "rev" $> DerivationDrvFun Rev)
   <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
   <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)
@@ -464,9 +445,8 @@ pDerivation =
 pGDef :: Parser GDefX
 pGDef = do { pReserved "gdef"
            ; d <- pDerivation
-           ; f <- pFunTyped
-           ; mk_fun_f <- pIsUserFun f
-           ; pure (GDef d mk_fun_f)
+           ; f <- pUserFunTyped
+           ; pure (GDef d f)
            }
 
 

@@ -45,6 +45,6 @@ torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
 torch::Tensor vrelu3_cuda_backward(
     torch::Tensor grad,
     torch::Tensor x) {
-  return revmap_gpu(grad, x, Relu3_backward{});
+  return map2_gpu(grad, x, Relu3_backward{});
 }
 

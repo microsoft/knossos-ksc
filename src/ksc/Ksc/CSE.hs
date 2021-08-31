@@ -1,16 +1,16 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-module CSE where
+module Ksc.CSE where
 
 import Ksc.Traversal( traverseState )
-import Lang
-import Prim
-import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( GblSymTab )
-import Rules
-import ANF
-import Opt
-import KMonad
+import Ksc.Lang
+import Ksc.Prim
+import Ksc.OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
+import Ksc.LangUtils( GblSymTab )
+import Ksc.Rules
+import Ksc.ANF
+import Ksc.Opt
+import Ksc.KMonad
 import qualified Data.Map as M
 
 {- Note [CSE for bindings]

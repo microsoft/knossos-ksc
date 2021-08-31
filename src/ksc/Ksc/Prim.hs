@@ -5,10 +5,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Prim where
+module Ksc.Prim where
 
-import Lang
-import LangUtils (isTrivial)
+import Ksc.Lang
+import Ksc.LangUtils (isTrivial)
 import GHC.Stack (HasCallStack)
 import Data.Maybe (isJust)
 import Control.Monad (zipWithM)
@@ -362,10 +362,6 @@ type Shape = TExpr
 lmZero :: Shape -> Shape -> TExpr
 lmZero s t = mkPrimCall1 P_lmZero (Tuple [s, t])
 
-lmZero_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmZero_Dir Fwd s t = lmZero s t
-lmZero_Dir Rev s t = lmZero t s
-
 -- lmOne S :: S -o S
 lmOne :: Type -> TExpr
 lmOne s = mkPrimCall1 P_lmOne (mkDummy s)
@@ -424,20 +420,9 @@ lmApply = mkPrimCall2 P_lmApply
 lmApplyR :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApplyR = mkPrimCall2 P_lmApplyR
 
-lmApply_AD :: HasCallStack => ADMode -> TExpr -> TExpr -> TExpr
-lmApply_AD (AD BasicAD dir) = lmApply_Dir  dir
-lmApply_AD (AD TupleAD dir) = lmApplyT_Dir dir
-
 lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
 lmApply_Dir Rev e dt = lmApplyR dt e
-
-lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
-lmApplyT_Dir Fwd e ds = mkPrimCall1 P_lmApplyT  (Tuple [e, ds])
-lmApplyT_Dir Rev e dt = mkPrimCall1 P_lmApplyTR (Tuple [dt, e])
-
-lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild n b = lmVCatV (pBuild n b)
 
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT n b = lmHCatV (pBuild n b)
@@ -450,21 +435,6 @@ pFFold = mkPrimCall6 P_FFold
 
 pRFold :: HasCallStack => Type -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 pRFold = mkPrimCall7 P_RFold . mkDummy
-
-lmDummyFold :: HasCallStack => Type -> TExpr
-lmDummyFold = mkPrimCall1 P_lmDummyFold . mkDummy
-
-lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmBuild_Dir Fwd = lmBuild
-lmBuild_Dir Rev = lmBuildT
-
-lmVCatV_Dir :: ADDir -> TExpr -> TExpr
-lmVCatV_Dir Fwd = lmVCatV
-lmVCatV_Dir Rev = lmHCatV
-
-lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
-lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun p -> PrimFun -> Bool
 isThePrimFun (TFun _ (Fun JustFun (PrimFunT f1))) f2 = f1 == f2
@@ -547,9 +517,6 @@ pDot   = mkPrimCall2 P_ts_dot
 pAdd1 :: TExpr -> TExpr
 pAdd1 = mkPrimCall1 P_ts_add
 
-pNeg :: HasCallStack => TExpr -> TExpr
-pNeg = mkPrimCall1 P_ts_neg
-
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 P_build
 
@@ -606,23 +573,18 @@ primCallResultTy_maybe fun arg_ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (GradFun adp) f
+      Fun GradFun f
         -> case primCallResultTy_maybe (Fun JustFun f) arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (mkGradType adp arg_ty res_ty)
+            Right res_ty -> Right (mkGradType arg_ty res_ty)
 
       Fun (DrvFun adm) f
-        | AD BasicAD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
+        | Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
         , TypeTuple [x, _dx] <- arg_ty
         , Right t_ty <- primCallResultTy_maybe (Fun JustFun f) x
         -> Right (tangentType t_ty)
 
-        | AD TupleAD Fwd <- adm    -- f :: S1 -> T, then fwdt$f :: (S1, S2_t) -> (T,T_t)
-        , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun JustFun f) x
-        -> Right (TypeTuple [t_ty, tangentType t_ty])
-
-        | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
+        | Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
         , TypeTuple [s, _dt] <- arg_ty
         -> Right (tangentType s)
         | otherwise
@@ -654,7 +616,7 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Type error in SUF rev fun:" <+> ppr fun
              <+> text "Arg ty was:" <+> ppr arg_ty)
 
-      Fun SUFRev f -> primCallResultTy_maybe (Fun (DrvFun (AD BasicAD Rev)) f) arg_ty
+      Fun SUFRev f -> primCallResultTy_maybe (Fun (DrvFun Rev) f) arg_ty
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args
@@ -846,9 +808,6 @@ primFunCallResultTy_maybe P_FFold args
   = Just dacc
   | otherwise = Nothing
 
-primFunCallResultTy_maybe P_lmDummyFold args
-  = Just args
-
 primFunCallResultTy_maybe (P_SelFun i n) (TypeTuple arg_tys)
   | i <= length arg_tys
   , n == length arg_tys
@@ -869,10 +828,6 @@ primFunCallResultTy_maybe fun args
            -- Linar map apply:  lmApply :: (s -o t) -> ds -> dt
       (P_lmApplyR , TypeTuple [t1, TypeLM s t2]) | t1 `eqType` tangentType t2 -> Just (tangentType s)
            -- Reverse apply:  lmApplyR :: dt -> (s -o t) -> ds
-
-      (P_lmApplyT , TypeTuple [TypeTuple [_, TypeLM s1 t], s2])
-                                | tangentType s1 `eqType` s2 -> Just (tangentType t)
-           -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
 
       -- The argument tuple to ksc's primitive function "lmVCat" must
       -- have two or more components else we can't deduce its return

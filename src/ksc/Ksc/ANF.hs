@@ -4,12 +4,12 @@
              PatternSynonyms,
 	     ScopedTypeVariables, TypeApplications #-}
 
-module ANF where
+module Ksc.ANF where
 
 import Ksc.Traversal( traverseState )
-import Lang
-import OptLet( Subst, mkEmptySubst, substBndr, substVar )
-import KMonad
+import Ksc.Lang
+import Ksc.OptLet( Subst, mkEmptySubst, substBndr, substVar )
+import Ksc.KMonad
 import Control.Monad( ap )
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]

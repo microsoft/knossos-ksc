@@ -12,7 +12,8 @@ from collections import namedtuple
 from contextlib import contextmanager
 from typing import Callable
 
-from ksc.torch_frontend import KscStub
+from ksc.torch_frontend import KscStub, CompileConfiguration
+from ksc.compile import VecSpec_Elementwise
 from ksc import utils
 
 
@@ -113,8 +114,23 @@ def functions_to_benchmark(
                 ks_compiled = fn_obj.compile(
                     torch_extension_name=torch_extension_name,
                     example_inputs=example_inputs,
+                    configuration=CompileConfiguration(gpu=False),
                 )
                 yield BenchmarkFunction("Knossos", ks_compiled.apply)
+                if (
+                    isinstance(fn_obj.vectorization, VecSpec_Elementwise)
+                    and torch.cuda.is_available()
+                ):
+                    ks_compiled_cuda = fn_obj.compile(
+                        torch_extension_name=torch_extension_name.replace(
+                            "ksc", "ksc_cuda", 1
+                        ),
+                        example_inputs=example_inputs,
+                        configuration=CompileConfiguration(gpu=True),
+                    )
+                    yield BenchmarkFunction(
+                        "Knossos CUDA", ks_compiled_cuda.apply, torch.device("cuda"),
+                    )
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)
@@ -133,7 +149,7 @@ def func_namer(benchmark_func):
 
 
 def config_namer(config):
-    return str(config.shape)
+    return "x".join([str(x) for x in config.shape])
 
 
 def pytest_configure(config):
