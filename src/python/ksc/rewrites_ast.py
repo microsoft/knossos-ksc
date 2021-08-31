@@ -31,7 +31,9 @@ class LiftOverCall(RuleMatcher, ABC):
 
     liftable_arg_type: Type[Expr]
     """ Must be defined by concrete instances as the subclass of Expr which, as argument to a Call,
-        the instance of LiftOverCall can lift to above the Call. For example, 'If' or 'Let'. """
+        the instance of LiftOverCall can lift to above the Call. For example, 'If' or 'Let'.
+        Loosely speaking, the instance rewrites Call-of-liftable_arg_type => liftable_arg_type-of-Call.
+    """
 
     def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
         def apply(arg_with_path: ExprWithPath):
@@ -76,9 +78,10 @@ class lift_if_over_call(LiftOverCall):
 
 def can_evaluate_without_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
     """ Given an input program that evaluated <e> only when <cond> evaluated to <cond_value>,
-        tells whether we can output a program that evaluates <e> when <cond> either
+        tells whether we can output a program that evaluates <e> before/without evaluating <cond>,
+        that is which (additionally) evaluates <p> when <cond> either
             * evaluates to the opposite of <cond_value>,
-            * raises an exception itself ? """
+            * raises an exception itself. """
     # TODO: we can return True here if we are sure e cannot raise an exception.
     # For now we'll use almost the simplest test possible ("return False" would be simpler).
     return isinstance(e, (Var, Const))
@@ -318,7 +321,7 @@ lift_let_rules = [
         # TODO Should we have another version that avoids the "if" when can_evaluate_without_condition(rhs, n > 0) is true?
         side_conditions=lambda *, i, x, n, rhs, body: (i.name not in rhs.free_vars_) and
         # In the absence of constVec 0, this avoids infinite chain of rewrites producing if (gt 0 0).
-        (n != Const(0.0)),
+        (n != Const(0)),
     ),
     lift_let_over_call,
 ]
