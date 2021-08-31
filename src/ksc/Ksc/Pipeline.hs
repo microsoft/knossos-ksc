@@ -17,11 +17,10 @@ import Ksc.Traversal (mapAccumLM)
 import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
-             ppr, renderSexp, (<+>))
+             ppr, (<+>))
 import qualified Ksc.Lang as L
 import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
 import qualified Ksc.Prune
-import qualified Ksc.Futhark
 import Ksc.Parse (parseF)
 import Ksc.Rules (mkRuleBase)
 import Ksc.Opt (optDefs)
@@ -30,7 +29,6 @@ import Ksc.SUF (sufDef)
 import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
 import Data.Maybe (maybeToList)
-import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Stack (HasCallStack)
@@ -263,34 +261,3 @@ displayPassM mverbosity what env decls
   = do { displayPassMNoLint mverbosity what decls
        ; lintDefs what env decls
     }
-
--------------------------------------
--- The Futhark driver
--------------------------------------
-futharkPipeline :: [FilePath] -> IO [TDef]
-futharkPipeline files
-  = do
-  { decls0 <- fmap concat (mapM (parseF . (++ ".ks")) files)
-  ; pipelineIO Nothing Nothing decls0
-  }
-
--- | Read source code from specified input file, optimise,
--- differentiate, optimise, and write result to corresponding @.fut@
--- file.  You will have to run the Futhark compiler yourself
--- afterwards (and probably write a small wrapper program, because
--- currently the generated file will not have any entry points).
---
--- Usage:
---
--- @
--- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
--- @
-genFuthark :: [FilePath] -> FilePath -> IO ()
-genFuthark files file = do
-  prelude <- readFile "src/runtime/knossos.fut"
-  defs <- futharkPipeline (files ++ [file])
-  putStrLn $ "ksc: Writing to " ++ futfile
-  Ksc.Cgen.createDirectoryWriteFile futfile $
-    intercalate "\n\n" $
-    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
-  where futfile = "obj/" ++ file ++ ".fut"

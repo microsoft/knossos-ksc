@@ -119,9 +119,6 @@ bump-allocated vector
 implementation, implementations of primitives, and a very small
 standard library called the "prelude".
 
-We also have a [Futhark](https://futhark-lang.org/) backend, but most
-of our efforts are concentrated on C++ at the moment.
-
 ### Automatic differentiation documentation
 
 #### Getting the PDF

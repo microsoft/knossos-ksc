@@ -8,7 +8,7 @@ import Ksc.Lang
 import Ksc.LangUtils
 import Ksc.Parse (parseE, pUserFunTyped, runParser)
 import Ksc.Opt
-import Ksc.Pipeline (displayCppGenAndCompile, genFuthark)
+import Ksc.Pipeline (displayCppGenAndCompile)
 import qualified Ksc.Pipeline
 import qualified Ksc.Cgen
 import qualified Control.Exception
@@ -122,7 +122,6 @@ option s = do
 
 testWithfsTest :: String -> IO ()
 testWithfsTest fsTestKs = do
-  -- futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
@@ -210,38 +209,6 @@ testRoundTrip ksFiles = do
         print parsed_rendered_parsed
         error "Round trip failure"
       else return ()
-
-futharkCompileKscPrograms :: [String] -> IO ()
-futharkCompileKscPrograms ksFiles = do
-  let testsThatDon'tWorkWithFuthark =
-        [ -- Doesn't handle edefs
-          "test/ksc/edef.ks"
-          -- Doesn't handle dummy variables
-        , "test/ksc/adbench-lstm.ks"
-        , "test/ksc/fold.ks"
-        , "test/ksc/logsumexp.ks"
-        , "test/ksc/vprod.ks"
-        , "test/ksc/syntax-primer.ks"
-          -- Doesn't handle recursion
-        , "test/ksc/power.ks"
-        , "test/ksc/sum.ks"
-          -- $trace not supported
-        , "test/ksc/test0.ks"
-          -- Seems not to handle negative float literals
-        , "test/ksc/negative-float-literals.ks"
-        ]
-
-  testOn ksFiles $ \ksFile -> do
-        ksTest <- dropExtensionOrFail "ks" ksFile
-        if ksFile `elem` testsThatDon'tWorkWithFuthark
-         then putStrLn ("ksc: Skipping " ++ ksFile
-                        ++ " because it is known not to work with Futhark")
-         else do
-            genFuthark ["src/runtime/prelude"] ksTest
-            Ksc.Cgen.readProcessPrintStderrOnFail
-              "futhark-0.11.2-linux-x86_64/bin/futhark"
-              ["check", "obj/" ++ ksTest ++ ".fut"]
-            return ()
 
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.

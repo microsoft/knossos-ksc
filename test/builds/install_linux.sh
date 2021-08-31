@@ -12,8 +12,5 @@ echo ----- perftools -----
 sudo apt-get install libgoogle-perftools-dev google-perftools
 echo ----- cabal update -----
 /opt/cabal/3.0/bin/cabal update
-echo ------ futhark -----
-wget https://futhark-lang.org/releases/futhark-0.11.2-linux-x86_64.tar.xz
-tar -xvaf futhark-0.11.2-linux-x86_64.tar.xz
 echo ----- Ninja -----
 sudo apt-get install ninja-build

@@ -263,7 +263,7 @@ is an auto-generated derivative of the function `eq` for two floats `@ff`.
 In Knossos, operations, functions and lambdas are indiscernible. They all have
 return types, arguments and a name. The main difference is that the operations
 are declared by the compiler (in `src/runtime/prelude.ks`) and implemented by
-the run-time (in Futhark, C++, etc.), while functions and lambdas are declared
+the run-time (in C++, etc.), while functions and lambdas are declared
 in user code.
 
 A call to a function, with syntax `(fname arg0 arg1 ...)` is only valid if it

@@ -14,7 +14,6 @@ Currently implemented frontends are
 
 Current backends:
  * CPU/C++: In src/ksc and src/runtime
- * GPU/Futhark: Also in src/ksc
  * MLIR: In [mlir](mlir/README.md)
 
 Current transformers:
