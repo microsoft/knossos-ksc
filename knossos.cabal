@@ -9,7 +9,6 @@ executable ksc
   other-modules: Ksc.AD
                  Ksc.ANF
                  Ksc.Annotate
-                 Ksc.CatLang
                  Ksc.CSE
                  Ksc.Cgen
                  Ksc.Futhark

@@ -12,11 +12,10 @@ import Ksc.AD (gradDef, applyDef)
 import qualified Ksc.Cgen
 import Ksc.CSE (cseDefs)
 import Ksc.KMonad (KM, KMT, runKM,  banner)
-import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
+import Ksc.Lang (Decl, DeclX(DefDecl),
              TDef, Pretty,
-             def_fun, displayN, partitionDecls,
+             displayN, partitionDecls,
              ppr, renderSexp, (<+>))
 import qualified Ksc.Lang as L
 import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
@@ -203,15 +202,6 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           ; let appliedDef = applyDef dir graddedDef
           ; pure (stInsertFun appliedDef env', [DefDecl appliedDef])
           }
-        L.DerivationCLFun
-          | Fun JustFun basefun <- fun
-          , let tdef' = case toCLDef_maybe tdef of
-                  Nothing -> error ("Couldn't derive CL of "
-                                    ++ L.render (ppr basefun))
-                  Just d  -> (fromCLDef d){ def_fun = Fun L.CLFun basefun }
-          -> pure (stInsertFun tdef' env, [DefDecl tdef'])
-          | otherwise
-          -> error ("Was not base fun: " ++ L.render (ppr fun))
 
         L.DerivationShapeFun ->
           let shapeDef = shapeDefs [tdef]

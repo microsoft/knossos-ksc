@@ -84,7 +84,6 @@ isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
 data Derivation = DerivationDrvFun ADDir
-                | DerivationCLFun
                 | DerivationShapeFun
                 | DerivationSUFFwdPass
                 | DerivationSUFRevPass
@@ -1152,7 +1151,6 @@ instance Pretty Derivation where
   ppr = \case
     DerivationDrvFun Fwd -> text "fwd"
     DerivationDrvFun Rev -> text "rev"
-    DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
     DerivationSUFFwdPass -> text "suffwdpass"
     DerivationSUFRevPass -> text "sufrevpass"

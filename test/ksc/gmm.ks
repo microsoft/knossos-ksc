@@ -198,14 +198,6 @@
              (Vec (Vec Float))
              (Tuple Float Integer))]])
 
-(gdef CL [gmm_knossos_gmm_objective
-      (Tuple (Vec (Vec Float))
-             (Vec Float)
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Tuple Float Integer))])
-
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
        (mul ($ranhashdoub seed) scale))
@@ -252,7 +244,6 @@
 
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls wishart))
           (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (ts_add x dx) (ts_add alphas dalphas) (ts_add mus dmus) (ts_add qs dqs) (ts_add ls dls) (ts_add wishart dwishart)))
-          (gmm_at_theta_CL ([CL gmm_knossos_gmm_objective] x alphas mus qs ls wishart))
 
           (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
           (gmm_fwd ([fwd gmm_knossos_gmm_objective]
@@ -360,8 +351,6 @@
 
           "gmm_at_theta = " gmm_at_theta
           "\n----\n" 
-          "gmm_at_theta_CL = " gmm_at_theta_CL
-          "\n----\n"
           "gmm_at_theta_shape = " rev_gmm_at_theta_shape
           "\n----\n"
           "gmm_at_theta_plus_dtheta = " gmm_at_theta_plus_dtheta

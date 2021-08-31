@@ -436,7 +436,6 @@ pDerivation :: Parser Derivation
 pDerivation =
       (pReserved "fwd" $> DerivationDrvFun Fwd)
   <|> (pReserved "rev" $> DerivationDrvFun Rev)
-  <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
   <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)
   <|> (pReserved "sufrevpass" $> DerivationSUFRevPass)
