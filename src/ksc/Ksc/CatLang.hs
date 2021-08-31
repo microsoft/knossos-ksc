@@ -1,12 +1,15 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 {-# LANGUAGE DataKinds #-}
 
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef ) where
 
 import Prelude hiding( (<>) )
-import Lang
-import LangUtils
-import Prim
+import Ksc.Lang
+import Ksc.LangUtils
+import Ksc.Prim
 import qualified Data.Set as S
 import Data.Maybe( mapMaybe )
 

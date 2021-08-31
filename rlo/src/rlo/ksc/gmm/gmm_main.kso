@@ -1,0 +1,85 @@
+(def
+ main Integer
+ ()
+ (let
+  ((x (mkvecvec 0 5 4 1.0))
+   (alphas (mkvec 1000 10 1.0))
+   (mus (mkvecvec 2000 10 4 1.0))
+   (qs (mkvecvec 3000 10 4 0.1))
+   (t15047 (gmm_knossos_tri 4))
+   (ls (mkvecvec 4000 10 t15047 1.0))
+   (dx (mkvecvec 5000 5 4 1.0e-4))
+   (dalphas (mkvec 6000 10 1.0e-4))
+   (dmus (mkvecvec 7000 10 4 1.0e-4))
+   (dqs (mkvecvec 8000 10 4 1.0e-4))
+   (dls (mkvecvec 9000 10 t15047 1.0e-4))
+   (t11504 (mkfloat 10000 1.0e-4))
+   (gmm_at_theta (gmm_knossos_gmm_objective x
+                                            alphas
+                                            mus
+                                            qs
+                                            ls
+                                            (tuple 3.1 7)))
+   (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (add x dx)
+                                                        (add alphas dalphas)
+                                                        (add mus dmus)
+                                                        (add qs dqs)
+                                                        (add ls dls)
+                                                        (tuple (add 3.1 t11504) 7)))
+   (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
+   (gmm_fwd (fwd$gmm_knossos_gmm_objective x
+                                           alphas
+                                           mus
+                                           qs
+                                           ls
+                                           (tuple 3.1 7)
+                                           dx
+                                           dalphas
+                                           dmus
+                                           dqs
+                                           dls
+                                           (tuple t11504 (tuple))))
+   (grad_gmm (rev$gmm_knossos_gmm_objective x
+                                            alphas
+                                            mus
+                                            qs
+                                            ls
+                                            (tuple 3.1 7)
+                                            1.0))
+   (checked ($check gmm_knossos_gmm_objective
+                    rev$gmm_knossos_gmm_objective
+                    (tuple x alphas mus qs ls (tuple 3.1 7))
+                    (tuple dx dalphas dmus dqs dls (tuple t11504 (tuple)))
+                    1.0))
+   (t15068 (gmm_knossos_makeQ (index 0 qs) (index 0 ls))))
+  (pr x
+      t15068
+      (mul$Mat$Vec t15068 (index 0 x))
+      (tuple "gmm_at_theta:" gmm_at_theta)
+      (tuple "gmm_at_theta_plus_dtheta:" gmm_at_theta_plus_dtheta)
+      (tuple "gmm_fwd:" gmm_fwd)
+      (tuple "gmm_fd:" gmm_fd)
+      (tuple "grad_gmm:" grad_gmm)
+      (tuple "dtheta:"
+             (tuple dx dalphas dmus dqs dls (tuple t11504 (tuple))))
+      (tuple "rev_ok:"
+             (tuple (add (dotvv (get$1$6 grad_gmm) dx)
+                         (add (dotv (get$2$6 grad_gmm) dalphas)
+                              (add (dotvv (get$3$6 grad_gmm) dmus)
+                                   (add (dotvv (get$4$6 grad_gmm) dqs)
+                                        (add (dotvv (get$5$6 grad_gmm) dls)
+                                             (mul (get$1$2 (get$6$6 grad_gmm)) t11504))))))
+                    " ==?== "
+                    gmm_fd))
+      (tuple "Checked, should be small:" checked)
+      "TESTS FOLLOW"
+      "Golden test GMM objective"
+      (lt (abs (sub gmm_at_theta 76.0882))
+          (max (mul (abs 76.0882) 1.0e-6) 1.0e-6))
+      "Reverse mode as expected"
+      (lt checked 1.0e-4)
+      "Forward mode as expected"
+      (lt (abs (sub gmm_fd gmm_fwd))
+          (max (mul (abs gmm_fwd) 1.0e-3) 1.0e-3))
+      "Not impossibly good"
+      (not_ (eq gmm_fd gmm_fwd)))))

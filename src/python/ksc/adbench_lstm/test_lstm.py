@@ -7,8 +7,6 @@ import ksc.adbench_lstm.lstm as k
 import random
 import numpy as np
 
-d = a.vec_Float
-
 
 def r():
     return random.random() * 2 - 1
@@ -60,19 +58,7 @@ def assert_equal_model():
     weight = concat([w1, w2, w3, w4])
     bias = concat([b1, b2, b3, b4])
 
-    (ao0, ao1) = a.lstm_model(
-        d(w1),
-        d(b1),
-        d(w2),
-        d(b2),
-        d(w3),
-        d(b3),
-        d(w4),
-        d(b4),
-        d(hidden),
-        d(cell),
-        d(input_),
-    )
+    (ao0, ao1) = a.lstm_model(w1, b1, w2, b2, w3, b3, w4, b4, hidden, cell, input_,)
 
     ao0l = to_list(ao0)
     ao1l = to_list(ao1)
@@ -140,17 +126,10 @@ def assert_equal_predict_and_objective():
     tp0l = tp0.tolist()
     tp1l = tp1.tolist()
 
-    wf_etc = [
-        tuple(d(i) for i in tu)
-        for tu in zip(w1, b1, w2, b2, w3, b3, w4, b4, hidden, cell)
-    ]
+    wf_etc = [tuple(tu) for tu in zip(w1, b1, w2, b2, w3, b3, w4, b4, hidden, cell)]
 
     (v, vtvv) = a.lstm_predict(
-        a.vec_tuple_vec10(wf_etc),
-        d(input_weight),
-        d(output_weight),
-        d(output_bias),
-        d(input_),
+        wf_etc, input_weight, output_weight, output_bias, input_,
     )
 
     vl = to_list(v)
@@ -162,11 +141,7 @@ def assert_equal_predict_and_objective():
     print(tol)
 
     aol = a.lstm_objective(
-        a.vec_tuple_vec10(wf_etc),
-        d(input_weight),
-        d(output_weight),
-        d(output_bias),
-        a.vec_tuple_vec2([(d(input_), d(input_))]),
+        wf_etc, input_weight, output_weight, output_bias, [(input_, input_)],
     )
 
     print(tp0l)

@@ -1,0 +1,28 @@
+target:
+  service: amlk8s
+  name: itplabrr1cl1
+  vc: resrchvc
+
+environment:
+  image: knossos.azurecr.io/rlo_linux_base:$DOCKER_TAG
+  registry: knossos.azurecr.io
+  #username: knossos # If using repo access key (az acr credential show) after PIM elevation
+  # Username below is appropriate for use with a temporary token (az acr login --expose-token)
+  username: 00000000-0000-0000-0000-000000000000
+
+code:
+  local_dir: src
+
+jobs:
+  - name: "test_blas_job"
+    sku: G4
+    command:
+    - python train_over_expressions.py blas
+      --output_dir $$PT_OUTPUT_DIR
+      --force_gpu
+      --num_repetitions=4
+      --num_parallel=4
+      --run_id blas1 --save_all_models
+       # The last is (only) required to resume following pre-emption
+    submit_args:
+      max_attempts: 1

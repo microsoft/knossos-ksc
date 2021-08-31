@@ -1,35 +1,38 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Ksc.Pipeline where
 
-import Annotate (annotDecls, lintDefs)
-import AD (gradDef, applyDef)
-import qualified Cgen
-import CSE (cseDefs)
-import KMonad (KM, KMT, runKM,  banner)
+import Ksc.Annotate (annotDecls, lintDefs)
+import Ksc.AD (gradDef, applyDef)
+import qualified Ksc.Cgen
+import Ksc.CSE (cseDefs)
+import Ksc.KMonad (KM, KMT, runKM,  banner)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
+import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
-import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
+import qualified Ksc.Lang as L
+import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
+import qualified Ksc.Prune
 import qualified Ksc.Futhark
-import Parse (parseF)
-import Rules (mkRuleBase)
-import Opt (optDefs)
-import Shapes (shapeDefs)
+import Ksc.Parse (parseF)
+import Ksc.Rules (mkRuleBase)
+import Ksc.Opt (optDefs)
+import Ksc.Shapes (shapeDefs)
 import Ksc.SUF (sufDef)
 import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
 import Data.Maybe (maybeToList)
 import Data.List (intercalate)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import GHC.Stack (HasCallStack)
 
 -------------------------------------
@@ -42,32 +45,34 @@ import GHC.Stack (HasCallStack)
 demoF :: [String] -> IO ()
 demoF files = do
   decls <- fmap concat (mapM parseF files)
-  _ <- pipelineIO (Just 999) decls
+  _ <- pipelineIO Nothing (Just 999) decls
   pure ()
 
 -------------------------------------
 -- Main compiler driver
 -------------------------------------
 
-displayCppGen :: Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGen verbosity ksFiles ksofile cppfile =
+displayCppGen :: Roots -> Maybe Int -> [String] -> [String] -> String -> String -> IO (String, String)
+displayCppGen roots verbosity cppincludefiles ksFiles ksofile cppfile =
   do {
   ; decls0 <- fmap concat (mapM parseF ksFiles)
   ; putStrLn "ksc: read decls"
-  ; defs <- pipelineIO verbosity decls0
-  ; Cgen.cppGenWithFiles ksofile cppfile defs
+  ; defs <- pipelineIO roots verbosity decls0
+  ; Ksc.Cgen.cppGenWithFiles ksofile cppfile cppincludefiles defs
   }
 
 displayCppGenAndCompile
   :: HasCallStack
-  => (String -> String -> IO a)
+  => Roots
+  -> (String -> String -> IO a)
   -> String
   -> Maybe Int
+  -> [String]
   -> [String]
   -> String
   -> IO (a, (String, String))
 displayCppGenAndCompile
-  compile ext verbosity files file = do {
+  roots compile ext verbosity cppincludefiles files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -75,43 +80,47 @@ displayCppGenAndCompile
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; outputFileContents <- displayCppGen verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; outputFileContents <- displayCppGen roots verbosity cppincludefiles (ksFiles ++ [ksFile]) ksofile cppfile
   ; compilerResult <- compiler cppfile exefile
   ; pure (compilerResult, outputFileContents)
   }
 
+type Roots = Maybe [L.UserFun L.Typed]
+
 displayCppGenCompileAndRun :: HasCallStack
-                           => String
+                           => Roots
+                           -> String
                            -> Maybe Int
+                           -> [String]
                            -> [String]
                            -> String
                            -> IO (String, (String, String))
-displayCppGenCompileAndRun compilername verbosity file files = do
+displayCppGenCompileAndRun roots compilername verbosity cppincludefiles files file = do
   { (exefile, cpp_kso) <- displayCppGenAndCompile
-                          (Cgen.compile compilername) ".exe" verbosity file files
-  ; output <- Cgen.runExe exefile
+                          roots (Ksc.Cgen.compile compilername) ".exe" verbosity cppincludefiles files file
+  ; output <- Ksc.Cgen.runExe exefile
   ; pure (output, cpp_kso)
   }
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
-  { (output, _) <- displayCppGenCompileAndRun compilername verbosity files file
+displayCppGenCompileAndRunWithOutput :: HasCallStack => Roots -> String -> Maybe Int -> [String] -> [String] -> String -> IO ()
+displayCppGenCompileAndRunWithOutput roots compilername verbosity cppincludefiles files file = do
+  { (output, _) <- displayCppGenCompileAndRun roots compilername verbosity cppincludefiles files file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doall :: HasCallStack => Maybe Int -> [String] -> String -> IO ()
-doall = displayCppGenCompileAndRunWithOutput "g++-7"
+doall :: HasCallStack => Maybe Int -> [String] -> [String] -> String -> IO ()
+doall = displayCppGenCompileAndRunWithOutput Nothing "g++-7"
 
 -------------------------------------
 -- Main compiler pipeline
 -------------------------------------
 
-pipelineIO :: Maybe Int -> [Decl] -> IO [TDef]
-pipelineIO v d = runKM (pipeline v d)
+pipelineIO :: Roots -> Maybe Int -> [Decl] -> IO [TDef]
+pipelineIO mroots v d = runKM (pipeline mroots v d)
 
-pipeline :: Maybe Int -> [Decl] -> KM [TDef]
-pipeline verbosity decls = do
+pipeline :: Roots -> Maybe Int -> [Decl] -> KM [TDef]
+pipeline mroots verbosity decls = do
   { (env, concat->decls) <- mapAccumLM annotAndDeriveDecl emptyGblST decls
   ; displayPassMNoLint verbosity "generated decls" decls
   ; let (rules, defs) = partitionDecls decls
@@ -121,6 +130,9 @@ pipeline verbosity decls = do
   ; displayPassM verbosity "opt decls" env defs
   ; (_env, defs) <- cseDefs rulebase env defs
   ; displayPassM verbosity "CSE decls" env defs
+  ; defs <- pure $ case mroots of
+      Nothing -> defs
+      Just roots -> Ksc.Prune.prune defs (Set.fromList roots)
   ; pure defs
   }
 
@@ -179,8 +191,8 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
               Just tdef' -> tdef'
 
     ; case derivation of
-        L.DerivationDrvFun (L.AD plan dir) -> do
-          { let mgradDef = gradDef plan tdef
+        L.DerivationDrvFun dir -> do
+          { let mgradDef = gradDef tdef
           ; let env' = maybe env (flip stInsertFun env) mgradDef
           ; graddedDef <- case mgradDef of
               Nothing -> do
@@ -259,7 +271,7 @@ futharkPipeline :: [FilePath] -> IO [TDef]
 futharkPipeline files
   = do
   { decls0 <- fmap concat (mapM (parseF . (++ ".ks")) files)
-  ; pipelineIO Nothing decls0
+  ; pipelineIO Nothing Nothing decls0
   }
 
 -- | Read source code from specified input file, optimise,
@@ -278,7 +290,7 @@ genFuthark files file = do
   prelude <- readFile "src/runtime/knossos.fut"
   defs <- futharkPipeline (files ++ [file])
   putStrLn $ "ksc: Writing to " ++ futfile
-  Cgen.createDirectoryWriteFile futfile $
+  Ksc.Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
     prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
   where futfile = "obj/" ++ file ++ ".fut"

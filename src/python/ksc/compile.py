@@ -1,17 +1,57 @@
+from dataclasses import dataclass
+from typing import List
+
 import atexit
 import os
 import subprocess
 import sysconfig
 import sys
+
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
 
 from torch.utils import cpp_extension
 
 from ksc import cgen, utils
+from ksc.cgen import VecSpec, VecSpec_None, VecSpec_Elementwise, VecSpec_VMap
 from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
+
+
+@dataclass(frozen=True)
+class CFlags:
+    cl_flags: List[str]
+    gcc_flags: List[str]
+
+    def __add__(self, other):
+        return CFlags(
+            cl_flags=self.cl_flags + other.cl_flags,
+            gcc_flags=self.gcc_flags + other.gcc_flags,
+        )
+
+    @staticmethod
+    def All(cflags):
+        return CFlags(cl_flags=cflags, gcc_flags=cflags)
+
+    @staticmethod
+    def Empty():
+        return CFlags.All([])
+
+    @staticmethod
+    def GCCOnly(gcc_flags):
+        return CFlags(cl_flags=[], gcc_flags=gcc_flags)
+
+
+default_cflags = CFlags(
+    cl_flags=["/std:c++17", "/O2"],
+    gcc_flags=[
+        "-std=c++17",
+        "-g",
+        "-O3",
+        # "-DKS_BOUNDS_CHECK",
+    ],
+)
 
 
 def subprocess_run(cmd, env=None):
@@ -20,7 +60,7 @@ def subprocess_run(cmd, env=None):
     )
 
 
-def generate_cpp_from_ks(ks_str, use_aten=False):
+def generate_cpp_from_ks(ks_str, ks_entry_points, preludes, prelude_headers):
     ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -34,19 +74,24 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
     ksc_command = [
         ksc_path,
         "--generate-cpp",
-        "--ks-source-file",
-        ksc_runtime_dir + "/prelude.ks",
         *(
-            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
-            if use_aten
-            else ()
+            opt
+            for prelude in preludes
+            for opt in ("--ks-source-file", f"{ksc_runtime_dir}/{prelude}")
         ),
         "--ks-source-file",
         fks.name,
         "--ks-output-file",
         fkso.name,
+        *(opt for header in prelude_headers for opt in ("--cpp-include", header)),
         "--cpp-output-file",
         fcpp.name,
+        "--remove-unused",
+        *(
+            opt
+            for entry_point in ks_entry_points
+            for opt in ("--used", str(entry_point))
+        ),
     ]
 
     try:
@@ -55,12 +100,22 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
         print(e.stderr.decode("ascii"))
         decls = list(parse_ks_filename(fkso.name))
     except subprocess.CalledProcessError as e:
-        print(f"Command failed:\n{' '.join(ksc_command)}")
-        print(f"files {fks.name} {fkso.name} {fcpp.name}")
+        ksc_command_str = " ".join(ksc_command)
+        print(f"Command failed:\n{ksc_command_str}")
+        print(f"KSC files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
+        print("KSC output:\n")
         print(e.output.decode("ascii"))
-        print(e.stderr.decode("ascii"))
-        raise
+        ksc_stderr = e.stderr.decode("ascii")
+        ksc_stderr_filtered = "> " + "\n> ".join(ksc_stderr.split("\n")[:-1])
+        print(ksc_stderr_filtered + "\n")
+        raise Exception(
+            f"Command failed:\n"
+            f"{ksc_command_str}\n"
+            f"KSC output:\n"
+            f"{ksc_stderr_filtered}\n"
+            f"See additional information in stdout"
+        ) from e
 
     # Read from CPP back to string
     with open(fcpp.name) as f:
@@ -84,7 +139,7 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
     return generated_cpp, decls
 
 
-def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
+def build_py_module_from_cpp(cpp_str, profiling=False):
     """
     Build python module, independently of pytorch, non-ninja
     """
@@ -117,7 +172,6 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
             " -fPIC"
             + (" -g -pg -O3" if profiling else "")
             + " -shared"
-            + (" -DKS_INCLUDE_ATEN" if use_aten else "")
             + f" -DPYTHON_MODULE_NAME={module_name}"
             f" -o {module_path} " + fcpp.name
         )
@@ -148,8 +202,20 @@ derivatives_to_generate_default = ["fwd", "rev"]
 
 
 def generate_cpp_for_py_module_from_ks(
-    ks_str, bindings_to_generate, python_module_name, use_aten=True,
+    ks_str,
+    bindings_to_generate,
+    python_module_name,
+    vectorization: VecSpec = VecSpec_None(),
+    use_aten=True,
+    use_torch=False,
+    gpu=False,
 ):
+    """Returns two strings of C++ code:
+       The first string contains definitions of all ksc-generated functions and entry points.
+       The second string defines a pybind module which uses the entry points.
+       These can either be compiled separately or concatenated into a single source file.
+       """
+
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
             raise ValueError(
@@ -162,13 +228,29 @@ def generate_cpp_for_py_module_from_ks(
         for (python_name, _) in bindings_to_generate
     ]
 
-    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-    cpp_entry_points = cgen.generate_cpp_entry_points(bindings_to_generate, decls)
+    preludes = ["prelude.ks"] + (["prelude-aten.ks"] if use_aten else [])
+    prelude_headers = ["prelude.h"] + (["prelude-aten.h"] if use_aten else [])
+    cpp_ks_functions, decls = generate_cpp_from_ks(
+        ks_str, [sn for _, sn in bindings_to_generate], preludes, prelude_headers
+    )
+    (
+        cpp_entry_point_declarations,
+        cpp_entry_point_definitions,
+    ) = cgen.generate_cpp_entry_points(
+        bindings_to_generate,
+        decls,
+        vectorization=vectorization,
+        use_torch=use_torch,
+        gpu=gpu,
+    )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
     )
 
-    return cpp_ks_functions + cpp_entry_points + cpp_pybind_module_declaration
+    return (
+        cpp_ks_functions + cpp_entry_point_definitions,
+        cpp_entry_point_declarations + cpp_pybind_module_declaration,
+    )
 
 
 def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
@@ -179,8 +261,18 @@ def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_n
 
     return (
         """
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
-#include "knossos-pybind.h"
+namespace ks {
+namespace entry_points {
+
+void reset_allocator();
+size_t allocator_top();
+size_t allocator_peak();
+
+}
+}
 
 PYBIND11_MODULE("""
         + python_module_name
@@ -188,27 +280,32 @@ PYBIND11_MODULE("""
     m.def("reset_allocator", &ks::entry_points::reset_allocator);
     m.def("allocator_top", &ks::entry_points::allocator_top);
     m.def("allocator_peak", &ks::entry_points::allocator_peak);
-    m.def("logging", &ks::entry_points::logging);
-
-    declare_tensor_1<ks::Float>(m, "Tensor_1_Float");
-    declare_tensor_2<ks::Float>(m, "Tensor_2_Float");
-    declare_tensor_2<ks::Integer>(m, "Tensor_2_Integer");
-
 """
         + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """
 }
-
-#include "knossos-entry-points.cpp"
 """
     )
 
 
-def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
+def build_py_module_from_ks(
+    ks_str,
+    bindings_to_generate,
+    vectorization: VecSpec = VecSpec_None(),
+    use_aten=False,
+    use_torch=False,
+):
 
-    cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, "PYTHON_MODULE_NAME", use_aten
+    cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
+        ks_str,
+        bindings_to_generate,
+        "PYTHON_MODULE_NAME",
+        vectorization=vectorization,
+        use_aten=use_aten,
+        use_torch=use_torch,
     )
+
+    cpp_str = cpp_definitions + cpp_pybind
 
     cpp_fname = (
         gettempdir() + "/ksc-pybind.cpp"
@@ -217,12 +314,18 @@ def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
     with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
 
-    module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
+    module_name, module_path = build_py_module_from_cpp(cpp_str)
     return utils.import_module_from_path(module_name, module_path)
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
+    ks_str,
+    bindings_to_generate,
+    torch_extension_name,
+    vectorization: VecSpec = VecSpec_None(),
+    use_aten=False,
+    extra_cflags=[],
+    gpu=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -236,34 +339,43 @@ def build_module_using_pytorch_from_ks(
       str is the Python name given to that function when exposed.
       Each StructuredName must have a type attached
     """
-    cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, torch_extension_name, use_aten
+    cpp_definitions, cpp_pybind = generate_cpp_for_py_module_from_ks(
+        ks_str,
+        bindings_to_generate,
+        "TORCH_EXTENSION_NAME",
+        vectorization=vectorization,
+        use_aten=use_aten,
+        use_torch=True,
+        gpu=gpu,
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str, torch_extension_name, use_aten
+        [
+            ("ksc-main.cu" if gpu else "ks-main.cpp", cpp_definitions),
+            ("ksc-pybind.cpp", cpp_pybind),
+        ],
+        torch_extension_name,
+        extra_cflags,
     )
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, torch_extension_name, use_aten
+    cpp_str, bindings_to_generate, torch_extension_name, extra_cflags=[]
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
-        bindings_to_generate, torch_extension_name
+        bindings_to_generate, "TORCH_EXTENSION_NAME"
     )
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str + cpp_pybind, torch_extension_name, use_aten
+        [("ksc.cpp", cpp_str + cpp_pybind + '#include "knossos-entry-points.cpp"\n')],
+        torch_extension_name,
+        extra_cflags,
     )
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_str, torch_extension_name, use_aten
+    cpp_strs, torch_extension_name, extra_cflags
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
-
-    extra_cflags = [
-        "-DKS_INCLUDE_ATEN" if use_aten else "",
-    ]
 
     # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
     # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
@@ -272,14 +384,9 @@ def build_module_using_pytorch_from_cpp_backend(
 
     cpp_compiler = os.environ.get("CXX")
     if cpp_compiler == None and sys.platform == "win32":
-        extra_cflags += ["/std:c++17", "/O2"]
+        extra_cflags = extra_cflags.cl_flags
     else:
-        extra_cflags += [
-            "-std=c++17",
-            "-g",
-            "-O3",
-            # "-DKS_BOUNDS_CHECK",
-        ]
+        extra_cflags = extra_cflags.gcc_flags
 
     verbose = True
 
@@ -289,17 +396,20 @@ def build_module_using_pytorch_from_cpp_backend(
     )
     os.makedirs(build_directory, exist_ok=True)
 
-    cpp_str = "#include <torch/extension.h>\n" + cpp_str
+    def source_path(filename):
+        return os.path.join(build_directory, filename)
 
-    cpp_source_path = os.path.join(build_directory, "ksc-main.cpp")
-
-    utils.write_file_if_different(cpp_str, cpp_source_path, verbose)
+    for filename, cpp_str in cpp_strs:
+        utils.write_file_if_different(
+            "#include <torch/extension.h>\n" + cpp_str, source_path(filename), verbose
+        )
 
     module = cpp_extension.load(
         name=torch_extension_name,
-        sources=[cpp_source_path],
+        sources=[source_path(filename) for filename, _ in cpp_strs],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=extra_cflags,
+        extra_cuda_cflags=extra_cflags + ["-DKS_CUDA"],
         build_directory=build_directory,
         verbose=verbose,
     )

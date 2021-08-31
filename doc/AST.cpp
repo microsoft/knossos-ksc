@@ -14,7 +14,7 @@ struct Type {
     Integer,   // TODO: Bit depths. See #358
     Float,
     Tuple,
-    Vector,
+    Tensor,
     Lambda,
     LinearMap  // Opaque type of "any" linear map
   };
@@ -55,7 +55,7 @@ struct Binding : public Expr {
 
 // Let, ex: (let (x 10) (add x 10))
 struct Let : public Expr {
-  std::vector<Binding::Ptr> vars;
+  Binding::Ptr binding;
   Expr::Ptr expr;
 };
 
@@ -63,6 +63,7 @@ struct Let : public Expr {
 struct Declaration : public Expr {
   Name name;
   Type argType;
+  Type returnType;
 };
 
 /// Call

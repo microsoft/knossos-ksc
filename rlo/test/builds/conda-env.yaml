@@ -1,0 +1,46 @@
+channels:
+    - defaults
+dependencies:
+    - python=3.8
+    - ffmpeg
+    - tensorflow-gpu=2.2
+    - unzip
+    - ruamel.yaml # Needed for AzureML context_injector
+    - pip
+    - pip:
+        # skip-if-cpu tells print_requirements.py to ignore some lines. We need to keep the package name
+        # in the same place as the --find-links URL so we put skip-if-cpu on several lines that do not 
+        # look GPU/CPU-specific in isolation.
+        - --find-links https://pytorch-geometric.com/whl/torch-1.8.0+cu101.html  # skip-if-cpu
+        - azureml-defaults
+        - azure-cosmos==4.2.0
+        - ray==0.8.7
+        - pytest==6.2.3
+        - numpy>=1.17
+        - sexpdata
+        - matplotlib==3.3.4
+        - pandas
+        - scikit-learn==0.24.1
+        - prettyprinter
+        - sortedcontainers==2.2.2
+        - tabulate
+        - tqdm
+        - graphviz
+        - GPUtil==1.4.0
+        - tensorflow-addons==0.10.0
+        - psutil
+        - Pillow
+        - azure-storage-blob==2.1.0
+        - editdistance==0.5.3
+        # Install torch with pip rather than conda because conda install requires
+        # cudatoolkit, and conda gives package conflict error when you try to install
+        # cudatoolkit and tensorflow together.
+        - torch==1.8.0 # skip-if-cpu
+        - torchvision==0.9.0 # skip-if-cpu
+        - torchaudio==0.8.0 # skip-if-cpu
+        - torch-scatter # skip-if-cpu
+        - torch-sparse  # skip-if-cpu
+        - torch-cluster # skip-if-cpu
+        - torch-spline-conv # skip-if-cpu
+        - torch-geometric # skip-if-cpu
+

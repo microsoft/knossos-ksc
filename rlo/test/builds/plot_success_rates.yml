@@ -1,0 +1,38 @@
+trigger:
+- master
+pr: none
+
+resources:
+  repositories:
+  - repository: microsoft/knossos-ksc
+    type: github
+    endpoint: Knossos
+    name: microsoft/knossos-ksc
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: self
+    path: s
+
+  - template: checkout_submodule.yml
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8'
+      architecture: 'x64'
+  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+    displayName: 'Install dependencies'
+  - task: AzureCLI@1
+    displayName: 'Azure CLI plot_success.py'
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptLocation: inlineScript
+      inlineScript: >
+        python src/plot_success.py > success_rates.html
+  - task: PublishPipelineArtifact@0
+    displayName: 'Publish success rate plots'
+    inputs:
+      artifactName: 'Success rate plots'
+      targetPath: success_rates.html

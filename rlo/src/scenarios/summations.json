@@ -1,0 +1,17 @@
+{
+  "train_exprs": "summations(n=50,min_terms=3,max_terms=10,choose_from=100)",
+  "test_exprs": "summations(n=100,min_terms=3,max_terms=10)",
+  "rules": "simplify_rules",
+  "train_search": "hybrid",
+  "max_gnn_train": 3000,
+  "eval_search": "hybrid",
+  "max_gnn_eval": 1000,
+  "max_epochs": 50,
+  "patience_epochs": 10,
+  "total_train_time": 7200,
+  "simulation_depth_train": 20,
+  "simulation_depth_eval": 20,
+  "oracle": false,
+  "extra_plots": ["summations_fit_animated"],
+  "sparse_gnn": true
+}

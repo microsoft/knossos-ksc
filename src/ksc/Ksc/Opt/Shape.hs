@@ -1,7 +1,10 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 module Ksc.Opt.Shape where
 
-import Lang
-import Prim
+import Ksc.Lang
+import Ksc.Prim
 
 -- See Note [Compressed shape types]
 

@@ -1,3 +1,6 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 {-# OPTIONS_GHC -Wname-shadowing #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
@@ -7,9 +10,9 @@
 
 module Ksc.SUF where
 
-import           Lang hiding ((<>))
-import           LangUtils (notInScopeTV)
-import           Prim
+import           Ksc.Lang hiding ((<>))
+import           Ksc.LangUtils (notInScopeTV)
+import           Ksc.Prim
 
 import qualified Data.Foldable as F
 import qualified Data.Set as S

@@ -1,0 +1,14 @@
+{
+  "graph_state_keep_prob": 0.5,
+  "hidden_dim": 200,
+  "max_depth": 12,
+  "merge_datasets": true,
+  "num_timesteps": 10,
+  "output_hidden_dim": 200,
+  "output_keep_prob": 0.5,
+  "patience_epochs": 10,
+  "rules": "binding_simplify_rules",
+  "simulation_depth": 11,
+  "use_subtree_match_edges": true,
+  "sparse_gnn": false
+}

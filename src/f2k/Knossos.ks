@@ -10,7 +10,6 @@
 
 (edef maximum Float ((Vec Float)))
 (edef D$maximum (LM (Vec Float) Float) ((Vec Float)))
-(edef Dt$maximum (Tuple Float (LM (Vec Float) Float)) ((Vec Float)))
 (edef fwd$maximum Float (Tuple (Vec Float) (Vec Float)))
 (edef rev$maximum (Vec Float) (Tuple (Vec Float) Float))
 
@@ -18,14 +17,12 @@
 (edef D$lgamma (LM Float Float) (Float))
 (edef fwd$lgamma Float (Tuple Float Float))
 (edef rev$lgamma Float (Tuple Float Float))
-(edef Dt$lgamma (Tuple Float (LM Float Float)) (Float))
 
 (def gammaLn Float (x : Float)
    (lgamma x))
 
 (edef pow@Float Float (Tuple (Float) (Float)))
 (edef D$pow@Float (LM (Tuple Float Float) Float) (Tuple Float Float))
-(edef Dt$pow@Float (Tuple Float (LM (Tuple Float Float) Float)) (Tuple Float Float))
 (edef fwd$pow@Float Float (Tuple (Tuple Float Float) (Tuple Float Float)))
 (edef rev$pow@Float (Tuple Float Float) (Tuple (Tuple Float Float) Float))
 

@@ -1,0 +1,101 @@
+; Hand-munged from running
+; ./build/bin/ksc --generate-cpp --ks-source-file src/runtime/prelude.ks --ks-source-file gelu.ks --ks-output-file obj/test/gelu.kso --cpp-output-file obj/test/gelu.cpp --all-defs
+; Where gelu.ks contained '(def gelu ...)' exactly as below, plus '(gdef rev [gelu Float])'
+; This file was then manually converted from gelu.kso by extracting only the relevant defs and mangling the names.
+
+; This handwritten sequence gets (I believe) to the lowest possible cost, but will definitely not be the shortest route there. (It is 274 steps.)
+; BEST ml_rules rev$gelu user ; [[172, "inline_call"], [9, "delete_let"], [102, "inline_call"], [118, "inline_let"], [133, "inline_let"], [102, "delete_let"], [104, "select_of_tuple"], [109, "select_of_tuple"], [120, "inline_let"], [131, "inline_let"], [107, "delete_let"], [110, "select_of_tuple"], [115, "select_of_tuple"], [120, "inline_call"], [152, "inline_let"], [120, "delete_let"], [122, "select_of_tuple"], [123, "inline_call"], [147, "inline_let"], [170, "inline_let"], [123, "delete_let"], [125, "select_of_tuple"], [125, "inline_call"], [143, "inline_let"], [160, "inline_let"], [125, "delete_let"], [127, "select_of_tuple"], [128, "inline_call"], [140, "inline_let"], [128, "delete_let"], [130, "select_of_tuple"], [139, "select_of_tuple"], [152, "select_of_tuple"], [0, "delete_let"], [25, "delete_let"], [123, "inline_let"], [130, "inline_let"], [114, "delete_let"], [117, "select_of_tuple"], [120, "select_of_tuple"], [127, "inline_call"], [147, "inline_let"], [166, "inline_let"], [127, "delete_let"], [129, "select_of_tuple"], [130, "inline_call"], [142, "inline_let"], [153, "inline_let"], [130, "delete_let"], [132, "select_of_tuple"], [137, "select_of_tuple"], [144, "inline_let"], [151, "inline_let"], [135, "delete_let"], [138, "select_of_tuple"], [141, "select_of_tuple"], [145, "select_of_tuple"], [152, "inline_let"], [159, "inline_let"], [143, "delete_let"], [146, "select_of_tuple"], [149, "select_of_tuple"], [164, "inline_let"], [175, "inline_let"], [152, "delete_let"], [154, "select_of_tuple"], [159, "select_of_tuple"], [166, "inline_let"], [173, "inline_let"], [157, "delete_let"], [160, "select_of_tuple"], [163, "select_of_tuple"], [166, "inline_call"], [0, "delete_let"], [153, "inline_let"], [164, "inline_let"], [141, "delete_let"], [143, "select_of_tuple"], [148, "select_of_tuple"], [155, "inline_let"], [162, "inline_let"], [146, "delete_let"], [149, "select_of_tuple"], [152, "select_of_tuple"], [28, "inline_let"], [19, "delete_let"], [38, "lift_bind"], [67, "inline_let"], [151, "inline_let"], [41, "delete_let"], [53, "select_of_tuple"], [129, "select_of_tuple"], [51, "lift_bind"], [57, "select_of_tuple"], [43, "lift_bind"], [90, "inline_let"], [142, "inline_let"], [77, "delete_let"], [84, "select_of_tuple"], [132, "select_of_tuple"], [55, "inline_let"], [48, "delete_let"], [60, "inline_let"], [53, "delete_let"], [59, "inline_let"], [46, "delete_let"], [73, "lift_bind"], [75, "select_of_tuple"], [76, "inline_let"], [72, "delete_let"], [98, "lift_bind"], [104, "select_of_tuple"], [84, "lift_bind"], [115, "inline_let"], [124, "inline_let"], [87, "delete_let"], [105, "select_of_tuple"], [108, "select_of_tuple"], [70, "lift_bind"], [85, "inline_let"], [108, "inline_let"], [73, "delete_let"], [75, "select_of_tuple"], [92, "select_of_tuple"], [44, "lift_bind"], [59, "select_of_tuple"], [93, "new_bind"], [90, "new_bind"], [90, "lift_bind"], [96, "lift_bind"], [89, "cse_bind"], [89, "lift_bind"], [85, "lift_bind"], [83, "lift_bind"], [60, "inline_let"], [43, "delete_let"], [83, "inline_let"], [75, "delete_let"], [72, "inline_let"], [64, "delete_let"], [67, "commute_mul"], [66, "assoc_mul_mul"], [67, "new_bind"], [67, "lift_bind"], [66, "lift_bind"], [64, "lift_bind"], [59, "lift_bind"], [41, "lift_bind"], [36, "lift_bind"], [31, "lift_bind"], [26, "lift_bind"], [19, "lift_bind"], [9, "cse_bind"], [75, "inline_let"], [31, "delete_let"], [65, "assoc_mul_mul"], [47, "commute_mul"], [45, "commute_mul"], [45, "assoc_mul_mul"], [46, "new_bind"], [69, "new_bind"], [46, "lift_bind"], [45, "lift_bind"], [44, "lift_bind"], [39, "lift_bind"], [38, "lift_bind"], [69, "lift_bind"], [68, "lift_bind"], [67, "lift_bind"], [62, "lift_bind"], [57, "lift_bind"], [43, "commute_mul"], [36, "cse_bind"], [40, "inline_let"], [31, "delete_let"], [30, "inline_let"], [19, "delete_let"], [27, "inline_let"], [14, "delete_let"], [16, "mul_by_add"], [17, "commute_mul"], [24, "commute_mul"], [22, "commute_mul"], [20, "commute_mul"], [21, "commute_mul"], [20, "assoc_mul_mul"], [21, "cprop_mul"], [20, "commute_mul"], [20, "assoc_mul_mul"], [20, "commute_mul"], [16, "add_of_muls"], [72, "inline_let"], [71, "inline_let"], [51, "delete_let"], [65, "add_of_muls"], [62, "commute_mul"], [61, "add_of_muls"], [67, "inline_let"], [66, "inline_let"], [64, "inline_let"], [46, "delete_let"], [62, "add_of_muls"], [58, "add_of_muls"], [33, "lift_bind"], [38, "new_bind"], [38, "lift_bind"], [32, "lift_bind"], [37, "lift_bind"], [58, "inline_let"], [64, "inline_let"], [44, "delete_let"], [59, "commute_mul"], [58, "assoc_mul_mul"], [56, "commute_mul"], [56, "assoc_mul_mul"], [56, "commute_mul"], [52, "add_of_muls"], [38, "commute_mul"], [37, "assoc_div_mul"], [37, "commute_mul"], [53, "inline_let"], [35, "delete_let"], [44, "commute_mul"], [43, "assoc_mul_mul"], [43, "commute_mul"], [35, "add_of_muls"], [36, "inline_let"], [23, "delete_let"], [49, "mul_by_add"], [50, "cprop_mul"], [51, "mul_by_add"], [55, "cprop_mul"], [52, "cprop_mul"], [48, "commute_mul"], [48, "mul_by_add"], [52, "mul_by_add"], [56, "new_bind"], [53, "new_bind"], [53, "lift_bind"], [59, "lift_bind"], [52, "cse_bind"], [49, "new_bind"], [49, "lift_bind"], [55, "lift_bind"], [48, "cse_bind"], [48, "lift_bind"], [46, "lift_bind"], [40, "lift_bind"], [34, "lift_bind"], [28, "lift_bind"], [23, "lift_bind"], [25, "new_bind"], [25, "lift_bind"], [23, "lift_bind"], [21, "lift_bind"], [14, "cse_bind"], [17, "inline_let"], [9, "delete_let"], [48, "commute_add"], [46, "commute_add"], [47, "commute_add"], [46, "assoc_add_add"], [47, "new_bind"], [47, "lift_bind"], [46, "lift_bind"], [40, "lift_bind"], [34, "lift_bind"], [28, "lift_bind"], [20, "new_bind"], [20, "lift_bind"], [18, "lift_bind"], [26, "lift_bind"], [23, "commute_add"], [16, "cse_bind"]]
+; BEST ml_rules gelu rlo 2021-05-28-14-32-17_gelu_bind ; [[12, "mul_by_add"], [12, "new_bind"], [4, "commute_mul"], [17, "commute_mul"], [18, "commute_mul"], [0, "let_recover"], [23, "commute_mul"], [15, "assoc_mul_mul"], [16, "assoc_mul_mul"], [15, "assoc_mul_mul"], [5, "new_bind"], [5, "lift_bind"], [26, "commute_mul"], [23, "commute_add"], [16, "assoc_mul_mul"], [17, "new_bind"], [16, "commute_mul"], [13, "commute_mul"], [29, "commute_mul"], [26, "commute_add"], [29, "new_bind"], [14, "assoc_mul_mul"], [3, "lift_bind"], [29, "let_recover"], [12, "assoc_mul_mul"], [18, "let_recover"], [23, "commute_add"], [14, "commute_mul"], [14, "commute_mul"], [26, "new_bind"], [22, "commute_mul"], [23, "let_recover"], [18, "commute_mul"], [22, "commute_mul"], [18, "commute_mul"], [14, "commute_mul"], [14, "commute_mul"], [6, "lift_bind"], [11, "commute_mul"], [11, "commute_mul"], [26, "new_bind"], [26, "let_recover"], [11, "assoc_mul_mul"], [16, "commute_mul"], [12, "new_bind"], [19, "commute_mul"], [19, "new_bind"], [19, "let_recover"], [25, "commute_mul"], [14, "commute_mul"], [12, "let_recover"], [12, "commute_mul"], [26, "commute_add"], [12, "new_bind"], [19, "commute_mul"], [11, "new_bind"], [16, "cprop_mul"], [20, "commute_mul"], [11, "let_recover"], [27, "new_bind"], [32, "inline_let"], [12, "let_recover"], [4, "lift_bind"], [12, "commute_mul"], [20, "assoc_mul_mul"], [20, "assoc_mul_mul"], [20, "assoc_mul_mul"], [21, "commute_mul"], [21, "commute_mul"], [9, "commute_mul"], [4, "commute_add"], [4, "commute_add"], [9, "commute_mul"], [5, "new_bind"], [11, "new_bind"], [13, "assoc_mul_mul"], [4, "commute_add"], [10, "new_bind"], [29, "assoc_mul_mul"], [18, "let_recover"], [12, "commute_mul"], [5, "let_recover"], [24, "commute_mul"], [8, "let_recover"], [5, "assoc_mul_mul"], [24, "lift_bind"], [29, "new_bind"], [4, "commute_add"], [25, "assoc_mul_mul"], [8, "assoc_mul_mul"], [25, "assoc_mul_mul"], [25, "assoc_mul_mul"], [25, "assoc_mul_mul"], [5, "commute_mul"], [9, "new_bind"], [8, "commute_mul"], [4, "add_of_muls"], [21, "delete_let"]]
+; BEST ml_rules gelu rlo 2021-05-28-14-32-17_gelu_bind ; [[0, "let_recover"]]
+; BEST ml_rules rev$add rlo 2021-05-28-14-32-17_gelu_bind ; [[16, "inline_let"], [9, "delete_let"], [10, "inline_let"], [4, "delete_let"], [0, "let_recover"]]
+; BEST ml_rules rev$add rlo 2021-05-28-14-32-17_gelu_bind ; [[0, "let_recover"], [7, "delete_let"], [8, "inline_let"], [11, "inline_let"], [2, "delete_let"]]
+; BEST ml_rules rev$mul rlo 2021-05-28-14-32-17_gelu_bind ; [[22, "new_bind"], [20, "new_bind"], [20, "lift_bind"], [28, "inline_let"], [0, "let_recover"], [15, "inline_let"], [23, "inline_let"], [28, "inline_let"], [31, "new_bind"], [2, "delete_let"], [13, "delete_let"], [21, "let_recover"], [22, "new_bind"], [29, "inline_let"], [7, "delete_let"], [21, "new_bind"], [13, "let_recover"], [8, "commute_mul"], [23, "inline_let"], [18, "delete_let"]]
+; BEST ml_rules rev$mul rlo 2021-05-28-14-32-17_gelu_bind ; [[23, "inline_let"], [0, "let_recover"], [21, "new_bind"], [18, "commute_mul"], [7, "lift_bind"], [16, "inline_let"], [22, "let_recover"], [26, "inline_let"], [26, "new_bind"], [14, "inline_let"], [23, "new_bind"], [31, "let_recover"], [7, "delete_let"], [25, "inline_let"], [30, "new_bind"], [8, "commute_mul"], [17, "commute_mul"], [18, "let_recover"], [21, "delete_let"], [17, "commute_mul"], [2, "delete_let"]]
+; BEST ml_rules rev$tanh rlo 2021-05-28-14-32-17_gelu_bind ; [[21, "commute_mul"], [0, "let_recover"], [18, "inline_let"], [2, "delete_let"], [11, "inline_let"], [7, "lift_bind"], [9, "delete_let"]]
+
+; I do not even assert the following is optimal; it's just the downhill-only application of certain rules, plus inlining of tuples whose elements are each selected at most once:
+; BEST ml_rules_no_bind rev$gelu expert handcrafted ; [[172, "inline_call"], [9, "delete_let"], [102, "inline_call"], [118, "inline_let"], [133, "inline_let"], [102, "delete_let"], [104, "select_of_tuple"], [109, "select_of_tuple"], [120, "inline_let"], [131, "inline_let"], [107, "delete_let"], [110, "select_of_tuple"], [115, "select_of_tuple"], [120, "inline_call"], [152, "inline_let"], [120, "delete_let"], [122, "select_of_tuple"], [123, "inline_call"], [147, "inline_let"], [170, "inline_let"], [123, "delete_let"], [125, "select_of_tuple"], [125, "inline_call"], [143, "inline_let"], [160, "inline_let"], [125, "delete_let"], [127, "select_of_tuple"], [128, "inline_call"], [140, "inline_let"], [128, "delete_let"], [130, "select_of_tuple"], [139, "select_of_tuple"], [152, "select_of_tuple"], [0, "delete_let"], [25, "delete_let"], [123, "inline_let"], [130, "inline_let"], [114, "delete_let"], [117, "select_of_tuple"], [120, "select_of_tuple"], [127, "inline_call"], [147, "inline_let"], [166, "inline_let"], [127, "delete_let"], [129, "select_of_tuple"], [130, "inline_call"], [142, "inline_let"], [153, "inline_let"], [130, "delete_let"], [132, "select_of_tuple"], [137, "select_of_tuple"], [144, "inline_let"], [151, "inline_let"], [135, "delete_let"], [138, "select_of_tuple"], [141, "select_of_tuple"], [145, "select_of_tuple"], [152, "inline_let"], [159, "inline_let"], [143, "delete_let"], [146, "select_of_tuple"], [149, "select_of_tuple"], [164, "inline_let"], [175, "inline_let"], [152, "delete_let"], [154, "select_of_tuple"], [159, "select_of_tuple"], [166, "inline_let"], [173, "inline_let"], [157, "delete_let"], [160, "select_of_tuple"], [163, "select_of_tuple"], [166, "inline_call"], [0, "delete_let"], [153, "inline_let"], [164, "inline_let"], [141, "delete_let"], [143, "select_of_tuple"], [148, "select_of_tuple"], [155, "inline_let"], [162, "inline_let"], [146, "delete_let"], [149, "select_of_tuple"], [152, "select_of_tuple"], [28, "inline_let"], [19, "delete_let"]]
+; BEST ml_rules_no_bind gelu rlo 2021-05-28-14-29-54_gelu ; [[16, "commute_mul"], [4, "commute_mul"], [9, "mul_by_add"], [5, "commute_add"], [22, "commute_mul"], [14, "commute_mul"], [22, "commute_mul"], [16, "commute_mul"], [8, "add_of_muls"], [10, "commute_add"], [13, "assoc_mul_mul"], [4, "commute_mul"], [16, "commute_mul"], [14, "commute_mul"], [17, "commute_mul"], [14, "commute_mul"], [8, "commute_add"], [8, "commute_add"], [5, "commute_mul"], [4, "commute_mul"], [15, "commute_mul"], [20, "commute_mul"], [8, "commute_mul"], [8, "commute_mul"], [15, "commute_mul"], [20, "commute_mul"], [8, "mul_by_add"], [5, "commute_add"], [12, "commute_mul"], [15, "commute_mul"], [15, "commute_mul"], [10, "commute_mul"], [11, "commute_mul"], [5, "commute_add"], [14, "commute_mul"], [4, "commute_mul"], [5, "commute_mul"], [8, "commute_add"], [12, "commute_add"], [19, "commute_mul"], [5, "commute_mul"], [12, "commute_add"], [13, "commute_mul"], [13, "commute_mul"], [4, "assoc_mul_mul"], [11, "commute_add"], [7, "commute_add"], [14, "assoc_mul_mul"], [7, "commute_add"], [15, "assoc_mul_mul"], [4, "assoc_mul_mul"], [4, "commute_mul"], [4, "commute_mul"], [13, "commute_mul"], [4, "commute_mul"], [13, "assoc_mul_mul"], [13, "commute_mul"], [4, "commute_mul"], [22, "cprop_mul"], [12, "commute_add"], [13, "assoc_mul_mul"], [14, "commute_mul"], [14, "commute_mul"], [13, "commute_mul"], [12, "add_of_muls"]]
+; BEST ml_rules_no_bind gelu rlo 2021-05-28-14-29-54_gelu ; [[4, "assoc_mul_mul"], [5, "commute_mul"], [10, "mul_by_add"], [6, "commute_add"], [13, "commute_mul"], [14, "commute_mul"], [4, "assoc_mul_mul"], [13, "assoc_mul_mul"], [14, "commute_mul"], [4, "assoc_mul_mul"], [9, "commute_add"], [11, "commute_mul"], [12, "commute_mul"], [12, "commute_mul"], [4, "commute_mul"], [10, "commute_add"], [14, "commute_mul"], [14, "commute_mul"], [15, "commute_mul"], [11, "commute_mul"], [15, "commute_mul"], [14, "assoc_mul_mul"], [10, "commute_add"], [15, "commute_mul"], [15, "commute_mul"], [20, "commute_mul"], [4, "commute_mul"], [11, "commute_mul"], [13, "commute_mul"], [4, "commute_mul"], [14, "commute_mul"], [11, "assoc_mul_mul"], [7, "commute_add"], [13, "cprop_mul"], [12, "commute_mul"], [13, "commute_mul"], [12, "assoc_mul_mul"], [19, "commute_mul"], [12, "assoc_mul_mul"], [12, "assoc_mul_mul"], [12, "commute_mul"], [11, "add_of_muls"]]
+; BEST ml_rules_no_bind rev$add rlo 2021-05-28-14-29-54_gelu ; [[9, "delete_let"], [10, "inline_let"], [13, "inline_let"], [4, "delete_let"]]
+; BEST ml_rules_no_bind rev$add rlo 2021-05-28-14-29-54_gelu ; [[16, "inline_let"], [9, "delete_let"], [10, "inline_let"], [4, "delete_let"]]
+; BEST ml_rules_no_bind rev$mul rlo 2021-05-28-14-29-54_gelu ; [[16, "inline_let"], [20, "inline_let"], [15, "commute_mul"], [27, "inline_let"], [25, "inline_let"], [24, "commute_mul"], [4, "delete_let"], [4, "delete_let"]]
+; BEST ml_rules_no_bind rev$mul rlo 2021-05-28-14-29-54_gelu ; [[16, "inline_let"], [20, "inline_let"], [27, "inline_let"], [9, "delete_let"], [20, "inline_let"], [4, "delete_let"]]
+; BEST ml_rules_no_bind rev$tanh rlo 2021-05-28-14-29-54_gelu ; [[19, "div_by_mul"], [19, "assoc_div_div"], [19, "div_of_div"], [19, "div_by_mul"], [19, "div_of_div"], [19, "div_by_mul"], [18, "inline_let"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [21, "assoc_div_div"], [23, "inline_let"], [21, "div_of_div"], [25, "commute_mul"], [9, "delete_let"], [4, "delete_let"]]
+; BEST ml_rules_no_bind rev$tanh rlo 2021-05-28-14-29-54_gelu ; [[20, "inline_let"], [18, "inline_let"], [4, "delete_let"], [4, "delete_let"]]
+
+(edef cosh Float (Float))
+(def cost$cosh Float (x : Float) 8.0)
+(edef tanh Float (Float))
+(def cost$tanh Float (x : Float) 8.0)
+
+(def rev$add
+ (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (drt : Float))
+ (tuple drt drt))
+
+(def rev$mul
+ (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (drt : Float))
+  (tuple (mul drt (get$2$2 xt)) (mul drt (get$1$2 xt))))
+
+
+(def rev$tanh
+ Float
+ ((x : Float) (d_dr : Float))
+ (let (cosh_x (cosh x))
+  (div d_dr (mul cosh_x cosh_x))))
+
+
+; available optimization for gelu - bringing constants together, e.g.
+; (x * 0.5) * (1 + tanh(0.7 * (x + (0.04 * (x * (x * x)))))) ->
+; (x * 0.5) * (1 + tanh(0.7 * x * (1 + (0.04 * (x * x))))) ->
+; (x * 0.5) * (1 + tanh(x * (0.7 + (0.0028 * (x * x)))))
+(def
+ gelu Float
+ (x : Float)
+ (mul (mul x 0.5)
+      (add 1.0 (tanh (mul 0.79788 (add x (mul 4.4715e-2 (mul x (mul x x)))))))))
+
+
+; final form rev$gelu - https://github.com/awf/knossos/pull/1547
+;(def rev$gelu
+;        Float
+;        ((_t1 : (Tuple Float Float)))
+;    (let (x (get$1$2 _t1))
+;    (let (var0 (mul (mul x x) 0.0356772042))
+;    (let (var1 (add 0.79788 var0))
+;    (let (t$1132 (mul x var1))
+;    (let (cosh_x (cosh t$1132))
+;    (mul
+;        (mul 0.5 (get$2$2 _t1))
+;        (add
+;            (add 1.0 (tanh t$1132))
+;            (mul
+;                (div x (mul cosh_x cosh_x))
+;                (add var1 (add var0 var0)))))))))))
+; letbody rev$gelu
+(def
+ rev$gelu Float
+ (_t1 : (Tuple Float Float))
+ (let (x (get$1$2 _t1))
+  (let (t$1128 (mul x x))
+   (let (t$1129 (mul x t$1128))
+    (let (t$1130 (mul 4.4715e-2 t$1129))
+     (let (t$1131 (add x t$1130))
+      (let (t$1132 (mul 0.79788 t$1131))
+       (let (t$1133 (tanh t$1132))
+        (let (t$1137 (rev$mul (tuple (mul x 0.5) (add 1.0 t$1133)) (get$2$2 _t1)))
+         (let (t$1179 (rev$add (tuple x t$1130)
+                               (get$2$2 (rev$mul (tuple 0.79788 t$1131)
+                                                 (rev$tanh t$1132
+                                                           (get$2$2 (rev$add (tuple 1.0 t$1133)
+                                                                             (get$2$2 t$1137))))))))
+          (let (t$1228 (rev$mul (tuple x t$1128)
+                                                        (get$2$2 (rev$mul (tuple 4.4715e-2 t$1129)
+                                                                          (get$2$2 t$1179)))))
+           (let (t$1280 (rev$mul (tuple x x) (get$2$2 t$1228)))
+            (add (get$1$2 (rev$mul (tuple x 0.5) (get$1$2 t$1137)))
+                 (add (get$1$2 t$1179)
+                      (add (get$1$2 t$1228)
+                           (add (get$1$2 t$1280) (get$2$2 t$1280)))))))))))))))))

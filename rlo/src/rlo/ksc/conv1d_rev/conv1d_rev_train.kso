@@ -1,0 +1,254 @@
+(def
+ rev$matrix_multiply (Tuple (Vec (Vec Float)) (Vec Float))
+ ((w : Vec (Vec Float)) (image : Vec Float) (d$r : Vec Float))
+ (let
+  ((k (size (index 0 w)))
+   (t4100 (size w)))
+  (sumbuild t4100
+            (lam (oi : Integer) (let
+                                 ((a_7 (index oi d$r))
+                                  (a_6 (build k (lam (sum$i : Integer) a_7))))
+                                 (tuple (sumbuild k
+                                                  (lam (ki : Integer) (let
+                                                                       ((t4102 (size (index oi w)))
+                                                                        (a_9 (deltaVec t4102
+                                                                                       ki
+                                                                                       (mul (index ki
+                                                                                                   image)
+                                                                                            (index ki
+                                                                                                   a_6))))
+                                                                        (t4109 (build t4100
+                                                                                      (lam (i : Integer) (build (size (index i
+                                                                                                                             w))
+                                                                                                                (lam (i_11 : Integer) 0.0))))))
+                                                                       (add (add t4109
+                                                                                 (add t4109
+                                                                                      (build t4100
+                                                                                             (lam (primDindex$i : Integer) (if
+                                                                                                                            (eq primDindex$i
+                                                                                                                                oi)
+                                                                                                                            a_9
+                                                                                                                            (build t4102
+                                                                                                                                   (lam (i : Integer) 0.0)))))))
+                                                                            (add t4109 t4109)))))
+                                        (sumbuild k
+                                                  (lam (ki : Integer) (let
+                                                                       ((t4130 (size image))
+                                                                        (t4131 (build t4130
+                                                                                      (lam (i : Integer) 0.0))))
+                                                                       (add (add t4131
+                                                                                 (add t4131 t4131))
+                                                                            (add t4131
+                                                                                 (deltaVec t4130
+                                                                                           ki
+                                                                                           (mul (index ki
+                                                                                                       (index oi
+                                                                                                              w))
+                                                                                                (index ki
+                                                                                                       a_6))))))))))))))
+(def
+ rev$matrix_multiply_transpose (Tuple (Vec (Vec Float)) (Vec Float))
+ ((w : Vec (Vec Float)) (image : Vec Float) (d$r : Vec Float))
+ (let
+  ((k (size w)))
+  (sumbuild (size (index 0 w))
+            (lam (oi : Integer) (let
+                                 ((a_7 (index oi d$r))
+                                  (a_6 (build k (lam (sum$i : Integer) a_7))))
+                                 (tuple (sumbuild k
+                                                  (lam (ki : Integer) (let
+                                                                       ((t4151 (size (index ki w)))
+                                                                        (a_9 (deltaVec t4151
+                                                                                       oi
+                                                                                       (mul (index ki
+                                                                                                   image)
+                                                                                            (index ki
+                                                                                                   a_6))))
+                                                                        (t4158 (build k
+                                                                                      (lam (i : Integer) (build (size (index i
+                                                                                                                             w))
+                                                                                                                (lam (i_11 : Integer) 0.0))))))
+                                                                       (add (add t4158
+                                                                                 (add t4158
+                                                                                      (build k
+                                                                                             (lam (primDindex$i : Integer) (if
+                                                                                                                            (eq primDindex$i
+                                                                                                                                ki)
+                                                                                                                            a_9
+                                                                                                                            (build t4151
+                                                                                                                                   (lam (i : Integer) 0.0)))))))
+                                                                            (add t4158 t4158)))))
+                                        (sumbuild k
+                                                  (lam (ki : Integer) (let
+                                                                       ((t4179 (size image))
+                                                                        (t4180 (build t4179
+                                                                                      (lam (i : Integer) 0.0))))
+                                                                       (add (add t4180
+                                                                                 (add t4180 t4180))
+                                                                            (add t4180
+                                                                                 (deltaVec t4179
+                                                                                           ki
+                                                                                           (mul (index oi
+                                                                                                       (index ki
+                                                                                                              w))
+                                                                                                (index ki
+                                                                                                       a_6))))))))))))))
+
+(def
+ rev$conv1d (Tuple (Vec (Vec (Vec Float))) (Vec (Vec Float)))
+ ((kernels : Vec (Vec (Vec Float)))
+  (image : Vec (Vec Float))
+  (d$r : Vec (Vec Float)))
+ (let
+  ((kernels_elt (index 0 kernels))
+   (kn (size (index 0 kernels_elt)))
+   (l_13 (size image))
+   (n (size (index 0 image)))
+   (t4261 (size kernels)))
+  (sumbuild t4261
+            (lam (ki : Integer) (let
+                                 ((a_10 (index ki d$r)))
+                                 (sumbuild n
+                                           (lam (ni : Integer) (let
+                                                                ((a_12 (index ni a_10))
+                                                                 (a_11 (build kn
+                                                                              (lam (sum$i : Integer) a_12))))
+                                                                (sumbuild kn
+                                                                          (lam (kni : Integer) (let
+                                                                                                ((a_14 (index kni
+                                                                                                              a_11))
+                                                                                                 (a_15 (build l_13
+                                                                                                              (lam (sum$i : Integer) a_14))))
+                                                                                                (sumbuild l_13
+                                                                                                          (lam (li : Integer) (let
+                                                                                                                               ((noi (sub (add ni
+                                                                                                                                               (div kn
+                                                                                                                                                    2))
+                                                                                                                                          kni))
+                                                                                                                                (outside_image (or (lt noi
+                                                                                                                                                       0)
+                                                                                                                                                   (gte noi
+                                                                                                                                                        n)))
+                                                                                                                                (t4266 (index ki
+                                                                                                                                              kernels))
+                                                                                                                                (t4267 (index li
+                                                                                                                                              t4266))
+                                                                                                                                (t4268 (size t4267))
+                                                                                                                                (t4271 (index li
+                                                                                                                                              a_15))
+                                                                                                                                (a_18 (deltaVec t4268
+                                                                                                                                                kni
+                                                                                                                                                (mul (if
+                                                                                                                                                      outside_image
+                                                                                                                                                      0.0
+                                                                                                                                                      (index noi
+                                                                                                                                                             (index li
+                                                                                                                                                                    image)))
+                                                                                                                                                     t4271)))
+                                                                                                                                (t4274 (size t4266))
+                                                                                                                                (a_19 (build t4274
+                                                                                                                                             (lam (primDindex$i : Integer) (if
+                                                                                                                                                                            (eq primDindex$i
+                                                                                                                                                                                li)
+                                                                                                                                                                            a_18
+                                                                                                                                                                            (build t4268
+                                                                                                                                                                                   (lam (i : Integer) 0.0))))))
+                                                                                                                                (t4379 (build t4261
+                                                                                                                                              (lam (i : Integer) (let
+                                                                                                                                                                  ((a_21 (index i
+                                                                                                                                                                                kernels)))
+                                                                                                                                                                  (build (size a_21)
+                                                                                                                                                                         (lam (i_20 : Integer) (build (size (index i_20
+                                                                                                                                                                                                                   a_21))
+                                                                                                                                                                                                      (lam (i_22 : Integer) 0.0))))))))
+                                                                                                                                (t4401 (build l_13
+                                                                                                                                              (lam (i : Integer) (build (size (index i
+                                                                                                                                                                                     image))
+                                                                                                                                                                        (lam (i_20 : Integer) 0.0))))))
+                                                                                                                               (add (if
+                                                                                                                                     outside_image
+                                                                                                                                     (tuple (build t4261
+                                                                                                                                                   (lam (i : Integer) (let
+                                                                                                                                                                       ((a_23 (index i
+                                                                                                                                                                                     kernels)))
+                                                                                                                                                                       (build (size a_23)
+                                                                                                                                                                              (lam (i_20 : Integer) (build (size (index i_20
+                                                                                                                                                                                                                        a_23))
+                                                                                                                                                                                                           (lam (i_22 : Integer) 0.0)))))))
+                                                                                                                                            (build l_13
+                                                                                                                                                   (lam (i : Integer) (build (size (index i
+                                                                                                                                                                                          image))
+                                                                                                                                                                             (lam (i_20 : Integer) 0.0)))))
+                                                                                                                                     (let
+                                                                                                                                      ((a_22 (build kn
+                                                                                                                                                    (lam (i : Integer) 0.0)))
+                                                                                                                                       (t4289 (size kernels_elt))
+                                                                                                                                       (a_23 (build t4289
+                                                                                                                                                    (lam (primDindex$i : Integer) (if
+                                                                                                                                                                                   (eq primDindex$i
+                                                                                                                                                                                       0)
+                                                                                                                                                                                   a_22
+                                                                                                                                                                                   a_22))))
+                                                                                                                                       (t4293 (size (index li
+                                                                                                                                                           image)))
+                                                                                                                                       (a_20 (deltaVec t4293
+                                                                                                                                                       noi
+                                                                                                                                                       (mul (index kni
+                                                                                                                                                                   t4267)
+                                                                                                                                                            t4271)))
+                                                                                                                                       (t4303 (build t4261
+                                                                                                                                                     (lam (i : Integer) (let
+                                                                                                                                                                         ((a_26 (index i
+                                                                                                                                                                                       kernels)))
+                                                                                                                                                                         (build (size a_26)
+                                                                                                                                                                                (lam (i_20 : Integer) (build (size (index i_20
+                                                                                                                                                                                                                          a_26))
+                                                                                                                                                                                                             (lam (i_22 : Integer) 0.0))))))))
+                                                                                                                                       (t4343 (build l_13
+                                                                                                                                                     (lam (i : Integer) (build (size (index i
+                                                                                                                                                                                            image))
+                                                                                                                                                                               (lam (i_20 : Integer) 0.0))))))
+                                                                                                                                      (tuple (add (add (add (add t4303
+                                                                                                                                                                 (add t4303
+                                                                                                                                                                      (build t4261
+                                                                                                                                                                             (lam (primDindex$i : Integer) (if
+                                                                                                                                                                                                            (eq primDindex$i
+                                                                                                                                                                                                                0)
+                                                                                                                                                                                                            a_23
+                                                                                                                                                                                                            (build t4289
+                                                                                                                                                                                                                   (lam (i : Integer) (build (size (index i
+                                                                                                                                                                                                                                                          kernels_elt))
+                                                                                                                                                                                                                                             (lam (i_22 : Integer) 0.0)))))))))
+                                                                                                                                                            t4303)
+                                                                                                                                                       t4303)
+                                                                                                                                                  (add t4303
+                                                                                                                                                       t4303))
+                                                                                                                                             (add (add (add (add t4343
+                                                                                                                                                                 (add t4343
+                                                                                                                                                                      t4343))
+                                                                                                                                                            t4343)
+                                                                                                                                                       t4343)
+                                                                                                                                                  (add t4343
+                                                                                                                                                       (build l_13
+                                                                                                                                                              (lam (primDindex$i : Integer) (if
+                                                                                                                                                                                             (eq primDindex$i
+                                                                                                                                                                                                 li)
+                                                                                                                                                                                             a_20
+                                                                                                                                                                                             (build t4293
+                                                                                                                                                                                                    (lam (i : Integer) 0.0))))))))))
+                                                                                                                                    (tuple (add t4379
+                                                                                                                                                (add t4379
+                                                                                                                                                     (add t4379
+                                                                                                                                                          (build t4261
+                                                                                                                                                                 (lam (primDindex$i : Integer) (if
+                                                                                                                                                                                                (eq primDindex$i
+                                                                                                                                                                                                    ki)
+                                                                                                                                                                                                a_19
+                                                                                                                                                                                                (build t4274
+                                                                                                                                                                                                       (lam (i : Integer) (build (size (index i
+                                                                                                                                                                                                                                              t4266))
+                                                                                                                                                                                                                                 (lam (i_22 : Integer) 0.0))))))))))
+                                                                                                                                           (add t4401
+                                                                                                                                                (add t4401
+                                                                                                                                                     (add t4401
+                                                                                                                                                          t4401)))))))))))))))))))

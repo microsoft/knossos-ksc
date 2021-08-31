@@ -1,3 +1,6 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 -- | Contains the rules for rewriting 'Lang.SUFFwdPass' and
 -- 'Lang.SUFRevPass' derived functions of 'Lang.PrimFun's to
 -- expressions that don't contain any derived functions.  This saves
@@ -7,8 +10,8 @@
 
 module Ksc.SUF.Rewrite (rewriteSUFFwdPass, rewriteSUFRevPass) where
 
-import Lang
-import Prim
+import Ksc.Lang
+import Ksc.Prim
 
 rewriteSUFFwdPass :: PrimFun -> TExpr -> Maybe TExpr
 rewriteSUFFwdPass (P_SelFun i n) arg

@@ -1,0 +1,42 @@
+# This experiment shows the effect of dropout in controlling overfitting.
+# datasets/value_dataset.json was extracted through an untrained astar
+# search on binding_simplify scenario. See datasets/config.json.
+# Run with 
+#    scripts/amlt_runner.sh train_on_dataset.yaml --upload-data
+
+target:
+  service: amlk8s
+  name: itpseasiav100cl
+
+environment:
+  image: knossos.azurecr.io/rlo_linux_base:$(DOCKER_TAG)
+  registry: knossos.azurecr.io
+  username: 00000000-0000-0000-0000-000000000000
+
+code:
+  local_dir: src
+
+data:
+  local_dir: datasets
+  remote_dir: datasets
+
+search:
+  job_template:
+    name: "train_on_dataset_{keep_prob}_{patience_epochs}"
+    sku: G1
+    command:
+    - python train_on_dataset.py binding_simplify_astar
+      --dataset_path /mnt/default/datasets/value_dataset.json
+      --graph_state_keep_prob 1.0
+      --output_keep_prob {keep_prob}
+      --patience_epochs {patience_epochs}
+      --output_dir $$PT_OUTPUT_DIR
+  type: grid
+  max_trials: 2
+  params:
+    - name: keep_prob
+      spec: discrete
+      values: [0.5, 1.0]
+    - name: patience_epochs
+      spec: discrete
+      values: [30]

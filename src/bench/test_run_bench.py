@@ -5,6 +5,9 @@ from benchmark_shim import benchmark_semi_pedantic
 cpu_device = torch.device("cpu")
 torch.set_default_dtype(torch.float32)
 
+# Most of the logic for these benchmark tests is in
+# conftest.py in this directory
+
 
 def assert_close(result, reference_result):
     assert torch.allclose(

@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Union, Optional, Sequence, Tuple, List
 import re
 
 from ksc.expr import StructuredName, Expr, Call
@@ -15,6 +15,7 @@ _prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
 
 def prim_lookup(sname: StructuredName, argtype: Type) -> Optional[Type]:
+    tys: Union[Tuple, List]
     if argtype.is_tuple:
         tys = tuple(argtype.tuple_elems())
     else:

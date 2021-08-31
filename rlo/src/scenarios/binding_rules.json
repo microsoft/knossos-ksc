@@ -1,0 +1,10 @@
+{
+  "_comment": "Legacy rollout scenario.",
+  "train_exprs": "original_binding_expressions",
+  "test_exprs": "original_binding_expressions",
+  "rules": "binding_rules",
+  "num_generations": 60,
+  "train_search": "rollout",
+  "eval_search": "rollout",
+  "oracle": true
+}

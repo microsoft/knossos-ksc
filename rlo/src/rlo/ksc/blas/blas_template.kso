@@ -1,0 +1,82 @@
+(def
+ float_matrix_multiply (Vec (Vec Float))
+ ((alpha : Float) (mat_x : Vec (Vec Float)))
+ (let ((n (size mat_x)) (m (size (index 0 mat_x))))
+ (build n
+        (lam (i : Integer) (build m
+                                  (lam (j : Integer) (mul alpha (index i (index j mat_x)))))))))
+(def
+ matrix_matrix_multiply (Vec (Vec Float))
+ ((mat_x : (Vec (Vec Float))) (mat_y : (Vec (Vec Float))))
+ (let ((n (size mat_x)) (m (size mat_y)) (l (size (index 0 mat_y))))
+ (build n
+        (lam (i : Integer) (build l
+                                  (lam (k : Integer) (sumbuild m
+                                                               (lam (j : Integer) (mul (index i
+                                                                                            (index j
+                                                                                                   mat_x))
+                                                                                     (index j
+                                                                                            (index k
+                                                                                                   mat_y)))))))))))
+(def
+ vector_vector_add (Vec Float)
+ ((vec_x : Vec Float) (vec_y : Vec Float))
+ (let (n (size vec_x))
+ (build n (lam (i : Integer) (add (index i vec_x) (index i vec_y))))))
+
+(def
+ matrix_matrix_add (Vec (Vec Float))
+ ((mat_x : Vec (Vec Float)) (mat_y : Vec (Vec Float)))
+ (let ((n (size mat_x)) (m (size (index 0 mat_x))))
+ (build n
+        (lam (i : Integer) (build m
+                                  (lam (j : Integer) (add (index i (index j mat_x))
+                                                        (index i (index j mat_y)))))))))
+(def
+ outer_product (Vec (Vec Float))
+ ((vec_x : Vec Float) (vec_y : Vec Float))
+ (let ((n (size vec_x)) (m (size vec_y)))
+ (build n
+        (lam (i : Integer) (build m
+                                  (lam (j : Integer) (mul (index i vec_x) (index j vec_y))))))))
+(def
+ transpose (Vec (Vec Float))
+ ((mat_x : Vec (Vec Float)))
+ (let ((n (size mat_x)) (m (size (index 0 mat_x))))
+ (build m
+        (lam (i : Integer) (build n
+                                  (lam (j : Integer) (index j (index i mat_x))))))))
+(def
+ scal (Vec Float)
+ ((a : Float) (vec_x : Vec Float))
+ (let (n (size vec_x))
+ (build n (lam (i : Integer) (mul a (index i vec_x))))))
+
+(def
+ axpy (Vec Float)
+ ((alpha : Float) (vec_x : Vec Float) (vec_y : Vec Float))
+ (let (n (size vec_x))
+ (build n
+        (lam (i : Integer) (add (index i (scal alpha vec_x))
+                              (index i vec_y))))))
+(def
+ dot Float
+ ((vec_x : Vec Float) (vec_y : Vec Float))
+ (let (n (size vec_x))
+ (sumbuild n
+           (lam (i : Integer) (mul (index i vec_x) (index i vec_y))))))
+(def
+ rscl (Vec Float)
+ ((vec_x : Vec Float))
+ (let (n (size vec_x))
+ (build n (lam (i : Integer) (div (index i vec_x) (sum vec_x))))))
+
+(def
+ rot (Tuple (Vec Float) (Vec Float))
+ ((x : Vec Float) (y : Vec Float) (c : Float) (s : Float))
+ (let (n (size x))
+ (tuple (build n
+               (lam (i : Integer) (add (mul c (index i x)) (mul s (index i y)))))
+        (build n
+               (lam (i : Integer) (add (mul (mul -1.0 s) (index i x))
+                                     (mul c (index i y))))))))
