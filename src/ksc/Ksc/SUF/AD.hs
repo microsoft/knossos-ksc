@@ -591,9 +591,6 @@ sufRevDef gst Def{ def_fun    = fun@(Fun JustFun f)
 
 sufRevDef _ _ = Nothing
 
-sufRevDefs :: GblSymTab -> [TDef] -> [TDef]
-sufRevDefs = mapMaybe . sufRevDef
-
 deltaOfSimple :: TVar -> TVar
 deltaOfSimple = \case
   TVar vty (Simple vname) -> TVar (tangentType vty) (Delta vname)
