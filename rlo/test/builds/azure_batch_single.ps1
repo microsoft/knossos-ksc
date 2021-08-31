@@ -21,7 +21,7 @@ $BUILD = CreateJob $BUILD @{
 
 CreateDockerSrcTask $cmd (@{
   "id"= "python"
-  "outputFiles" = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "outputs/**/$_" $RESULTS_SAS_URL})
+  "outputFiles" = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "rlo/outputs/**/$_" $RESULTS_SAS_URL})
 })
 az batch job set --job-id $BUILD --on-all-tasks-complete "terminatejob"
 

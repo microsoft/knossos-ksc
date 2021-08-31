@@ -110,11 +110,11 @@ function CreatePool {
 }
 
 Write-Host Creating src.zip
-git archive --format=zip --output=src.zip HEAD .\src\ .\test\ .\datasets\
+git archive --format=zip --output=src.zip HEAD .\rlo\src\ .\rlo\test\ .\rlo\datasets\
 # git archive doesn't include the contents of the submodule. Add the files ourselves.
 Add-Type -Assembly System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open("src.zip", "update")
-Get-Childitem -Recurse -File .\knossos-ksc\src\python | Resolve-Path -Relative |% {
+Get-Childitem -Recurse -File .\src\python | Resolve-Path -Relative |% {
   [void]([System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_, $_.Replace("\", "/"), [System.IO.Compression.CompressionLevel]::Optimal))
 }
 $zip.Dispose()
@@ -142,7 +142,7 @@ $VERBOSE_SAS_URL=az storage blob url --container-name "verbose" --name $BUILD --
 
 $containerSettings = @{
   # The tag here must match that of docker_tag.sh
-  "imageName" = "knossos.azurecr.io/rlo_linux_base:$(git rev-parse --short=10 $(git hash-object test/builds/Docker/Dockerfile))$(git rev-parse --short=10 $(git hash-object test/builds/conda-env.yaml))"
+  "imageName" = "knossos.azurecr.io/rlo_linux_base:$(git rev-parse --short=10 $(git hash-object rlo/test/builds/Docker/Dockerfile))$(git rev-parse --short=10 $(git hash-object rlo/test/builds/conda-env.yaml))"
   "registry" = @{
     "registryServer" = "knossos.azurecr.io"
     "username" = "knossos"
@@ -181,7 +181,7 @@ function StdErrUploader {
 function CreateDockerSrcTask {
   Param($cmds, $props, $job=$BUILD)
   # TF_DETERMINISTIC_OPS here is exposed by the NVidia NGC Docker container.
-  $props["commandLine"] = "/bin/bash -c 'unzip src.zip; sh ./test/builds/free_memory.sh & python3 src/rlo/diagnostics.py; export TF_DETERMINISTIC_OPS=1; $cmds'"
+  $props["commandLine"] = "/bin/bash -c 'unzip src.zip; sh ./rlo/test/builds/free_memory.sh & python3 rlo/src/rlo/diagnostics.py; export TF_DETERMINISTIC_OPS=1; $cmds'"
   $props["containerSettings"] = $containerSettings
   $props["resourceFiles"] = @( $srcZipResource )
   AzBatchCreate "task" $props --job-id $job
