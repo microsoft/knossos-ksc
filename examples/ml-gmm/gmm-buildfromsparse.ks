@@ -11,16 +11,11 @@
  [rev [to_float Integer]] (Tuple)
  ((x : Integer) (d_dto_float : Float))
  (tuple))
-(edef
- [Dt [to_float Integer]]
- (Tuple Float (LM Integer Float))
- (Integer))
 (def [not Bool] Bool (p : Bool) (if p false true))
 (def [fwd [not Bool]] (Tuple) (_t1 : (Tuple Bool (Tuple))) (tuple))
 (def [rev [not Bool]] (Tuple) (_t1 : (Tuple Bool (Tuple))) (tuple))
 (edef [neg Float] Float (Float))
 (edef [D [neg Float]] (LM Float Float) (Float))
-(edef [Dt [neg Float]] (Tuple Float (LM Float Float)) (Float))
 (def
  [fwd [neg Float]] Float
  ((x : Float) (dx : Float))
@@ -31,10 +26,6 @@
  ([neg Float] d_dneg))
 (edef [neg Integer] Integer (Integer))
 (edef [D [neg Integer]] (LM Integer Integer) (Integer))
-(edef
- [Dt [neg Integer]]
- (Tuple Integer (LM Integer Integer))
- (Integer))
 (def
  [fwd [neg Integer]] (Tuple)
  ((x : Integer) (dx : (Tuple)))
@@ -47,10 +38,6 @@
 (edef
  [D [add (Tuple Float Float)]]
  (LM (Tuple Float Float) Float)
- ((Tuple Float Float)))
-(edef
- [Dt [add (Tuple Float Float)]]
- (Tuple Float (LM (Tuple Float Float) Float))
  ((Tuple Float Float)))
 (def
  [fwd [add (Tuple Float Float)]] Float
@@ -68,10 +55,6 @@
  [D [add (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Integer)
  ((Tuple Integer Integer)))
-(edef
- [Dt [add (Tuple Integer Integer)]]
- (Tuple Integer (LM (Tuple Integer Integer) Integer))
- ((Tuple Integer Integer)))
 (def
  [fwd [add (Tuple Integer Integer)]] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -84,10 +67,6 @@
 (edef
  [D [sub (Tuple Float Float)]]
  (LM (Tuple Float Float) Float)
- ((Tuple Float Float)))
-(edef
- [Dt [sub (Tuple Float Float)]]
- (Tuple Float (LM (Tuple Float Float) Float))
  ((Tuple Float Float)))
 (def
  [fwd [sub (Tuple Float Float)]] Float
@@ -104,10 +83,6 @@
 (edef
  [D [sub (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Integer)
- ((Tuple Integer Integer)))
-(edef
- [Dt [sub (Tuple Integer Integer)]]
- (Tuple Integer (LM (Tuple Integer Integer) Integer))
  ((Tuple Integer Integer)))
 (def
  [fwd [sub (Tuple Integer Integer)]] (Tuple)
@@ -201,10 +176,6 @@
  [D [mul (Tuple Float Float)]]
  (LM (Tuple Float Float) Float)
  ((Tuple Float Float)))
-(edef
- [Dt [mul (Tuple Float Float)]]
- (Tuple Float (LM (Tuple Float Float) Float))
- ((Tuple Float Float)))
 (def
  [fwd [mul (Tuple Float Float)]] Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -227,10 +198,6 @@
 (edef
  [D [mul (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Integer)
- ((Tuple Integer Integer)))
-(edef
- [Dt [mul (Tuple Integer Integer)]]
- (Tuple Integer (LM (Tuple Integer Integer) Integer))
  ((Tuple Integer Integer)))
 (def
  [fwd [mul (Tuple Integer Integer)]] (Tuple)
@@ -261,11 +228,6 @@
  [D [mul (Tuple (Tensor 2 Float) (Vec Float))]]
  (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float))
  ((Tuple (Tensor 2 Float) (Vec Float))))
-(edef
- [Dt [mul (Tuple (Tensor 2 Float) (Vec Float))]]
- (Tuple (Vec Float)
-        (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
- ((Tuple (Tensor 2 Float) (Vec Float))))
 (def
  [fwd [mul (Tuple (Tensor 2 Float) (Vec Float))]] (Vec Float)
  ((M_v : (Tuple (Tensor 2 Float) (Vec Float)))
@@ -283,10 +245,6 @@
 (edef
  [D [div (Tuple Float Float)]]
  (LM (Tuple Float Float) Float)
- ((Tuple Float Float)))
-(edef
- [Dt [div (Tuple Float Float)]]
- (Tuple Float (LM (Tuple Float Float) Float))
  ((Tuple Float Float)))
 (def
  [fwd [div (Tuple Float Float)]] Float
@@ -315,10 +273,6 @@
  [D [div (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Integer)
  ((Tuple Integer Integer)))
-(edef
- [Dt [div (Tuple Integer Integer)]]
- (Tuple Integer (LM (Tuple Integer Integer) Integer))
- ((Tuple Integer Integer)))
 (def
  [fwd [div (Tuple Integer Integer)]] (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
@@ -331,10 +285,6 @@
 (edef
  [D [pow (Tuple Float Integer)]]
  (LM (Tuple Float Integer) Float)
- ((Tuple Float Integer)))
-(edef
- [Dt [pow (Tuple Float Integer)]]
- (Tuple Float (LM (Tuple Float Integer) Float))
  ((Tuple Float Integer)))
 (def
  [fwd [pow (Tuple Float Integer)]] Float
@@ -360,10 +310,6 @@
  [D [gt (Tuple Float Float)]]
  (LM (Tuple Float Float) Bool)
  ((Tuple Float Float)))
-(edef
- [Dt [gt (Tuple Float Float)]]
- (Tuple Bool (LM (Tuple Float Float) Bool))
- ((Tuple Float Float)))
 (def
  [fwd [gt (Tuple Float Float)]] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -376,10 +322,6 @@
 (edef
  [D [gt (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Bool)
- ((Tuple Integer Integer)))
-(edef
- [Dt [gt (Tuple Integer Integer)]]
- (Tuple Bool (LM (Tuple Integer Integer) Bool))
  ((Tuple Integer Integer)))
 (def
  [fwd [gt (Tuple Integer Integer)]] (Tuple)
@@ -394,10 +336,6 @@
  [D [lt (Tuple Float Float)]]
  (LM (Tuple Float Float) Bool)
  ((Tuple Float Float)))
-(edef
- [Dt [lt (Tuple Float Float)]]
- (Tuple Bool (LM (Tuple Float Float) Bool))
- ((Tuple Float Float)))
 (def
  [fwd [lt (Tuple Float Float)]] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -410,10 +348,6 @@
 (edef
  [D [lt (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Bool)
- ((Tuple Integer Integer)))
-(edef
- [Dt [lt (Tuple Integer Integer)]]
- (Tuple Bool (LM (Tuple Integer Integer) Bool))
  ((Tuple Integer Integer)))
 (def
  [fwd [lt (Tuple Integer Integer)]] (Tuple)
@@ -428,10 +362,6 @@
  [D [lte (Tuple Float Float)]]
  (LM (Tuple Float Float) Bool)
  ((Tuple Float Float)))
-(edef
- [Dt [lte (Tuple Float Float)]]
- (Tuple Bool (LM (Tuple Float Float) Bool))
- ((Tuple Float Float)))
 (def
  [fwd [lte (Tuple Float Float)]] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -444,10 +374,6 @@
 (edef
  [D [lte (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Bool)
- ((Tuple Integer Integer)))
-(edef
- [Dt [lte (Tuple Integer Integer)]]
- (Tuple Bool (LM (Tuple Integer Integer) Bool))
  ((Tuple Integer Integer)))
 (def
  [fwd [lte (Tuple Integer Integer)]] (Tuple)
@@ -462,10 +388,6 @@
  [D [gte (Tuple Float Float)]]
  (LM (Tuple Float Float) Bool)
  ((Tuple Float Float)))
-(edef
- [Dt [gte (Tuple Float Float)]]
- (Tuple Bool (LM (Tuple Float Float) Bool))
- ((Tuple Float Float)))
 (def
  [fwd [gte (Tuple Float Float)]] (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
@@ -478,10 +400,6 @@
 (edef
  [D [gte (Tuple Integer Integer)]]
  (LM (Tuple Integer Integer) Bool)
- ((Tuple Integer Integer)))
-(edef
- [Dt [gte (Tuple Integer Integer)]]
- (Tuple Bool (LM (Tuple Integer Integer) Bool))
  ((Tuple Integer Integer)))
 (def
  [fwd [gte (Tuple Integer Integer)]] (Tuple)
@@ -501,7 +419,6 @@
  [rev [log Float]] Float
  ((x : Float) (d_dlog : Float))
  ([div (Tuple Float Float)] d_dlog x))
-(edef [Dt [log Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [exp Float] Float (Float))
 (edef [D [exp Float]] (LM Float Float) (Float))
 (def
@@ -512,7 +429,6 @@
  [rev [exp Float]] Float
  ((x : Float) (d_dexp : Float))
  ([mul (Tuple Float Float)] ([exp Float] x) d_dexp))
-(edef [Dt [exp Float]] (Tuple Float (LM Float Float)) (Float))
 (def
  [exp (Vec Float)] (Vec Float)
  (v : Vec Float)
@@ -546,7 +462,6 @@
  [rev [sin Float]] Float
  ((x : Float) (d_dsin : Float))
  ([mul (Tuple Float Float)] ([cos Float] x) d_dsin))
-(edef [Dt [sin Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [D [cos Float]] (LM Float Float) (Float))
 (def
  [fwd [cos Float]] Float
@@ -556,7 +471,6 @@
  [rev [cos Float]] Float
  ((x : Float) (d_dcos : Float))
  ([neg Float] ([mul (Tuple Float Float)] ([sin Float] x) d_dcos)))
-(edef [Dt [cos Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [cosh Float] Float (Float))
 (edef [tanh Float] Float (Float))
 (def
@@ -574,23 +488,14 @@
   ([div (Tuple Float Float)] d_dr
                              ([mul (Tuple Float Float)] cosh_x cosh_x))))
 (edef [D [tanh Float]] (LM Float Float) (Float))
-(edef [Dt [tanh Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [max (Tuple Float Float)] Float ((Tuple Float Float)))
 (edef
  [D [max (Tuple Float Float)]]
  (LM (Tuple Float Float) Float)
  ((Tuple Float Float)))
-(edef
- [Dt [max (Tuple Float Float)]]
- (Tuple Float (LM (Tuple Float Float) Float))
- ((Tuple Float Float)))
 (edef [imax (Vec Float)] Integer ((Vec Float)))
 (edef [max (Vec Float)] Float ((Vec Float)))
 (edef [D [max (Vec Float)]] (LM (Vec Float) Float) ((Vec Float)))
-(edef
- [Dt [max (Vec Float)]]
- (Tuple Float (LM (Vec Float) Float))
- ((Vec Float)))
 (def
  [fwd [max (Vec Float)]] Float
  ((x : Vec Float) (dx : Vec Float))
@@ -609,10 +514,6 @@
  [rev [$ranhashdoub Integer]] (Tuple)
  ((x : Integer) (d_dranhashdoub : Float))
  (tuple))
-(edef
- [Dt [$ranhashdoub Integer]]
- (Tuple Float (LM Integer Float))
- (Integer))
 (edef [abs Float] Float (Float))
 (edef [D [abs Float]] (LM Float Float) (Float))
 (def
@@ -623,20 +524,14 @@
  [rev [abs Float]] Float
  ((x : Float) (d_dabs : Float))
  (if ([gt (Tuple Float Float)] x 0.0) d_dabs ([neg Float] d_dabs)))
-(edef [Dt [abs Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [lgamma Float] Float (Float))
 (edef [D [lgamma Float]] (LM Float Float) (Float))
 (edef [fwd [lgamma Float]] Float ((Tuple Float Float)))
 (edef [rev [lgamma Float]] Float ((Tuple Float Float)))
-(edef [Dt [lgamma Float]] (Tuple Float (LM Float Float)) (Float))
 (edef [or (Tuple Bool Bool)] Bool ((Tuple Bool Bool)))
 (edef
  [D [or (Tuple Bool Bool)]]
  (LM (Tuple Bool Bool) Bool)
- ((Tuple Bool Bool)))
-(edef
- [Dt [or (Tuple Bool Bool)]]
- (Tuple Bool (LM (Tuple Bool Bool) Bool))
  ((Tuple Bool Bool)))
 (def
  [fwd [or (Tuple Bool Bool)]] (Tuple)
@@ -650,10 +545,6 @@
 (edef
  [D [and (Tuple Bool Bool)]]
  (LM (Tuple Bool Bool) Bool)
- ((Tuple Bool Bool)))
-(edef
- [Dt [and (Tuple Bool Bool)]]
- (Tuple Bool (LM (Tuple Bool Bool) Bool))
  ((Tuple Bool Bool)))
 (def
  [fwd [and (Tuple Bool Bool)]] (Tuple)
@@ -698,10 +589,6 @@
 (edef
  [D [dot (Tuple (Vec Float) (Vec Float))]]
  (LM (Tuple (Vec Float) (Vec Float)) Float)
- ((Tuple (Vec Float) (Vec Float))))
-(edef
- [Dt [dot (Tuple (Vec Float) (Vec Float))]]
- (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
  ((Tuple (Vec Float) (Vec Float))))
 (edef
  [R$dot (Tuple (Vec Float) (Vec Float))]

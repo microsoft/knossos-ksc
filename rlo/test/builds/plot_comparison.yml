@@ -1,0 +1,49 @@
+trigger: none
+pr: none
+
+jobs:
+- job: 'DownloadAndPlot'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      Python37:
+        python.version: '3.8'
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+
+  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+    displayName: 'Install dependencies'
+
+  - task: AzureCLI@1
+    displayName: 'Azure CLI plot_comparison.sh'
+    inputs:
+      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: './test/builds/plot_comparison.sh $(experiments)'
+
+  - task: CopyFiles@2
+    displayName: 'Copy *.png to artifact folder'
+    inputs:
+       contents: |
+         # Plots not specific to one experiment, are in root folder not outputs
+         *.png
+         # If there was only one experiment (replotting with updated plotting code)
+         outputs/**/*.png
+       targetFolder: $(Build.ArtifactStagingDirectory)
+
+  - task: PublishPipelineArtifact@0
+    displayName: 'Publish plots'
+    inputs:
+      artifactName: 'Plots'
+      targetPath: $(Build.ArtifactStagingDirectory)
+
+  - script: rm -rf *
+    displayName: 'Clean'

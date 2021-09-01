@@ -104,7 +104,6 @@ std::ostream& Binding::dump(std::ostream& s, size_t tab) const {
   } else {
     s << string(tab + 2, ' ') << "name [" << var->getName() << "]" << endl;
   }
-  var->Expr::dump(s, tab + 2);
   init->dump(s, tab + 2);
   return s;
 }

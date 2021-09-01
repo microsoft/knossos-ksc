@@ -527,8 +527,6 @@ namespace ks
 
 	inline auto D$ts_neg(allocator *, Float d) { return LM::Scale::mk(-1.0); }
 
-	inline auto D$to_integer(int d) { return LM::Zero<int, int>(); }
-
 	/*
 		template <class I, class Vec>
 		using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,

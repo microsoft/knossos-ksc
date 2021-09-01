@@ -1,0 +1,40 @@
+target:
+  cluster: rr3
+  vc: msrhyperprojvc3
+
+environment:
+  image: philly/jobs/toolkit/tensorflow:community-gpu-1.14.0-cp35
+  registry: phillyregistry.azurecr.io
+  setup:
+  - pip install --upgrade pip
+  - pip install --no-cache-dir numpy\>=1.17 sexpdata matplotlib sklearn pandas scikit-learn==0.22.1
+
+code:
+  local_dir: src
+
+search:
+  job_template:
+    name: "{experiment_name:s}_{gnn}"
+    sku: G16 # G8 seems to work but is frowned upon
+    command:
+    - python train_over_expressions.py {scenario}
+      --output_dir $$PT_OUTPUT_DIR
+      --num_parallel 16
+      --num_repetitions 16
+      --force_gpu
+      --max_gnn_train {gnn}
+      --max_epochs {epochs}
+    submit_args:
+      max_attempts: 1
+  type: grid
+  max_trials: 10
+  params:
+    - name: scenario
+      spec: discrete
+      values: ["blas_combined"]
+    - name: gnn
+      spec: discrete
+      values: [1000, 2000, 5000, 10000, 50000]
+    - name: epochs
+      spec: discrete
+      values: [1, 3]

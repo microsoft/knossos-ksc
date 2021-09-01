@@ -1,0 +1,11 @@
+{
+  "train_exprs": "binding_simplify_8",
+  "test_exprs": "binding_simplify_8",
+  "rules": "binding_simplify_rules",
+  "oracle": true,
+  "eval_search": "astar",
+  "max_gnn_eval": 1000,
+  "train_search": "astar",
+  "max_gnn_train": 1000,
+  "total_train_time": 1800
+}

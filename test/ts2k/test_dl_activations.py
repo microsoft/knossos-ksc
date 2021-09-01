@@ -5,12 +5,14 @@ import torch
 import inspect
 import importlib
 
-from ksc.torch_frontend import tsmod2ksmod
-
 
 @pytest.mark.parametrize(
     "module_file,bench_name",
-    [("examples/dl-activations/relu3", "vrelu3"), ("examples/dl-capsule/sqrl", "sqrl")],
+    [
+        ("examples/dl-activations/relu3", "vrelu3"),
+        ("examples/dl-capsule/sqrl", "sqrl"),
+        ("examples/dl-capsule/sqrl", "vsqrl"),
+    ],
 )
 def test_bench(module_file, bench_name):
     """
@@ -22,23 +24,19 @@ def test_bench(module_file, bench_name):
     module_dir, module_name = os.path.split(module_file)
     sys.path.append(module_dir)
     mod = importlib.import_module(module_name)
-    for fn in inspect.getmembers(mod, inspect.isfunction):
-        fn_name, fn_obj = fn
+    for fn_name, fn_obj in inspect.getmembers(mod):
         if fn_name == bench_name + "_bench_configs":
             configs = list(fn_obj())
         elif fn_name == bench_name + "_pytorch":
             pt_fast = fn_obj
+        elif fn_name == bench_name:
+            ks_raw = fn_obj
         else:
             print(f"Ignoring {fn_name}")
 
     arg = configs[0]
 
-    torch_extension_name = "ksc_test_dl_activations_" + bench_name
-    ks_compiled = tsmod2ksmod(
-        mod, bench_name, torch_extension_name, example_inputs=(arg,), generate_lm=False
-    )
-
-    ks_compiled.py_mod.logging(True)
+    ks_compiled = ks_raw.compile((arg,), "ksc_test_dl_activations_" + bench_name)
 
     pt_arg = arg.detach()
     pt_arg.requires_grad = True

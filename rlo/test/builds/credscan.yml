@@ -1,0 +1,24 @@
+trigger:
+
+- none
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: CredScan@2
+  inputs:
+    toolMajorVersion: 'V2'
+
+- task: PostAnalysis@1
+  inputs:
+    AllTools: true
+    BinSkimBreakOn: 'Error'
+    CodesignValidationBreakOn: 'Error'
+    FxCopBreakOn: 'ErrorAbove'
+    ModernCopBreakOn: 'Error'
+    PoliCheckBreakOn: 'Severity1'
+    RoslynAnalyzersBreakOn: 'Error'
+    SemmleBreakOn: 'Error'
+    TSLintBreakOn: 'Error'
+    ToolLogsNotFoundAction: 'Standard'

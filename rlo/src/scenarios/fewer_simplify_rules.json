@@ -1,0 +1,18 @@
+{
+  "_comment": "This is generally used as a does-it-crash test rather than of performance, hence combine A* + rollout for code coverage",
+  "train_exprs": "fewer_simplify_expressions",
+  "test_exprs": "fewer_simplify_expressions",
+  "dataset_refiners": ["reuse_refiner", "best_across_generations_refiner"],
+  "rules": "simplify_rules",
+  "num_generations": 2,
+  "num_repetitions": 2,
+  "num_positive_examples": 1,
+  "max_epochs": 1,
+  "eval_search": "astar",
+  "max_gnn_eval": 30,
+  "train_search": "rollout",
+  "oracle": true,
+  "sparse_gnn": true,
+  "decoder_readout": "sum",
+  "loss": "pinball=0.9"
+}

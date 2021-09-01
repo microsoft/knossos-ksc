@@ -1,0 +1,3 @@
+(def a Float ((x : Float)) (* 3.0 x))
+(*1.0 x)
+(def check_alone_ex_error Float ((x : Float)) (- 1.0 y))

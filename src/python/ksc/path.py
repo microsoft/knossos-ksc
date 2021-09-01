@@ -1,12 +1,50 @@
+"""
+Paths identify nodes (sub-expressions) within Expr's as a sequence of PathElements
+each of which identifies a field of an Expr subclass or one argument of a Call.
+>>> # doctests - run specifically for this file in test_pytest.sh
+>>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
+>>> let_rhs.get(e)
+5
+>>> lam_body.get(e)
+Traceback (most recent call last):
+...
+AssertionError...
+
+ExprWithPath allows traversing an expr, and listing the addressable subexprs.
+>>> ewp = ExprWithPath.from_expr(e)
+>>> ewp.path
+()
+>>> ewp.rhs
+ExprWithPath(..., path=(let_rhs,), expr=5)
+>>> ewp.body.args[0]
+ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
+>>> ExprWithPath.from_expr(e, [let_body, call_args[0]])
+ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
+>>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
+Traceback (most recent call last):
+...
+IndexError: list index out of range
+>>> ExprWithPath.from_expr(e).all_subexprs_with_paths()
+[ExprWithPath(..., path=(let_rhs,), expr=5), ExprWithPath(..., path=(let_body,), expr=(Call...))]
+
+ExprWithPath also allows directly accessing other members of the Expr
+ (which do not have Paths):
+>>> ewp.vars
+a
+>>> ewp.body
+ExprWithPath(...)
+>>> ewp.body.name
+StructuredName(add)
+"""
+
 from collections.abc import Sequence as AbstractSeq
 from dataclasses import dataclass
 from itertools import islice
 import re
 from typing import Dict, List, Mapping, NamedTuple, Sequence, Tuple, Type, Union
 
-from ksc.expr import Expr, Let, Lam, If, Assert, Call
+from ksc.expr import Expr, Let, Lam, If, Assert, Call, Var, Const
 from ksc.utils import singleton
-
 
 #####################################################################
 # Path elements
@@ -28,6 +66,9 @@ class _FieldElement:
     def __str__(self):
         return self.expr_class.__name__.lower() + "_" + self.field_name
 
+    def __repr__(self):
+        return str(self)
+
     def get(self, e: Expr) -> Expr:
         assert e.__class__ == self.expr_class
         return getattr(e, self.field_name)
@@ -46,6 +87,9 @@ class _CallArg:
 
     def __str__(self):
         return f"call_args[{self.n}]"
+
+    def __repr__(self):
+        return str(self)
 
 
 PathElement = Union[_FieldElement, _CallArg]
@@ -134,6 +178,14 @@ SerializedPath = List[str]
 
 
 def serialize_path(path: Path) -> SerializedPath:
+    """ Turns a path into a form that can be passed to json.dumps.
+    >>> serialize_path([let_rhs, call_args[0]])
+    ['let_rhs', 'call_args[0]']
+    >>> import json
+    >>> json.dumps(serialize_path([let_body, if_t_body, call_args[1]]))
+    '["let_body", "if_t_body", "call_args[1]"]'
+    """
+
     # There is no particular need to use str() to turn elements to strings,
     # but str() contains all the information that's needed.
     return [str(elem) for elem in path]

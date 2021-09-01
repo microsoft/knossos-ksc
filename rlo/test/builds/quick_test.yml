@@ -1,0 +1,40 @@
+resources:
+  repositories:
+  - repository: microsoft/knossos-ksc
+    type: github
+    endpoint: Knossos
+    name: microsoft/knossos-ksc
+
+pool:
+  vmImage: 'ubuntu-18.04'
+
+steps:
+- checkout: self
+  path: s
+
+- template: checkout_submodule.yml
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.8'
+
+- script: sh ./test/builds/install_linux.sh
+  displayName: 'Install dependencies'
+
+- script: sh ./check_format.sh
+  displayName: check_format
+
+- script: sh ./pylint.sh
+  displayName: pylint
+  
+- bash: python -m mypy --version && python -m mypy ./
+  displayName: mypy
+
+- script: 'pytest --quick test/rlo --durations=5'
+  displayName: pytest
+
+- script: 'python src/train_over_expressions.py fewer_simplify_rules'
+  displayName: 'Test training on fewer_simplify_rules (pytorch)'
+
+- script: 'python src/train_over_expressions.py fewer_simplify_rules --tensorflow'
+  displayName: 'Test training on fewer_simplify_rules (tensorflow)'

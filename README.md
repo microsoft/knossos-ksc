@@ -18,7 +18,8 @@ Current backends:
  * MLIR: In [mlir](mlir/README.md)
 
 Current transformers:
- * KSC: Various Autodiff and optimization transforms, in Haskell 
+ * KSC: Various Autodiff and optimization transforms, in Haskell
+ * RLO: A rewriting-based optimizer using reinforcement learning
 
 ### KS-Lisp: A low-sugar IR
 
@@ -35,7 +36,7 @@ The IR is pure functional, so functions may be called more than once or not at a
 
 The lisp-like IR is extremely simple -- all the language builtins are in this code:
 ```clojure
-;; Externally defined function "sqrt" returns a Float, takes two Float
+;; Externally defined function "atan2", which returns a Float, and takes two Floats
 (edef atan2 Float (Float Float)) 
 
 #| Block comments
@@ -46,7 +47,7 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 (def myfun                                       ; function name
   (Tuple String Float)                           ; return type
   ((i : Integer)                                 ; argument 1: int
-   (v : Tensor 1 (Tuple Float Float)))           ; argument 2: tensor of tuple
+   (v : Tensor 3 (Tuple Float Float)))           ; argument 2: 3D tensor of tuple
   (assert (gt i 0)                               ; (assert TEST BODY)
      (if (eq i 0)                                ; (if TEST TEXPR FEXPR)
         ; "then" br
@@ -135,6 +136,7 @@ a `.ks` program.  This example runs `hello-world.ks`.
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file test/ksc/hello-world.ks \
   --ks-output-file obj/test/ksc/hello-world.kso \
+  --cpp-include prelude.h \
   --cpp-output-file obj/test/ksc/hello-world.cpp \
   --c++ g++ \
   --exe-output-file obj/test/ksc/hello-world.exe
@@ -147,6 +149,7 @@ or with PowerShell syntax:
   --ks-source-file src/runtime/prelude.ks `
   --ks-source-file test/ksc/hello-world.ks `
   --ks-output-file obj/test/ksc/hello-world.kso `
+  --cpp-include prelude.h `
   --cpp-output-file obj/test/ksc/hello-world.cpp `
   --c++ g++ `
   --exe-output-file obj/test/ksc/hello-world.exe
@@ -172,6 +175,10 @@ Hello world!
 If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
 ```
 
+#### PyTorch frontend
+
+See doc/sphinx
+
 #### Tests
 
 To run the ksc self-tests use the command line
@@ -190,10 +197,11 @@ i.e. to type check and apply ksc's heuristic optimisations, use the
 command line
 
 ```
-./build/bin/ksc --generate-cpp-without-diffs \
+./build/bin/ksc --generate-cpp \
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file input.ks \
   --ks-output-file output.ks \
+  --cpp-include prelude.h \
   --cpp-output-file output.cpp
 ```
 

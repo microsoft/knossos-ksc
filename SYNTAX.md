@@ -284,9 +284,9 @@ separate into four categories:
  * **Arithmetic**: `add, sub, mul, div, neg`, for both `Float` and `Integer`.
  * **Comparison**: `eq, ne, gt, lt, gte, lte`, for both `Float` and `Integer`.
  * **Maths**: `log, exp, sin, cos, max, min, abs` for `Float`
- * **Type Conversion**: `to_float` for `Integer` and `to_integer` for `Float`
+ * **Type Conversion**: `to_float` for `Integer`
 
-Compilers will also generate their auto derivative, appending `D$` or `Dt$` to
+Compilers will also generate their auto derivative, appending `D$` to
 their names, but those should be used by the compiler only during
 auto-derivation.
 

@@ -1,0 +1,10 @@
+{
+  "train_exprs": "all_simplify_expressions",
+  "test_exprs": "all_simplify_expressions",
+  "rules": "simplify_rules",
+  "oracle": true,
+  "exprs_per_generation": 6,
+  "num_generations": 60,
+  "train_search": "rollout",
+  "eval_search": "rollout"
+}

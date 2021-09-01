@@ -1,0 +1,9 @@
+# Below is a workaround for the issue that the main repo and the submodule are
+# in different organizations. We have service connections to both of them, but
+# DevOps does not allow us to use two connections in one checkout step.
+steps:
+- checkout: microsoft/knossos-ksc
+  path: s/knossos-ksc
+
+- bash: git submodule update --init
+  displayName: Checkout the correct submodule version

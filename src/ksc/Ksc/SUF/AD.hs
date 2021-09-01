@@ -1,3 +1,6 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
+
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
@@ -7,14 +10,14 @@ module Ksc.SUF.AD where
 
 import           Ksc.SUF (L2(L2), L3(L3), L4(L4), L8(L8))
 
-import           Lang
-import           LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
+import           Ksc.Lang
+import           Ksc.LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
                             freeVarsOf, lookupGblST, InScopeSet, mkInScopeSet,
                             extendInScopeSet)
-import           Prim
+import           Ksc.Prim
 
 import qualified Data.Set as S
-import           Data.Maybe (mapMaybe, catMaybes)
+import           Data.Maybe (mapMaybe)
 import           Data.Traversable (mapAccumL)
 
 type SUFFwdRevPass =
@@ -47,7 +50,16 @@ type SUFRevPass =
 
 -- Generate the SUF/BOG-AD foward and reverse pass from an expression
 -- already in Single Use Form (see Ksc.SUF for more details on Single
--- Use Form).
+-- Use Form).  The type invariants are
+--
+-- * If G |- e :: T, then
+--
+-- * BOG_e is a type which depends on (the structure of) e
+--
+-- * G |- FWD{e} :: (T, BOG_e)
+--
+-- * If dt :: dT, b :: BOG_e, then REV{e} dt b is a set of bindings
+--   which, for every free variable x : X in G, binds dx : dX.
 --
 -- See Note [Automatic differentiation documentation]
 sufFwdRevPass :: SUFFwdRevPass
@@ -71,22 +83,21 @@ sufFwdRevPass gst subst = \case
   --                                ++ REV{body} dt   b_body
   --                                ++ REV{rhs}  dpat b_rhs
   Let p rhs body -> (gradf_let, typeof bog, sufRevPass_)
-    where (subst2, L4 bodyv b_rhs p'var b_body) =
+    where (subst2, L4 bodyv b_rhs p_var b_body) =
             notInScopeTVs subst (L4 (TVar (typeof body) (Simple "body"))
                                     (TVar rhs_bog_ty (Simple "b_rhs"))
                                     (TVar (typeof rhs) (Simple "p_var"))
                                     (TVar body_bog_ty (Simple "b_body")))
 
-          p' = p
-          subst3 = foldr (\v s -> extendInScopeSet v s) subst2 p
+          subst3 = foldr extendInScopeSet subst2 p
 
           (fwdpass_rhs, rhs_bog_ty, revpass_rhs) = sufFwdRevPass gst subst3 rhs
           (fwdpass_body, body_bog_ty, revpass_body) = sufFwdRevPass gst subst3 body
 
           bog = mkBog [b_rhs, b_body]
 
-          gradf_let = Let (TupPat [p'var, b_rhs]) fwdpass_rhs
-                    $ Let p' (Var p'var)
+          gradf_let = Let (TupPat [p_var, b_rhs]) fwdpass_rhs
+                    $ Let p (Var p_var)
                     $ Let (TupPat [bodyv, b_body]) fwdpass_body
                     $ Tuple [Var bodyv, bog]
 
@@ -178,17 +189,17 @@ sufFwdRevPass gst subst = \case
             subst ts
 
           as = Tuple (map (Var . fst4) binds_tys)
+            where fst4 (a, _, _, _, _) = a
+
           bs = mkBog (map bogVar binds_tys)
             where bogVar (_, b, _, _, _) = b
 
           lets_list = map thd4 binds_tys
+            where thd4 (_, _, a, _, _) = a
 
           lets = foldr (.) id lets_list
 
           es = lets (Tuple [as, bs])
-
-          fst4 (a, _, _, _, _) = a
-          thd4 (_, _, a, _, _) = a
 
           sufRevPass_ avoid' dt b = (avoid'4, lets_ ++ rest)
             where (avoid'3, revpass_e_bs_) =
@@ -215,12 +226,9 @@ sufFwdRevPass gst subst = \case
 
                   rest = concat rests
 
-  -- N.B. Until we have proper sum types we use products with a dummy
-  -- component to simulate sums.
-  --
   -- FWD{if cond then t else f} = let (cond_v, b_cond) = FWD{cond}
-  --                              in if cond_v then let (t_v, b_t) = FWD{t} in (t_v, (b_cond, cond, b_t, dummy))
-  --                                           else let (f_v, b_f) = FWD{f} in (t_f, (b_cond, cond, dummy, b_f))
+  --                              in if cond_v then let (t_v, b_t) = FWD{t} in (t_v, (b_cond, Left b_t))
+  --                                           else let (f_v, b_f) = FWD{f} in (t_f, (b_cond, Right b_f))
   --
   -- REV{if cond then t else f} dt b = { (b_cond, cond, b_t, b_f) = b
   --                                   ; dvs = if cond then let REV{t} dt b_t in dvs
@@ -230,6 +238,13 @@ sufFwdRevPass gst subst = \case
   -- (vs is the list of variables that occur free in each branch of
   -- the if.  N.B. the Single Use Property implies that the free
   -- variable set is the same for each branch.)
+  --
+  -- N.B. Until we have proper sum types we use products with a dummy
+  -- component to simulate sums.  Specifically, we use the following
+  -- encodings:
+  --
+  -- (b_cond, Left b_t)   -> (b_cond, cond, b_t, dummy)
+  -- (b_cond, Right b_f)  -> (b_cond, cond, dummy, b_f)
   If econd et ef ->
     let (fwdpass_cond, cond_bog_ty, sufRevPassecond) = sufFwdRevPass gst subst econd
 
@@ -500,13 +515,6 @@ possiblyEmptyBogExpr v = if typeof v `eqType` TypeTuple []
 mkLets_ :: [(Pat, TExpr)] -> TExpr -> TExpr
 mkLets_ t e = foldr (uncurry Let) e t
 
-sufFwdRevPassDefs :: GblSymTab -> [TDef] -> [TDef]
-sufFwdRevPassDefs gst__ = catMaybes . concat . snd . sufRevPassDefsMaybe gst__
-      where sufRevPassDefsMaybe gst' defs__ =
-              mapAccumL (\gst_ a ->
-                           let (mtdef1, mtdef, gst_') = sufFwdRevPassDef gst_ a
-                           in ( gst_', [mtdef1, mtdef])) gst' defs__
-
 -- f : S -> T
 --
 -- fwdpass$f : S -> (T, B{f})
@@ -521,21 +529,14 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
                         , def_res_ty = t_ty
                         }
   = let
+      (rhs', bog_ty, mkRev) =
+        sufFwdRevPass gst (mkInScopeSet (patVars s)) rhs
+
       fwd = Def { def_fun    = Fun SUFFwdPass f
                 , def_pat    = s
                 , def_rhs    = UserRhs rhs'
                 , def_res_ty = TypeTuple [t_ty, bog_ty]
                 }
-
-      deltaVarsOfPat :: Pat -> S.Set Var
-      deltaVarsOfPat = S.fromList . map (tVarVar . deltaOfSimple) . patVars
-
-      (rhs', bog_ty, mkRev) =
-        sufFwdRevPass gst (mkInScopeSet (patVars s)) rhs
-
-      (_, lets_) = mkRev avoid (Var dt) (Var bog)
-
-      lets = foldr (\(p, er) rest -> Let p er . rest) id lets_
 
       rev = Def { def_fun    = Fun SUFRevPass f
                 , def_pat    = TupPat [ dt, bog ]
@@ -543,15 +544,16 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
                 , def_res_ty = ds_ty
                 }
        where
-        rhs'' = lets (patToExpr (fmap deltaOfSimple s))
+        bog  = TVar bog_ty (Simple "bog_arg")
+        dt = TVar dt_ty (Simple "dt_arg")
+        ds_ty = tangentType (patType s)
+        dt_ty = tangentType t_ty
+        rhs'' = mkLets_ lets_ (patToExpr (fmap deltaOfSimple s))
+          where (_, lets_) = mkRev avoid (Var dt) (Var bog)
+                avoid = deltaVarsOfPat s `S.union` S.fromList (map tVarVar [dt, bog])
 
-      bog  = TVar bog_ty (Simple "bog_arg")
-      dt = TVar dt_ty (Simple "dt_arg")
-
-      ds_ty = tangentType (patType s)
-      dt_ty = tangentType t_ty
-
-      avoid = deltaVarsOfPat s `S.union` S.fromList (map tVarVar [dt, bog])
+                deltaVarsOfPat :: Pat -> S.Set Var
+                deltaVarsOfPat = S.fromList . map (tVarVar . deltaOfSimple) . patVars
 
       gst' = (stInsertFun rev . stInsertFun fwd) gst
   in (Just fwd, Just rev, gst')
