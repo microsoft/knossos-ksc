@@ -18,7 +18,7 @@ def vrelu3(x: float) -> float:
     """
     Like ReLu, but smoother
     Like GeLu, but cheaper
-  """
+    """
     if x < 0.0:
         return 0.0
     elif x < 1.0:

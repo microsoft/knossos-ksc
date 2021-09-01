@@ -6,7 +6,7 @@ We benchmark the Python parts of Knossos with https://pytest-benchmark.readthedo
 
 ## Nightly benchmark runs
 
-We have a GitHub Action that runs nightly [here](../../.github/workflows/benchmark.yml)
+We have a GitHub Action that runs nightly [here](../.github/workflows/benchmark.yml)
 
 ## Getting existing results
 
