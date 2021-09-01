@@ -163,42 +163,21 @@
            <div itemprop="articleBody">
             
   <div class="toctree-wrapper compound">
-<p class="caption"><span class="caption-text">Contents:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
-<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#the-need-for-an-informal-syntax-and-semantics">The need for an informal syntax and semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-syntax">Basic Syntax</a></li>
-<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#types">Types</a></li>
-<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-constructs">Basic Constructs</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="examples/relu3.html">Relu3 - An example kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/sqrl.html">SQRL - An example non-elementwise kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="Benchmarking.html">Benchmarking</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#nightly-benchmark-runs">Nightly benchmark runs</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#getting-existing-results">Getting existing results</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#making-comparisons">Making comparisons</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="MLIR.html">MLIR integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="Glossary.html">Knossos Glossary</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#kinaufl-knossos-is-not-a-user-facing-language">KINAUFL: Knossos is not a user-facing language.</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#otp-one-theorem-prover">OTP: One theorem prover</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#suf-single-use-form">SUF: Single use form</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#otos-optimized-for-time-or-space">OtOs: Optimized for time or space</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#idtw-if-that-didn-t-work">IDTW: If that didn’t work</a></li>
-<li class="toctree-l2"><a class="reference internal" href="Glossary.html#general-concepts-from-related-work">General concepts from related work</a></li>
-</ul>
-</li>
-</ul>
 </div>
 <div class="section" id="welcome-to-knossos">
 <h1>Welcome to Knossos!<a class="headerlink" href="#welcome-to-knossos" title="Permalink to this headline">¶</a></h1>
-<p>Knossos turns (a subset of) PyTorch (and Julia, and F#) code into C++ (and MLIR and ONNX and other stuff).
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Knossos is very much a work in progress.</strong>
+Pretty much anything may not work, so we encourage you to
+say hello at <a class="reference external" href="https://github.com/microsoft/knossos-ksc/discussions">https://github.com/microsoft/knossos-ksc/discussions</a>
+before even starting to play :)</p>
+</div>
+<p>Knossos compiles (a subset of) PyTorch (and Julia, and F#) code into C++ (and MLIR and ONNX and other stuff).
 By which we mean actual C++, that you can deploy completely runtime-free if you like,
 or linking against ATen, MLAS, ONNX Runtime, whatever you have.</p>
-<p>But that’s not all – it also contains a source-to-source autodiff, so you can get gradients for free.</p>
+<p>But that’s not all – it also contains a source-to-source autodiff,
+so you can get gradients for free.</p>
 <p>The canonical use case is to write custom PyTorch extensions.
 Suppose you’ve invented a great new activation function, which you call <code class="docutils literal notranslate"><span class="pre">relu3</span></code>:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nd">@knossos</span><span class="o">.</span><span class="n">elementwise</span>
@@ -206,7 +185,7 @@ Suppose you’ve invented a great new activation function, which you call <code 
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Like ReLu, but smoother</span>
 <span class="sd">    Like GeLu, but cheaper</span>
-<span class="sd">  &quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">0.0</span>
     <span class="k">elif</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
@@ -215,8 +194,8 @@ Suppose you’ve invented a great new activation function, which you call <code 
         <span class="k">return</span> <span class="n">x</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">3</span>
 </pre></div>
 </div>
-<p>It must be better, right?  Smoother than relu, cheaper than gelu sounds like an excellent idea.
-Well, let’s try it in an MNIST model.  First, however, we should make it work on tensors:</p>
+<p>It must be better, right?  Smoother than relu, cheaper than gelu sounds like an excellent idea.</p>
+<p>Well, let’s try it in an MNIST model.  First, however, we should make it work on tensors:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">relu3</span><span class="p">)</span>
 </pre></div>
 </div>
