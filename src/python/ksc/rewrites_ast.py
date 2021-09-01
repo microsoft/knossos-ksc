@@ -40,8 +40,9 @@ class raw_new_bind(ParsedRuleMatcher):
 new_bind = RuleFilter(
     "new_bind",
     raw_new_bind,
-    lambda m: len(m.ewp.path) > 0
-    and m.ewp.path[-1] not in [let_rhs, let_body, lam_body],
+    lambda m: (
+        len(m.ewp.path) > 0 and m.ewp.path[-1] not in [let_rhs, let_body, lam_body]
+    ),
 )
 
 
