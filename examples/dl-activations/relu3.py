@@ -370,7 +370,7 @@ torch::Tensor entry(torch::Tensor x) {
   return mask0_1 * val_0_1 + mask1_inf * val_1_inf;
 }
 
-torch::Tensor entry_vjp(torch::Tensor grad, torch::Tensor x) {
+torch::Tensor entry_vjp(torch::Tensor x, torch::Tensor grad) {
   torch::Tensor mask1_inf = x > 1.0;
   torch::Tensor mask0_1 = (x > 0.0) & ~mask1_inf;
   torch::Tensor val_0_1 = x * x;
