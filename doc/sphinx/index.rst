@@ -6,6 +6,7 @@
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
    :caption: Contents:
 
    About
@@ -19,11 +20,19 @@
 Welcome to Knossos!
 ===================
 
-Knossos turns (a subset of) PyTorch (and Julia, and F#) code into C++ (and MLIR and ONNX and other stuff).  
+.. warning::
+  **Knossos is very much a work in progress.**
+  Pretty much anything may not work, so we encourage you to 
+  say hello at https://github.com/microsoft/knossos-ksc/discussions 
+  before even starting to play :)
+
+
+Knossos compiles (a subset of) PyTorch (and Julia, and F#) code into C++ (and MLIR and ONNX and other stuff).  
 By which we mean actual C++, that you can deploy completely runtime-free if you like, 
 or linking against ATen, MLAS, ONNX Runtime, whatever you have.
 
-But that's not all -- it also contains a source-to-source autodiff, so you can get gradients for free.
+But that's not all -- it also contains a source-to-source autodiff, 
+so you can get gradients for free.
 
 The canonical use case is to write custom PyTorch extensions.
 Suppose you've invented a great new activation function, which you call ``relu3``:
@@ -34,6 +43,8 @@ Suppose you've invented a great new activation function, which you call ``relu3`
      :end-before: ENDDOC-KS
 
 It must be better, right?  Smoother than relu, cheaper than gelu sounds like an excellent idea.  
+
+
 Well, let's try it in an MNIST model.  First, however, we should make it work on tensors:
 
 .. code:: Python
