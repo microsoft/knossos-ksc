@@ -10,7 +10,12 @@ jobs:
     vmImage: 'ubuntu-18.04'
 
   steps:
-    
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8'
+      architecture: 'x64'
+
   - script: sh ./test/builds/mkdirs.sh
     displayName: 'Make directories [userInstall]'
 
