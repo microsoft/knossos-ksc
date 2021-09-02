@@ -10,7 +10,12 @@ jobs:
     vmImage: 'ubuntu-18.04'
 
   steps:
-    
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.8'
+      architecture: 'x64'
+
   - script: sh ./test/builds/mkdirs.sh
     displayName: 'Make directories [userInstall]'
 
@@ -38,6 +43,6 @@ jobs:
   - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
     displayName: 'Building ksc [userInstall]'
 
-  - script: sh ./test/builds/test_kscmlir_examples.sh
+  - script: sh ./test/builds/test_kscmlir_examples.sh .
     displayName: Testing Ksc MLIR on examples from ksc [userTest]
 
