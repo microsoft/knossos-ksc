@@ -718,7 +718,7 @@ traceWhenTypesUnequal = traceWhenUnequal
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
-newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
+newtype SDoc = SDoc(() -> Doc) -- True = S-expressions, False = infix style
 
 (<>) :: SDoc -> SDoc -> SDoc
 SDoc d1 <> SDoc d2 = SDoc (\s -> d1 s PP.<> d2 s)
@@ -766,9 +766,9 @@ sep ss = SDoc
   )
 
 mode :: SDoc  -- How to print in s-expression style
-     -> SDoc  -- How to print in "user" style
+     -> sDoc  -- How to print in "user" style
      -> SDoc
-mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
+mode (SDoc se) _ = SDoc se
 
 nest :: Int -> SDoc -> SDoc
 nest i (SDoc d) = SDoc (PP.nest i . d)
@@ -805,17 +805,17 @@ fsep ss = SDoc
 
 punctuate :: SDoc -> [SDoc] -> [SDoc]
 punctuate (SDoc p) ss =
-  let ts = PP.punctuate (p True) $ map
+  let ts = PP.punctuate (p ()) $ map
         (\case
-          SDoc s -> s True
+          SDoc s -> s ()
         )
         ss
-      fs = PP.punctuate (p False) $ map
+      fs = PP.punctuate (p ()) $ map
         (\case
-          SDoc s -> s False
+          SDoc s -> s ()
         )
         ss
-  in  map (\(t, f) -> SDoc (\m -> if m then t else f)) (zip ts fs)
+  in  map (\(t, f) -> SDoc (\() -> if True then t else f)) (zip ts fs)
 
 comma :: SDoc
 comma = text ","
@@ -823,14 +823,14 @@ comma = text ","
 empty :: SDoc
 empty = SDoc (\_ -> PP.empty)
 
-default_display_style :: Bool
-default_display_style = False
+default_display_style :: ()
+default_display_style = ()
 
 render :: SDoc -> String
 render (SDoc s) = PP.render (s default_display_style)
 
 renderSexp :: SDoc -> String
-renderSexp (SDoc s) = PP.render (s True)
+renderSexp (SDoc s) = PP.render (s ())
 
 instance Show SDoc where
   show (SDoc s) = show (s default_display_style)
@@ -1242,8 +1242,8 @@ hspec = do
       e2 = Call (Fun JustFun (BaseFunId (BaseUserFunName "f") Nothing)) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
-    test e  "g( i )"
-    test e2 "f( (g( i ), _t1, 5) )"
+    test e  "(g i)"
+    test e2 "(f (g i) _t1 5)"
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
