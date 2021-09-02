@@ -4,8 +4,6 @@ set -e
 
 echo Installing dependencies...
 
-python3 -m pip install -U Pillow jax==0.1.57 jaxlib==0.1.41
-
 export PYTHONPATH="./src/python"
 
 TMPDIR="obj/test"
