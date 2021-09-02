@@ -718,49 +718,49 @@ traceWhenTypesUnequal = traceWhenUnequal
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
-newtype SDoc = SDoc(() -> Doc) -- True = S-expressions, False = infix style
+newtype SDoc = SDoc Doc
 
 (<>) :: SDoc -> SDoc -> SDoc
-SDoc d1 <> SDoc d2 = SDoc (\s -> d1 s PP.<> d2 s)
+SDoc d1 <> SDoc d2 = SDoc (d1 PP.<> d2)
 
 (<+>) :: SDoc -> SDoc -> SDoc
-SDoc d1 <+> SDoc d2 = SDoc (\s -> d1 s PP.<+> d2 s)
+SDoc d1 <+> SDoc d2 = SDoc (d1 PP.<+> d2)
 
 ($$) :: SDoc -> SDoc -> SDoc
-SDoc d1 $$ SDoc d2 = SDoc (\s -> d1 s PP.$$ d2 s)
+SDoc d1 $$ SDoc d2 = SDoc (d1 PP.$$ d2)
 
 text :: String -> SDoc
-text s = SDoc (\_ -> PP.text s)
+text s = SDoc (PP.text s)
 
 char :: Char -> SDoc
-char c = SDoc (\_ -> PP.char c)
+char c = SDoc (PP.char c)
 
 int :: Int -> SDoc
-int i = SDoc (\_ -> PP.int i)
+int i = SDoc (PP.int i)
 
 integer :: Integer -> SDoc
-integer i = SDoc (\_ -> PP.integer i)
+integer i = SDoc (PP.integer i)
 
 double :: Double -> SDoc
-double d = SDoc (\_ -> PP.double d)
+double d = SDoc (PP.double d)
 
 parens :: SDoc -> SDoc
-parens (SDoc d) = SDoc (PP.parens . d)
+parens (SDoc d) = SDoc (PP.parens d)
 
 cat :: [SDoc] -> SDoc
 cat ss = SDoc
-  (\m -> PP.cat $ map
+  (PP.cat $ map
     (\case
-      SDoc s -> s m
+      SDoc s -> s
     )
     ss
   )
 
 sep :: [SDoc] -> SDoc
 sep ss = SDoc
-  (\m -> PP.sep $ map
+  (PP.sep $ map
     (\case
-      SDoc s -> s m
+      SDoc s -> s
     )
     ss
   )
@@ -771,69 +771,69 @@ mode :: SDoc  -- How to print in s-expression style
 mode (SDoc se) _ = SDoc se
 
 nest :: Int -> SDoc -> SDoc
-nest i (SDoc d) = SDoc (PP.nest i . d)
+nest i (SDoc d) = SDoc (PP.nest i d)
 
 vcat :: [SDoc] -> SDoc
 vcat ss = SDoc
-  (\m -> PP.vcat $ map
+  (PP.vcat $ map
     (\case
-      SDoc s -> s m
+      SDoc s -> s
     )
     ss
   )
 
 hang :: SDoc -> Int -> SDoc -> SDoc
-hang (SDoc d1) i (SDoc d2) = SDoc (\m -> PP.hang (d1 m) i (d2 m))
+hang (SDoc d1) i (SDoc d2) = SDoc (PP.hang d1 i d2)
 
 braces :: SDoc -> SDoc
-braces (SDoc d) = SDoc (PP.braces . d)
+braces (SDoc d) = SDoc (PP.braces d)
 
 brackets :: SDoc -> SDoc
-brackets (SDoc d) = SDoc (PP.brackets . d)
+brackets (SDoc d) = SDoc (PP.brackets d)
 
 doubleQuotes :: SDoc -> SDoc
-doubleQuotes (SDoc d) = SDoc (PP.doubleQuotes . d)
+doubleQuotes (SDoc d) = SDoc (PP.doubleQuotes d)
 
 fsep :: [SDoc] -> SDoc
 fsep ss = SDoc
-  (\m -> PP.fsep $ map
+  (PP.fsep $ map
     (\case
-      SDoc s -> s m
+      SDoc s -> s
     )
     ss
   )
 
 punctuate :: SDoc -> [SDoc] -> [SDoc]
 punctuate (SDoc p) ss =
-  let ts = PP.punctuate (p ()) $ map
+  let ts = PP.punctuate p $ map
         (\case
-          SDoc s -> s ()
+          SDoc s -> s
         )
         ss
-      fs = PP.punctuate (p ()) $ map
+      fs = PP.punctuate p $ map
         (\case
-          SDoc s -> s ()
+          SDoc s -> s
         )
         ss
-  in  map (\(t, f) -> SDoc (\() -> if True then t else f)) (zip ts fs)
+  in  map (\(t, f) -> SDoc (if True then t else f)) (zip ts fs)
 
 comma :: SDoc
 comma = text ","
 
 empty :: SDoc
-empty = SDoc (\_ -> PP.empty)
+empty = SDoc (PP.empty)
 
 default_display_style :: ()
 default_display_style = ()
 
 render :: SDoc -> String
-render (SDoc s) = PP.render (s default_display_style)
+render (SDoc s) = PP.render s
 
 renderSexp :: SDoc -> String
-renderSexp (SDoc s) = PP.render (s ())
+renderSexp (SDoc s) = PP.render s
 
 instance Show SDoc where
-  show (SDoc s) = show (s default_display_style)
+  show (SDoc s) = show s
 
 -----------------------------------------------
 --     Pretty printer for the KS language
