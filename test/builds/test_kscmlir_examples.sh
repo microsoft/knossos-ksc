@@ -1,5 +1,8 @@
 set -e
 
+echo Installing dependencies...
+python3 -m pip install -r src/python/requirements.txt -f https://download.pytorch.org/whl/torch_stable.html
+
 KNOSSOS=$1
 KSCPY=$KNOSSOS/src/python
 
