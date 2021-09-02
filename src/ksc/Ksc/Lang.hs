@@ -1073,7 +1073,7 @@ pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
 pprExpr _ (Dummy ty) = parens $ text "$dummy" <+> pprParendType ty
 pprExpr p (Konst k ) = pprPrec p k
-pprExpr p (Call f e) = pprCall p f e
+pprExpr _ (Call f e) = pprCall f e
 pprExpr _ (Tuple es) = parens $ text "tuple" <+> rest
   where rest = pprList ppr es
 pprExpr _ (Lam v e) =  parens $ text "lam" <+> parens (pprTVar v) <+> ppr e
@@ -1086,8 +1086,8 @@ pprExpr _ (App e1 e2) =
   parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
-pprCall _ f e = parens $ pprFunOcc @p f <+> pp_args_tuple
+pprCall :: forall p. InPhase p => FunX p -> ExprX p -> SDoc
+pprCall f e = parens $ pprFunOcc @p f <+> pp_args_tuple
  where
   pp_args = ppr e
 
