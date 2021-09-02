@@ -17,7 +17,7 @@ import Ksc.Traversal (mapAccumLM)
 import Ksc.Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
-             ppr, renderSexp,)
+             ppr)
 import qualified Ksc.Lang as L
 import Ksc.LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
 import qualified Ksc.Prune
@@ -294,5 +294,5 @@ genFuthark files file = do
   putStrLn $ "ksc: Writing to " ++ futfile
   Ksc.Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
-    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
+    prelude : map (L.render . ppr . Ksc.Futhark.toFuthark) defs
   where futfile = "obj/" ++ file ++ ".fut"

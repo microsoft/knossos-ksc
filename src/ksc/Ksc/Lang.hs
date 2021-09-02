@@ -17,7 +17,6 @@ import           Prelude                 hiding ( (<>) )
 
 import qualified Ksc.Traversal                  as T
 
-import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint
 import           Data.List                      ( intersperse )
 import           Ksc.KMonad
@@ -722,9 +721,6 @@ type SDoc = Doc
 
 default_display_style :: ()
 default_display_style = ()
-
-renderSexp :: SDoc -> String
-renderSexp = PP.render
 
 -----------------------------------------------
 --     Pretty printer for the KS language

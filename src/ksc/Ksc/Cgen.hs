@@ -831,7 +831,7 @@ isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
 isMainFunction _ = False
 
 ksoGen :: [TDef] -> String
-ksoGen = unlines . map (renderSexp . ppr)
+ksoGen = unlines . map (render . ppr)
 
 cppGenWithFiles :: String -> String -> [String] -> [TDef] -> IO (String, String)
 cppGenWithFiles ksofile cppfile cppincludefiles defs = do
