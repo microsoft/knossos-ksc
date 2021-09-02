@@ -11,8 +11,11 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Dialect/SCF/EDSC/Builders.h"
+#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Parser.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -348,12 +351,18 @@ Values Generator::buildCall(const AST::Call* call) {
 #undef CREATE_CMP
 
   if (MATCH_2("index", Integer, Vector)) {
-    auto idx = buildArg(call,0);
-    auto vec = buildArg(call,1);
-    auto indTy = builder.getIndexType();
-    auto indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
-    mlir::ValueRange rangeIdx {indIdx};
-    return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
+    mlir::Value idx = buildArg(call,0);
+    mlir::Value vec = buildArg(call,1);
+    // only cast if necessary
+    mlir::Value indIdx;
+    if (!idx.getType().isa<mlir::IndexType>()) {
+      auto indTy = builder.getIndexType();
+      indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
+    } else {
+      indIdx = idx;
+    }
+
+    return {builder.create<mlir::LoadOp>(UNK, vec, mlir::ValueRange{indIdx})};
   }
 
   if (MATCH_1("size", Vector)) {
@@ -457,63 +466,34 @@ Values Generator::buildCond(const AST::Condition* cond) {
 }
 
 // Builds loops creating vectors
-// FIXME: Use loop.for dialect
 Values Generator::buildBuild(const AST::Build* b) {
+  // FIXME: It is bad practice to use unknown locations everywhere. Moving to
+  // properly managing locations will drastically improve the error messages we
+  // can provide
+
+  // Scope takes care of inserting
+  mlir::edsc::ScopedContext scope(builder, UNK);
+
+  mlir::Type indTy = builder.getIndexType();
+  mlir::Type elmTy = Single(ConvertType(b->getExpr()->getType()));
+  mlir::MemRefType vecTy = mlir::MemRefType::get(-1, elmTy);
+
   // Declare the bounded vector variable and allocate it
-  auto dim = Single(buildNode(b->getRange()));
-  auto indTy = builder.getIndexType();
-  auto dimIdx = builder.create<mlir::IndexCastOp>(UNK, dim, indTy);
-  auto elmTy = Single(ConvertType(b->getExpr()->getType()));
-  auto ivTy = dim.getType();
-  auto vecTy = mlir::MemRefType::get(-1, elmTy);
-  mlir::ValueRange dimArg {dimIdx};
-  auto vec = builder.create<mlir::AllocOp>(UNK, vecTy, dimArg);
+  mlir::Value dim = Single(buildNode(b->getRange()));
+  mlir::Value lb = mlir::edsc::intrinsics::std_constant_index(0);
+  mlir::Value ub = mlir::edsc::intrinsics::std_index_cast(dim, indTy);
+  mlir::Value step = mlir::edsc::intrinsics::std_constant_index(1);
 
-  // Declare the range, initialised with zero
-  auto zeroAttr = builder.getIntegerAttr(ivTy, 0);
-  auto zero = builder.create<mlir::ConstantOp>(UNK, ivTy, zeroAttr);
-  auto range = Single(buildNode(b->getRange()));
+  mlir::Value vec = mlir::edsc::intrinsics::std_alloc(vecTy, mlir::ValueRange{ub});
 
-  // Create all basic blocks and the condition
-  auto headBlock = currentFunc.addBlock();
-  headBlock->addArgument(ivTy);
-  auto bodyBlock = currentFunc.addBlock();
-  bodyBlock->addArgument(ivTy);
-  auto exitBlock = currentFunc.addBlock();
-  mlir::ValueRange indArg {zero};
-  builder.create<mlir::BranchOp>(UNK, headBlock, indArg);
-
-  // HEAD BLOCK: Compare induction with range, exit if equal or greater
-  builder.setInsertionPointToEnd(headBlock);
-  auto headIv = headBlock->getArgument(0);
-  auto cond = builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::slt,
-                                           headIv, range);
-  mlir::ValueRange bodyArg{headIv};
-  mlir::ValueRange exitArgs{};
-  builder.create<mlir::CondBranchOp>(UNK, cond, bodyBlock, bodyArg, exitBlock,
-                                     exitArgs);
-
-  // BODY BLOCK: Lowers expression, store and increment
-  builder.setInsertionPointToEnd(bodyBlock);
-  auto bodyIv = bodyBlock->getArgument(0);
-  // Declare the local induction variable before using in body
-  auto varName = b->getVariable()->getName();
-  declareVariable(varName, {zero});
-  variables[varName] = {bodyIv};
-  // Build body and store result (no vector of tuples supported)
-  auto expr = Single(buildNode(b->getExpr()));
-  auto indIv = builder.create<mlir::IndexCastOp>(UNK, bodyIv, indTy);
-  mlir::ValueRange indices{indIv};
-  builder.create<mlir::StoreOp>(UNK, expr, vec, indices);
-  // Increment induction and loop
-  auto oneAttr = builder.getIntegerAttr(ivTy, 1);
-  auto one = builder.create<mlir::ConstantOp>(UNK, ivTy, oneAttr);
-  auto incr = builder.create<mlir::AddIOp>(UNK, bodyIv, one);
-  mlir::ValueRange headArg {incr};
-  builder.create<mlir::BranchOp>(UNK, headBlock, headArg);
-
-  // EXIT BLOCK: change insertion point before returning the final vector
-  builder.setInsertionPointToEnd(exitBlock);
+  mlir::edsc::loopNestBuilder(lb, ub, step, [&](mlir::Value iv) {
+    AST::Variable *var = llvm::dyn_cast<AST::Variable>(b->getVariable());
+    mlir::Value ivInt = mlir::edsc::intrinsics::std_index_cast(iv, dim.getType());
+    declareVariable(var->getName(), {ivInt});
+    // Build body and store result (no vector of tuples supported)
+    mlir::Value expr = Single(buildNode(b->getExpr()));
+    builder.create<mlir::StoreOp>(UNK, expr, vec, mlir::ValueRange{iv});
+  });
   return {memrefCastForCall(vec)};
 }
 
@@ -698,6 +678,7 @@ const mlir::ModuleOp Generator::build(const std::string& mlir) {
 unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & llvmContext) {
   // The lowering "pass manager"
   mlir::PassManager pm(&context);
+
   if (optLevel > 0) {
     pm.addPass(mlir::createInlinerPass());
     pm.addPass(mlir::createSymbolDCEPass());
@@ -705,6 +686,7 @@ unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & l
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
   }
+  pm.addPass(mlir::createLowerToCFGPass());  // convert SCF to std
   pm.addPass(mlir::createLowerToLLVMPass());
 
   // First lower to LLVM dialect
@@ -712,7 +694,6 @@ unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & l
     module->dump();
     return nullptr;
   }
-
   // Then lower to LLVM IR
   auto llvmModule = mlir::translateModuleToLLVMIR(module.get(), llvmContext);
   assert(llvmModule);
