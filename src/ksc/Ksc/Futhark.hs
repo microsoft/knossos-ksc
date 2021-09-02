@@ -7,12 +7,13 @@ module Ksc.Futhark (toFuthark, Def) where
 import           Data.Int
 import           Data.List
 import           Prelude                 hiding ( (<>) )
+import           Text.PrettyPrint (($$), (<+>), (<>),  fsep, punctuate, comma,
+                                  text,  hang,  fsep, empty, integer, brackets,
+                                  parens, sep, double, render)
 
 import qualified Ksc.Cgen
 import qualified Ksc.Lang                as L
-import Ksc.Lang (Pretty(..), text, render, empty, parensIf,
-             (<>), (<+>), ($$), parens, brackets, punctuate, sep,
-             integer, double, comma, PrimFun(..))
+import Ksc.Lang (Pretty(..), PrimFun(..), parensIf)
 import qualified Ksc.LangUtils           as LU
 
 --------------------------
@@ -102,10 +103,10 @@ instance Pretty Param where
 
 instance Pretty Def where
   ppr (DefFun entry fname tparams params ret rhs) =
-    L.hang (let' entry <+> text fname <+>
-            L.fsep (map ppr tparams) <+>
-            L.fsep (map ppr params) <+>
-            maybe empty ((text ":" <+>) . ppr) ret <+> text "=")
+    hang (let' entry <+> text fname <+>
+          fsep (map ppr tparams) <+>
+          fsep (map ppr params) <+>
+          maybe empty ((text ":" <+>) . ppr) ret <+> text "=")
     2 (ppr rhs)
     where let' Entry = text "entry"
           let' NotEntry = text "let"
@@ -172,7 +173,7 @@ instance Pretty Exp where
     parensIf p 10 $
     ppr f <+> sep (map (pprPrec 10) args)
   pprPrec _ (Lambda params body) =
-    parens $ text "\\" <> L.hang (sep (map ppr params) <+> text "->")
+    parens $ text "\\" <> hang (sep (map ppr params) <+> text "->")
     2 (ppr body)
   pprPrec _ (Project e field) =
     e' <> text "." <> text field

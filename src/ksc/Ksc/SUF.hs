@@ -10,7 +10,7 @@
 
 module Ksc.SUF where
 
-import           Ksc.Lang hiding ((<>))
+import           Ksc.Lang
 import           Ksc.LangUtils (notInScopeTV)
 import           Ksc.Prim
 

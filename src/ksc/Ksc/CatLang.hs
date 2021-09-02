@@ -12,6 +12,8 @@ import Ksc.LangUtils
 import Ksc.Prim
 import qualified Data.Set as S
 import Data.Maybe( mapMaybe )
+import Text.PrettyPrint (($$), (<+>), (<>), punctuate, comma,
+                         text, vcat, hang, parens, nest, sep, char, cat, int)
 
 data CLExpr
   = CLId

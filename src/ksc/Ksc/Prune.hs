@@ -9,7 +9,7 @@
 
 module Ksc.Prune where
 
-import Ksc.Lang hiding ((<>), empty)
+import Ksc.Lang
 import Data.Maybe (mapMaybe)
 import Data.Set
 import Data.Map (fromList, lookup, Map)

@@ -19,8 +19,9 @@ import qualified System.Directory
 import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
+import           Text.PrettyPrint        (render)
 
-import           Ksc.Lang                hiding ( (<>) )
+import           Ksc.Lang
 import qualified Ksc.OptLet
 
 import Debug.Trace
