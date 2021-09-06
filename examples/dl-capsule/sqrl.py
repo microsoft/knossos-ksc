@@ -16,7 +16,7 @@ cpp_inlined_map = """
         #include "knossos.h"
 
         namespace ks{
-        tensor<2, ks::Float> sqrl(ks::allocator * $alloc, tensor<2, ks::Float> t) {
+        ks::Float sqrl(ks::allocator * $alloc, tensor<2, ks::Float> t) {
             auto tdata = t.data();
             ks::Float sum = 0.0;
             auto ne = t.num_elements();
@@ -39,11 +39,7 @@ cpp_inlined_map = """
                 }
             }
 
-            ks::Float outmean = outsum / ne;
-
-            auto outtensor = tensor<2, ks::Float>::create($alloc, make_Tuple(1, 1));
-            outtensor.data()[0] = outmean;
-            return outtensor;
+            return outsum / ne;
         }
 
         tensor<2, ks::Float> sufrev_sqrl(ks::allocator * $alloc, tensor<2, ks::Float> t, tensor<2, ks::Float> dret) {
@@ -82,11 +78,11 @@ cpp_inlined_map = """
 embedded_cpp_entry_points = """
 #include "knossos-entry-points-torch.h"
 
-torch::Tensor entry(torch::Tensor t) {
+ks::Float entry(torch::Tensor t) {
     using namespace ks::entry_points;
     auto ks_t = convert_argument<ks::tensor<2, ks::Float>>(t);
     auto ks_ret = ks::sqrl(&g_alloc, ks_t);
-    return convert_return_value<torch::Tensor>(ks_ret);
+    return ks_ret;
 }
 
 torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
