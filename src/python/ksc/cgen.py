@@ -391,7 +391,7 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     auto [{ks_sizes}] = ret0.size();
     auto ret = torch::empty({{n, {ks_sizes}}});
     
-    // And wrap it in ks - this is a view of the torch data, so convert_argument, not convert_return_value
+    // And wrap it in ks - this is a view of the torch data
     auto ks_ret = convert_to_ks_viewing_tensordata<ks::tensor<{ks_return_dim}, Float>>(ret);
 
     // Place 0th value in the output
