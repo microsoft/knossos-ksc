@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as np
+import jax.experimental.stax as stax
 
 # Use relative import to work around a python 3.6 issue
 # https://stackoverflow.com/questions/57615877/importing-difference-in-python3-6-and-python3-7
