@@ -42,12 +42,11 @@ cpp_inlined_map = """
             return outsum / ne;
         }
 
-        tensor<2, ks::Float> sufrev_sqrl(ks::allocator * $alloc, tensor<2, ks::Float> t, tensor<2, ks::Float> dret) {
+        tensor<2, ks::Float> sufrev_sqrl(ks::allocator * $alloc, tensor<2, ks::Float> t, ks::Float dret) {
             auto tdata = t.data();
             ks::Float sum = 0.0;
             auto ne = t.num_elements();
 
-            auto dretdata = dret.data()[0];
             auto ret = tensor<2, ks::Float>::create($alloc, t.size());
             auto retdata = ret.data();
 
@@ -55,16 +54,18 @@ cpp_inlined_map = """
                 sum += tdata[i];
             }
 
+            auto dscale = dret / ne;
+
             if (sum < 0.0) {
                 for (int i = 0; i != ne; ++i) {
                     ks::Float r = -0.125 * tdata[i];
-                    ks::Float dr = (sin(r) + cos(r) * r) / ne;
+                    ks::Float dr = (sin(r) + cos(r) * r) * dscale;
                     retdata[i] = -0.125 * dr;
                 }
             } else {
                 for (int i = 0; i != ne; ++i) {
                     ks::Float r = 0.5 * tdata[i] * tdata[i];
-                    ks::Float dr = (sin(r) + cos(r) * r) / ne;
+                    ks::Float dr = (sin(r) + cos(r) * r) * dscale;
                     retdata[i] = tdata[i] * dr;
                 }
             }
@@ -80,17 +81,17 @@ embedded_cpp_entry_points = """
 
 ks::Float entry(torch::Tensor t) {
     using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<2, ks::Float>>(t);
+    auto ks_t = convert_to_ks_viewing_tensordata<ks::tensor<2, ks::Float>>(t);
     auto ks_ret = ks::sqrl(&g_alloc, ks_t);
     return ks_ret;
 }
 
-torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
+torch::Tensor entry_vjp(torch::Tensor t, ks::Float dret) {
     using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<2, ks::Float>>(t);
-    auto ks_dret = convert_argument<ks::tensor<2, ks::Float>>(dret);
+    auto ks_t = convert_to_ks_viewing_tensordata<ks::tensor<2, ks::Float>>(t);
+    auto ks_dret = dret;
     auto ks_ret = ks::sufrev_sqrl(&g_alloc, ks_t, ks_dret);
-    return convert_return_value<torch::Tensor>(ks_ret);
+    return convert_from_ks<torch::Tensor>(ks_ret);
 }
 """
 
