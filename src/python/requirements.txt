@@ -1,3 +1,4 @@
+pytest
 wheel==0.36.2
 sexpdata==0.0.3
 numpy==1.21.0
