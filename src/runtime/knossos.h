@@ -1092,10 +1092,10 @@ namespace ks {
 	template <size_t i, class T, class... Ts>
 	KS_FUNCTION void inplace_copy_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
 	{
-		static constexpr size_t n = sizeof...(Ts);
+		static constexpr size_t size_minus_1 = sizeof...(Ts);
 
 		inplace_copy(&ks::get<i>(*t1), ks::get<i>(t2));
-		if constexpr (i < n)
+		if constexpr (i < size_minus_1)
 			inplace_copy_aux<i + 1>(t1, t2);
 	}
 
@@ -1139,10 +1139,10 @@ namespace ks {
 	template <size_t i, class T, class... Ts>
 	KS_FUNCTION void inplace_add_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
 	{
-		static constexpr size_t n = sizeof...(Ts);
+		static constexpr size_t size_minus_1 = sizeof...(Ts);
 
 		inplace_add(&ks::get<i>(*t1), ks::get<i>(t2));
-		if constexpr (i < n)
+		if constexpr (i < size_minus_1)
 			inplace_add_aux<i + 1>(t1, t2);
 	}
 
