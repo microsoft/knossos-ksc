@@ -4,6 +4,8 @@ set -e
 
 echo Installing dependencies...
 
+python3 -m pip install -U Pillow
+
 export PYTHONPATH="./src/python"
 
 TMPDIR="obj/test"
