@@ -358,7 +358,8 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     # Difficulty: depending on the rank of ks_ret, ks_ret[i] returns either
     #   Rank 1: a reference to the float at  index i
     #   Rank 2: an rvalue representing a view on subtensor i.
-    # inplace add must act differently on each, so we switch on the return dimension here
+    # TODO: consider unifying the code (https://github.com/microsoft/knossos-ksc/pull/1046/files#r700957531)
+    # When doing that, ensure no speed impact, which requires benchmarking support I don't have now.
 
     ks_return_type = add_vmap_dimension(decl.return_type)
     ks_return_dim = ks_return_type.tensor_rank
@@ -394,9 +395,9 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     auto ks_ret = convert_to_ks_viewing_tensordata<ks::tensor<{ks_return_dim}, Float>>(ret);
 
     // Place 0th value in the output
-    auto ks_ret0 = ks_ret[0];
-    inplace_copy(&ks_ret0, ret0); // This would update a temporary in the 1D case
-
+    auto && ks_ret0 = ks_ret[0];
+    inplace_copy(&ks_ret0, ret0);
+    
     // And then place the rest
     KS_MARK(&g_alloc, mark);
     for (int i = 1; i != n; ++i) {{
