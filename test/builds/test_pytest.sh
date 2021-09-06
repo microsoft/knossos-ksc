@@ -1,7 +1,10 @@
 set -e
 
 echo Installing dependencies...
-python3 -m pip install -r src/python/requirements.txt -f https://download.pytorch.org/whl/torch_stable.html
+python3 -m pip install \
+  -r src/python/requirements.txt \
+  -r src/python/requirements-unix.txt \
+  -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Running pytest '(+ doctest)'
 python3 -m pytest test/python --doctest-modules src/python/ksc/path.py
