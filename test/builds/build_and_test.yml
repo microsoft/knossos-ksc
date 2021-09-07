@@ -267,7 +267,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO_AzureBatch azure_batch_test'
+- job: 'RLO_AzureBatch_azure_batch_test_sh'
   timeoutInMinutes: 0
   pool: Knossos-batch-master
   workspace:
