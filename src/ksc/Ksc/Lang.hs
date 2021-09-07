@@ -17,8 +17,7 @@ import           Prelude                 hiding ( (<>) )
 
 import qualified Ksc.Traversal                  as T
 
-import qualified Text.PrettyPrint              as PP
-import           Text.PrettyPrint               ( Doc )
+import           Text.PrettyPrint
 import           Data.List                      ( intersperse )
 import           Ksc.KMonad
 
@@ -718,122 +717,10 @@ traceWhenTypesUnequal = traceWhenUnequal
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
-newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
+type SDoc = Doc
 
-(<>) :: SDoc -> SDoc -> SDoc
-SDoc d1 <> SDoc d2 = SDoc (\s -> d1 s PP.<> d2 s)
-
-(<+>) :: SDoc -> SDoc -> SDoc
-SDoc d1 <+> SDoc d2 = SDoc (\s -> d1 s PP.<+> d2 s)
-
-($$) :: SDoc -> SDoc -> SDoc
-SDoc d1 $$ SDoc d2 = SDoc (\s -> d1 s PP.$$ d2 s)
-
-text :: String -> SDoc
-text s = SDoc (\_ -> PP.text s)
-
-char :: Char -> SDoc
-char c = SDoc (\_ -> PP.char c)
-
-int :: Int -> SDoc
-int i = SDoc (\_ -> PP.int i)
-
-integer :: Integer -> SDoc
-integer i = SDoc (\_ -> PP.integer i)
-
-double :: Double -> SDoc
-double d = SDoc (\_ -> PP.double d)
-
-parens :: SDoc -> SDoc
-parens (SDoc d) = SDoc (PP.parens . d)
-
-cat :: [SDoc] -> SDoc
-cat ss = SDoc
-  (\m -> PP.cat $ map
-    (\case
-      SDoc s -> s m
-    )
-    ss
-  )
-
-sep :: [SDoc] -> SDoc
-sep ss = SDoc
-  (\m -> PP.sep $ map
-    (\case
-      SDoc s -> s m
-    )
-    ss
-  )
-
-mode :: SDoc  -- How to print in s-expression style
-     -> SDoc  -- How to print in "user" style
-     -> SDoc
-mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
-
-nest :: Int -> SDoc -> SDoc
-nest i (SDoc d) = SDoc (PP.nest i . d)
-
-vcat :: [SDoc] -> SDoc
-vcat ss = SDoc
-  (\m -> PP.vcat $ map
-    (\case
-      SDoc s -> s m
-    )
-    ss
-  )
-
-hang :: SDoc -> Int -> SDoc -> SDoc
-hang (SDoc d1) i (SDoc d2) = SDoc (\m -> PP.hang (d1 m) i (d2 m))
-
-braces :: SDoc -> SDoc
-braces (SDoc d) = SDoc (PP.braces . d)
-
-brackets :: SDoc -> SDoc
-brackets (SDoc d) = SDoc (PP.brackets . d)
-
-doubleQuotes :: SDoc -> SDoc
-doubleQuotes (SDoc d) = SDoc (PP.doubleQuotes . d)
-
-fsep :: [SDoc] -> SDoc
-fsep ss = SDoc
-  (\m -> PP.fsep $ map
-    (\case
-      SDoc s -> s m
-    )
-    ss
-  )
-
-punctuate :: SDoc -> [SDoc] -> [SDoc]
-punctuate (SDoc p) ss =
-  let ts = PP.punctuate (p True) $ map
-        (\case
-          SDoc s -> s True
-        )
-        ss
-      fs = PP.punctuate (p False) $ map
-        (\case
-          SDoc s -> s False
-        )
-        ss
-  in  map (\(t, f) -> SDoc (\m -> if m then t else f)) (zip ts fs)
-
-comma :: SDoc
-comma = text ","
-
-empty :: SDoc
-empty = SDoc (\_ -> PP.empty)
-
-default_display_style :: Bool
-default_display_style = False
-
-render :: SDoc -> String
-render (SDoc s) = PP.render (s default_display_style)
-
-renderSexp :: SDoc -> String
-renderSexp (SDoc s) = PP.render (s True)
-
-instance Show SDoc where
-  show (SDoc s) = show (s default_display_style)
+default_display_style :: ()
+default_display_style = ()
 
 -----------------------------------------------
 --     Pretty printer for the KS language
@@ -1039,8 +926,7 @@ instance Pretty TypeX where
                                 text "Vec" <+> pprParendType ty
   pprPrec p (TypeTensor d ty) = parensIf p precTyApp $
                                 text "Tensor" <+> int d <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                     (parens (pprList pprParendType tys))
+  pprPrec _ (TypeTuple tys)   = parens (text "Tuple" <+> pprList pprParendType tys)
   pprPrec p (TypeLam from to) = parensIf p precZero $
                                 text "Lam" <+> pprParendType from <+> pprParendType to
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
@@ -1079,30 +965,12 @@ pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
 pprExpr _ (Dummy ty) = parens $ text "$dummy" <+> pprParendType ty
 pprExpr p (Konst k ) = pprPrec p k
-pprExpr p (Call f e) = pprCall p f e
-pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
+pprExpr _ (Call f e) = pprCall f e
+pprExpr _ (Tuple es) = parens $ text "tuple" <+> rest
   where rest = pprList ppr es
-pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
-                            (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
-pprExpr p (Let v e1 e2) = mode
-  (pprLetSexp v e1 e2)
-  (parensIf
-    p
-    precZero
-    (vcat
-      [ text "let"
-        <+> (bracesSp $ sep [pprPatLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
-      , ppr e2
-      ]
-    )
-  )
-pprExpr p (If e1 e2 e3) = mode
-  (parens (sep [text "if", ppr e1, ppr e2, ppr e3]))
-  (parensIf
-    p
-    precZero
-    (sep [text "if" <+> ppr e1, text "then" <+> ppr e2, text "else" <+> ppr e3])
-  )
+pprExpr _ (Lam v e) =  parens $ text "lam" <+> parens (pprTVar v) <+> ppr e
+pprExpr _ (Let v e1 e2) = pprLetSexp v e1 e2
+pprExpr _ (If e1 e2 e3) = parens (sep [text "if", ppr e1, ppr e2, ppr e3])
 pprExpr p (Assert e1 e2) =
   parensIf p precZero $ sep [text "assert" <+> pprParendExpr e1, ppr e2]
 
@@ -1110,12 +978,8 @@ pprExpr _ (App e1 e2) =
   parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
-pprCall prec f e = mode
-  (parens $ pprFunOcc @p f <+> pp_args_tuple)
-  (parensIf prec precCall $
-         cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
-  )
+pprCall :: forall p. InPhase p => FunX p -> ExprX p -> SDoc
+pprCall f e = parens $ pprFunOcc @p f <+> pp_args_tuple
  where
   pp_args = ppr e
 
@@ -1166,13 +1030,10 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
                      , pprParendType res_ty
                      , parens (pprParendType (typeof vs)) ]
 
-      UserRhs rhs -> mode
+      UserRhs rhs ->
           (parens $ sep [ text "def", pprFun_f <+> pprParendType res_ty
                         , parens (pprPat False vs)
                         , ppr rhs])
-          (sep [ hang (text "def" <+> pprFun_f <+> pprParendType res_ty)
-                    2 (parens (pprPat False vs))
-               , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
 
@@ -1216,7 +1077,7 @@ parensSp :: SDoc -> SDoc
 parensSp d = char '(' <+> d <+> char ')'
 
 pprList :: (p -> SDoc) -> [p] -> SDoc
-pprList ppr ps = mode (sep pps) (sep $ punctuate comma pps)
+pprList ppr ps = sep pps
   where
    pps = map ppr ps
 
@@ -1242,8 +1103,8 @@ hspec = do
       e2 = Call (Fun JustFun (BaseFunId (BaseUserFunName "f") Nothing)) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
-    test e  "g( i )"
-    test e2 "f( (g( i ), _t1, 5) )"
+    test e  "(g i)"
+    test e2 "(f (g i) _t1 5)"
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)

@@ -12,6 +12,7 @@ import qualified Ksc.OptLet
 import GHC.Stack
 
 import Data.Maybe (mapMaybe)
+import Text.PrettyPrint (render)
 
 {- Note [Automatic differentiation documentation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

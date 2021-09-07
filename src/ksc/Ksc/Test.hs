@@ -14,6 +14,7 @@ import qualified System.Directory
 import qualified System.FilePath
 import Test.Hspec (Spec)
 import Test.Hspec.Runner (isSuccess, runSpec, defaultConfig)
+import Text.PrettyPrint (render)
 
 import Control.Monad (when)
 
@@ -79,7 +80,7 @@ testRoundTrip ksFiles = do
     original <- readFile ksFile
 
     let render :: InPhase p => [DeclX p] -> String
-        render = unlines . map (renderSexp . ppr)
+        render = unlines . map (Text.PrettyPrint.render . ppr)
 
         parsedE = parseE original
 

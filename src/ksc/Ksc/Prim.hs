@@ -12,6 +12,7 @@ import Ksc.LangUtils (isTrivial)
 import GHC.Stack (HasCallStack)
 import Data.Maybe (isJust)
 import Control.Monad (zipWithM)
+import Text.PrettyPrint (($$), (<+>), text, vcat)
 
 --------------------------------------------
 --  Simple call construction

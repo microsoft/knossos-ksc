@@ -40,6 +40,8 @@ import qualified Data.Set as S
 import Data.Char( isDigit )
 import Data.List( mapAccumL )
 import Test.Hspec
+import Text.PrettyPrint (($$), (<+>), braces, fsep, punctuate, comma,
+                         text, vcat, hang)
 
 -----------------------------------------------
 --     Functions over expressions
