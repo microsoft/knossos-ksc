@@ -171,7 +171,7 @@ jobs:
     displayName: check_format
     workingDirectory: rlo
 
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml --durations=10
+  - script: pytest test/rlo --quick  --junitxml=junit/test-results_fast.xml --durations=10
     displayName: 'pytest_fast'
     workingDirectory: rlo
 
@@ -254,7 +254,7 @@ jobs:
     displayName: 'Install dependencies'
     workingDirectory: rlo
 
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml
+  - script: pytest test/rlo --quick  --junitxml=junit/test-results_fast.xml
     displayName: 'pytest_fast'
     workingDirectory: rlo
 
