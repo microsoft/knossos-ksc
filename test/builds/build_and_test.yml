@@ -267,7 +267,7 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO_AzureBatch'
+- job: 'RLO_AzureBatch rlo/test/azure_batch_test.sh'
   timeoutInMinutes: 0
   pool: Knossos-batch-master
   workspace:
@@ -279,7 +279,9 @@ jobs:
         azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
         scriptLocation: inlineScript
         inlineScript: >
-          powershell -ExecutionPolicy bypass -File rlo\test\builds\azure_batch_single.ps1 -b test-$(Build.BuildNumber) "cd rlo && bash test/azure_batch_test.sh"
+          powershell -ExecutionPolicy bypass 
+          -File rlo\test\builds\azure_batch_single.ps1 -b test-$(Build.BuildNumber) 
+          "cd rlo && bash test/azure_batch_test.sh"
       # dockerPassword is defined in the Azure DevOps build definition 'variables' (not in source control)
       env:
         DOCKER_PASSWORD: $(dockerPassword)
