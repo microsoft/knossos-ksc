@@ -12,7 +12,7 @@ function script:log {
 
 log "BUILD: $BUILD"
 log "CMD: $cmd"
-log "outputs: $outputs"
+log "outputs: [$outputs]"
 
 Import-Module "$PSScriptRoot\azure_batch_common.ps1"
 
@@ -27,9 +27,14 @@ $BUILD = CreateJob $BUILD @{
   "onTaskFailure" = "performexitoptionsjobaction"
 }
 
-$outputFiles = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "rlo/outputs/**/$_" $RESULTS_SAS_URL})
+$outputsinsubdir = $outputs |? {$_ -ne ""} |% {"rlo/outputs/**/$_"}
 
-log "outputFiles: @outputFiles"
+# https://stackoverflow.com/questions/54346256/fileuploadmiscerror-azure-batch-output-file
+$outputFiles = @(StdErrUploader "") + `
+  @(FilePatternUploader "" "../fileupload*.txt" + `
+  ($outputsinsubdir |% {OutputUploader $_ $RESULTS_SAS_URL})
+
+log "outputFiles: [$outputFiles]"
 
 $task = CreateDockerSrcTask $cmd (@{
   "id"= "python"

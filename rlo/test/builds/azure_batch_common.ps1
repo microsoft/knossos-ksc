@@ -172,10 +172,10 @@ function OutputUploader {
   }
 }
 
-function StdErrUploader {
-  Param([string]$subfolder)
+function FilePatternUploader {
+  Param([string]$subfolder, [string]$filePattern)
   @{
-    "filePattern" = "../std*.txt"
+    "filePattern" = $filePattern
     "uploadOptions" = @{"uploadCondition" = "TaskCompletion"}
     "destination" = @{
       "container"= @{
@@ -183,6 +183,12 @@ function StdErrUploader {
       }
     }
   }
+}
+
+
+function StdErrUploader {
+  Param([string]$subfolder)
+  FilePatternUploader $subfolder "../std*.txt" 
 }
 
 function CreateDockerSrcTask {
