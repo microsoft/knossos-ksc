@@ -34,7 +34,11 @@ WaitForJobCompletion
 
 [void](mkdir results)
 # This will set ANY_FAILED to True if the download-batch is unable to download stdout/stderr.
-$ANY_FAILED = (!$(az storage blob download-batch --destination "./results" --source "results" --no-progress --pattern "$($BUILD)/*" | Write-Host; $?))
+log "Download results"
+az storage blob download-batch --destination "./results" --source "results" --no-progress --pattern "$($BUILD)/*" |`
+  Write-Host
+$ANY_FAILED = $?
+log "Download results: done, exitcode='$?'"
 if (CheckTasksDisplayTime) { $ANY_FAILED = $True }
 
 log STDOUT
