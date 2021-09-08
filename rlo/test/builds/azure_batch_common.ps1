@@ -91,6 +91,7 @@ function CreatePool {
       "enableAutoScale" = $True
       "autoScaleFormula" = '$TargetLowPriorityNodes = min(70, max(0, $PendingTasks.GetSample(TimeInterval_Minute*30, 0)))'
       "autoScaleEvaluationInterval" = "PT5M"
+      # TODO "taskSlotsPerNode" = 4 # https://docs.microsoft.com/en-us/azure/batch/batch-parallel-node-tasks#enable-parallel-task-execution
       # Azure Security Pack updates, as per Andy.Slowey@
       "applicationPackageReferences" = @(
         @{
@@ -271,7 +272,7 @@ function CheckExitCodes {
         log "  WARNING: failureInfo nonempty, but exitcode OK"
       }
       log "  ...failed: message='$($FAILURE_REASON.message)'"
-      log $FAILURE_REASON
+      write-host $FAILURE_REASON
       $TASK_FAILED = $true
     }
     if ($TASK_FAILED) { 

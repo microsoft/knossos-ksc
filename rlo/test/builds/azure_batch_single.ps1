@@ -24,25 +24,28 @@ $BUILD = CreateJob $BUILD @{
   "onTaskFailure" = "performexitoptionsjobaction"
 }
 
-CreateDockerSrcTask $cmd (@{
+$task = CreateDockerSrcTask $cmd (@{
   "id"= "python"
   "outputFiles" = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "rlo/outputs/**/$_" $RESULTS_SAS_URL})
 })
+log "task=" ($task | convertfrom-json)
+
 az batch job set --job-id $BUILD --on-all-tasks-complete "terminatejob"
 
 WaitForJobCompletion
 
-$ANY_FAILED = $False
 [void](mkdir results)
 # This will set ANY_FAILED to True if the download-batch is unable to download stdout/stderr.
 log "Download results"
 az storage blob download-batch --destination "./results" --source "results" --no-progress --pattern "$($BUILD)/*" |`
   Write-Host
 if (-not $?) {
-  $ANY_FAILED = $True
+  log "Failed to download results"
+  exit 1
 }
-log "Download results: done, ANY_FAILED='$ANY_FAILED'"
-if (CheckTasksDisplayTime) { $ANY_FAILED = $True }
+log "Download results: done"
+
+$ANY_FAILED = CheckTasksDisplayTime
 
 log STDOUT
 Get-Content .\results\$BUILD\stdout.txt

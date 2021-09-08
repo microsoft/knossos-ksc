@@ -2,8 +2,10 @@ import os
 
 
 def main():
+    print("diagnostics.py: begin system config")
     show_versions()
     show_env_vars()
+    print("diagnostics.py: end system config")
 
 
 def show_versions():
