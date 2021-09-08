@@ -8,11 +8,16 @@ Param(
 
 Import-Module "$PSScriptRoot\azure_batch_common.ps1"
 
+function script:log {
+  write-host "azure_batch_single.ps1: $args"
+}
+
 $POOL = "knossos-gpu-docker" # These have no startup task, but accept per-task containers.
 
 CreatePool $POOL
 
-Write-Host Creating Job and Tasks
+log "CMD: $cmd"
+log Creating Job and Tasks
 
 $BUILD = CreateJob $BUILD @{
   "poolInfo" = @{ "poolId" = $POOL }
@@ -32,17 +37,17 @@ WaitForJobCompletion
 $ANY_FAILED = (!$(az storage blob download-batch --destination "./results" --source "results" --no-progress --pattern "$($BUILD)/*" | Write-Host; $?))
 if (CheckTasksDisplayTime) { $ANY_FAILED = $True }
 
-Write-Host STDOUT
-type .\results\$BUILD\stdout.txt
-Write-Host
-Write-Host STDERR
-type .\results\$BUILD\stderr.txt
-Write-Host
+log STDOUT
+Get-Content .\results\$BUILD\stdout.txt
+log
+log STDERR
+Get-Content .\results\$BUILD\stderr.txt
+log
 
 if ($ANY_FAILED) {
-    Write-Host
-    Write-Host "There were errors; see STDERR above"
+    log
+    log "There were errors; see STDERR above"
     exit 1
 }
 
-Write-Host All tasks succeeded
+log All tasks succeeded

@@ -1,10 +1,14 @@
+function script:log {
+  write-host "azure_batch_common.ps1: $args"
+}
+
 # Common functions, variables and setup for azure_batch builds.
 # Note many of these use global variables in the module; they have not been made fully reusable or parameterized.
 az batch account login --name knossosbuildpipeline --resource-group adobuilds --subscription Knossos
 
 # If DAYS_TO_LIVE isn't set, set it.
 if ($DAYS_TO_LIVE -eq $null) {
-  Write-Host "Using default DAYS_TO_LIVE 1 for SAS URLs"
+  log "Using default DAYS_TO_LIVE 1 for SAS URLs"
   $DAYS_TO_LIVE = 1
 }
 
@@ -37,7 +41,7 @@ function CreateJob {
   if ((!$force_name) -and (az batch job show --job-id $job_id)) {
     $base = $job_id
     do {
-      Write-Host "Job $job_id exists, trying new id"
+      log "Job $job_id exists, trying new id"
       $suffix += 1 # Will set to 1 if previously unset
       $job_id = "$($base)_$($suffix)"
     } while (az batch job show --job-id $job_id)
@@ -58,7 +62,7 @@ function GenerateSAS {
   while ($True) {
     $sas=az storage $what generate-sas --expiry (Get-Date $expiry -uformat '+%Y-%m-%dT%H:%MZ') @rest
     if ($sas.IndexOf("//") -eq -1) { return $sas }
-    Write-Host "Regenerating SAS as got malformed SAS $($sas) from flags $what $EXPIRY $rest"
+    log "Regenerating SAS as got malformed SAS $($sas) from flags $what $EXPIRY $rest"
     $expiry = $expiry.AddMinutes(1)
   }
 }
@@ -69,7 +73,7 @@ function CreatePool {
     [Parameter(mandatory=$False)]$overrides=@{}
   )
   if (az batch pool show --pool-id $name) {
-    Write-Host "Found existing pool $($name), reusing"
+    log "Found existing pool $($name), reusing"
   } else {
     $props = @{
       "id" = $name
@@ -109,7 +113,7 @@ function CreatePool {
   }
 }
 
-Write-Host Creating src.zip
+log Creating src.zip
 git archive --format=zip --output=src.zip HEAD .\rlo\src\ .\rlo\test\ .\rlo\datasets\
 # git archive doesn't include the contents of the submodule. Add the files ourselves.
 Add-Type -Assembly System.IO.Compression.FileSystem
@@ -119,14 +123,14 @@ Get-Childitem -Recurse -File .\src\python | Resolve-Path -Relative |% {
 }
 $zip.Dispose()
 
-Write-Host Uploading src.zip to Blob Storage
+log Uploading src.zip to Blob Storage
 $env:AZURE_STORAGE_ACCOUNT="knossosbuildpipeline"
 az storage container create --name "sources" > $null
 $SRC_NAME="src_$($env:BUILD_SOURCEVERSION).zip"
 az storage blob upload --container-name "sources" --name $SRC_NAME --file "src.zip"
 $SRC_SAS=GenerateSAS blob --name $SRC_NAME --container-name "sources" --permission "r"
 $SRC_URL=az storage blob url --container-name "sources" --name $SRC_NAME --sas-token $SRC_SAS | ConvertFrom-Json
-Write-Host src_url $SRC_URL
+log src_url $SRC_URL
 $srcZipResource = @{
   "httpUrl" = $SRC_URL
   "filePath"="src.zip"
@@ -202,13 +206,13 @@ function WaitForJobCompletion {
   # Keep the node-id on which each task was last running, keyed by jobid/taskid
   $last_running = @{}
   $last_msg_time = (Get-Date).AddHours(-1) # So loop below thinks it's time to display a new message
-  Write-Host "Waiting for Azure Batch job(s) $($job_ids) to complete..."
+  log "Waiting for Azure Batch job(s) $($job_ids) to complete..."
   while ($True) {
     $states = $job_ids |% {(az batch job show --job-id $_ | ConvertFrom-Json).state}
     $state_timestamp = Get-Date
     $summary = "$($state_timestamp) job(s) now: $($states)"
     if ($states.contains("completed")) {
-      Write-Host $summary
+      log $summary
       break
     }
     $msgs = @()
@@ -241,7 +245,7 @@ function WaitForJobCompletion {
       }
     }
     if ($changed -or (($state_timestamp - $last_msg_time).TotalMinutes -gt 10)) {
-      Write-Host $summary
+      log $summary
       $last_msg_time = $state_timestamp
     }
     if ($changed) { $msgs | Write-Host }
@@ -254,16 +258,16 @@ function CheckExitCodes {
   # Look for task failures. The ideal here would be to identify which (if any) failed intrinsically
   # (excluding those which were terminated by Azure Batch after another task failed), and output
   # their stderr (or just the end thereof) here. (Even better, stderr retrieved from the node.)
-  Write-Host Looking for task failures
+  log Looking for task failures
   $ANY_FAILED = $false
   $tasks |% {
     $TASK = $_
     $EXITCODE = $TASK.executionInfo.exitCode
-    Write-Host Task $TASK.id exitcode $EXITCODE
+    log Task $TASK.id exitcode $EXITCODE
     if (($EXITCODE -ne $null) -and ($EXITCODE -ne 0)) { $ANY_FAILED = $True }
     $FAILURE_REASON=$TASK.executionInfo.failureInfo
     if ($FAILURE_REASON -ne $null) {
-        Write-Host ...failed because $FAILURE_REASON
+        log ...failed because $FAILURE_REASON
         $ANY_FAILED = $true
     }
   }
@@ -275,8 +279,8 @@ function PrintTotalTime {
   $taskTimes = $tasks |% { try {[DateTime]::Parse($_.executionInfo.endTime) - [DateTime]::Parse($_.executionInfo.startTime)} catch {} }
   $totalTime = 0
   $taskTimes |% {$totalTime += $_}
-  Write-Host "From $($TASKS.Length) tasks, got $($taskTimes.Length) durations"
-  Write-Host "Total: $([System.Math]::Round($totalTime.TotalHours, 3)) hours == $([System.Math]::Round($totalTime.TotalSeconds)) seconds"
+  log "From $($TASKS.Length) tasks, got $($taskTimes.Length) durations"
+  log "Total: $([System.Math]::Round($totalTime.TotalHours, 3)) hours == $([System.Math]::Round($totalTime.TotalSeconds)) seconds"
 }
 
 function CheckTasksDisplayTime {
