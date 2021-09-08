@@ -60,9 +60,9 @@ if (-not $?) {
 log "Download results: done"
 
 function emitlog($name) {
-  log "$name"
+  log "Begin dump of $name"
   Get-Content .\results\$BUILD\$name.txt | ForEach-Object { log "${name}: $_"}
-  lof "${name}-END"
+  log "End dump of $name"
 }
 emitlog STDOUT
 emitlog STDERR
