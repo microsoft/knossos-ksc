@@ -48,11 +48,11 @@ log "Download results: done"
 $ANY_FAILED = CheckTasksDisplayTime
 
 log STDOUT
-Get-Content .\results\$BUILD\stdout.txt
-log
+Get-Content .\results\$BUILD\stdout.txt | % { log "STDOUT: $_"}
+log STDOUT-END
 log STDERR
-Get-Content .\results\$BUILD\stderr.txt
-log
+Get-Content .\results\$BUILD\stderr.txt | % { log "STDERR: $_"}
+log STDERR-END
 
 if ($ANY_FAILED) {
     log

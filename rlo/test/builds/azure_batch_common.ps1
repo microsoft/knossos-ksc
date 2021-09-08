@@ -21,12 +21,14 @@ function AzBatchCreate {
   $TmpFile = New-TemporaryFile
   $props | ConvertTo-Json -Depth 9 | Out-File $TmpFile.FullName
   # This writes to stdout, but returns the exitcode
-  $success = $(az batch $what create --json-file $TmpFile.FullName @rest | Write-Host; $?)
+  $obj = az batch $what create --json-file $TmpFile.FullName @rest
+  $success = $?
   Remove-Item -force $TmpFile.FullName
   # If exitcode indicates failure, the error message is already on stdout
   if (!$success) {
     throw "azure_batch_common.ps1: Failed to create '$what'"
   }
+  return $obj
 }
 
 function CreateJob {
