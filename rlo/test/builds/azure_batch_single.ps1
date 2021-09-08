@@ -34,7 +34,9 @@ $outputFiles = @(StdErrUploader "") + `
   @(FilePatternUploader "" "../fileupload*.txt") + `
   @($outputsinsubdir |% {OutputUploader $_ $RESULTS_SAS_URL})
 
-log "outputFiles: [$outputFiles]"
+log "outputFiles: begin"
+write-host $outputFiles
+log "outputFiles: end"
 
 $task = CreateDockerSrcTask $cmd (@{
   "id"= "python"
