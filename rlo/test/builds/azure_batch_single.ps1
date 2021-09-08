@@ -31,8 +31,8 @@ $outputsinsubdir = $outputs |? {$_ -ne ""} |% {"rlo/outputs/**/$_"}
 
 # https://stackoverflow.com/questions/54346256/fileuploadmiscerror-azure-batch-output-file
 $outputFiles = @(StdErrUploader "") + `
-  @(FilePatternUploader "" "../fileupload*.txt" + `
-  ($outputsinsubdir |% {OutputUploader $_ $RESULTS_SAS_URL})
+  @(FilePatternUploader "" "../fileupload*.txt") + `
+  @($outputsinsubdir |% {OutputUploader $_ $RESULTS_SAS_URL})
 
 log "outputFiles: [$outputFiles]"
 
