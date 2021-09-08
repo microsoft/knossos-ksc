@@ -37,7 +37,7 @@ WaitForJobCompletion
 [void](mkdir results)
 # This will set ANY_FAILED to True if the download-batch is unable to download stdout/stderr.
 log "Download results"
-az storage blob download-batch --destination "./results" --source "results" --no-progress --pattern "$($BUILD)/*" |`
+az storage blob download-batch --destination "./results" --source "results" --pattern "$($BUILD)/*" |`
   Write-Host
 if (-not $?) {
   log "Failed to download results"
