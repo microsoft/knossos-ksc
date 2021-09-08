@@ -25,7 +25,7 @@ function AzBatchCreate {
   Remove-Item -force $TmpFile.FullName
   # If exitcode indicates failure, the error message is already on stdout
   if (!$success) {
-    throw "azure_batch_common.ps1: Failed to create $what"
+    throw "azure_batch_common.ps1: Failed to create '$what'"
   }
 }
 
@@ -258,20 +258,21 @@ function CheckExitCodes {
   # Look for task failures. The ideal here would be to identify which (if any) failed intrinsically
   # (excluding those which were terminated by Azure Batch after another task failed), and output
   # their stderr (or just the end thereof) here. (Even better, stderr retrieved from the node.)
-  log Looking for task failures
-  $local:ANY_FAILED = $false
+  log "Looking for task failures"
+  $ANY_FAILED = $false
   $tasks |ForEach-Object {
     $TASK = $_
     $EXITCODE = $TASK.executionInfo.exitCode
-    log "Task [$TASK.id], exitcode [$EXITCODE]"
+    log "  Task '$($TASK.id)', exitcode '$EXITCODE'"
     $TASK_FAILED = $EXITCODE -and ($EXITCODE -ne 0)
     $FAILURE_REASON=$TASK.executionInfo.failureInfo
     if ($FAILURE_REASON) {
-        log "...failed: failureInfo=[$FAILURE_REASON]"
-        if (!$TASK_FAILED) {
-          log "WARNING: failureInfo nonempty, but exitcode OK"
-        }
-        $TASK_FAILED = $true
+      if (!$TASK_FAILED) {
+        log "  WARNING: failureInfo nonempty, but exitcode OK"
+      }
+      log "  ...failed: message='$($FAILURE_REASON.message)'"
+      log $FAILURE_REASON
+      $TASK_FAILED = $true
     }
     if ($TASK_FAILED) { 
       $ANY_FAILED = $True 
