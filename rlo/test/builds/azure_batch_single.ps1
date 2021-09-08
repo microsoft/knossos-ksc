@@ -27,9 +27,13 @@ $BUILD = CreateJob $BUILD @{
   "onTaskFailure" = "performexitoptionsjobaction"
 }
 
+$outputFiles = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "rlo/outputs/**/$_" $RESULTS_SAS_URL})
+
+log "outputFiles: @outputFiles"
+
 $task = CreateDockerSrcTask $cmd (@{
   "id"= "python"
-  "outputFiles" = @(StdErrUploader "") + ($outputs |? {$_ -ne ""} |% {OutputUploader "rlo/outputs/**/$_" $RESULTS_SAS_URL})
+  "outputFiles" = $outputFiles
 })
 log "task=" ($task | convertfrom-json)
 
