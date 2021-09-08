@@ -6,17 +6,20 @@ Param(
   [Parameter(Position=1, ValueFromRemainingArguments=$True, Mandatory=$True)][string[]]$cmd
 )
 
-Import-Module "$PSScriptRoot\azure_batch_common.ps1"
-
 function script:log {
   write-host "azure_batch_single.ps1: $args"
 }
+
+log "BUILD: $BUILD"
+log "CMD: $cmd"
+log "outputs: $outputs"
+
+Import-Module "$PSScriptRoot\azure_batch_common.ps1"
 
 $POOL = "knossos-gpu-docker" # These have no startup task, but accept per-task containers.
 
 CreatePool $POOL
 
-log "CMD: $cmd"
 log "Creating Job and Tasks"
 
 $BUILD = CreateJob $BUILD @{

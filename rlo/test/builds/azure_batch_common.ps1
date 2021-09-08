@@ -271,9 +271,9 @@ function CheckExitCodes {
     $FAILURE_REASON=$TASK.executionInfo.failureInfo
     if ($FAILURE_REASON) {
       if (!$TASK_FAILED) {
-        log "  WARNING: failureInfo nonempty, but exitcode OK"
+        log "  WARNING: exitcode OK, but failureInfo nonempty"
       }
-      log "  ...failed: message='$($FAILURE_REASON.message)'"
+      log "  ...failureInfo.message='$($FAILURE_REASON.message)'"
       write-host $FAILURE_REASON
       $TASK_FAILED = $true
     }
