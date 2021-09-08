@@ -305,7 +305,7 @@ jobs:
         # Many of these tests also run in QuickTest and the pytest portion of BuildAndTest. However, those run on CPU.
         # we only really care about the medium tests (which are also executed by BuildAndTest but on CPU).
         inlineScript: >
-          powershell -ExecutionPolicy bypass -File rlo\test\builds\azure_batch_single.ps1 -b azbpytest-$(Build.BuildNumber) "cd rlo && pytest test/rlo/ --quick --durations=5"
+          powershell -ExecutionPolicy bypass -File rlo\test\builds\azure_batch_single.ps1 -b azbpytest-$(Build.BuildNumber) "cd rlo && bash test/azure_batch_pytest.sh"
       # dockerPassword is defined in the Azure DevOps build definition 'variables' (not in source control)
       env:
         DOCKER_PASSWORD: $(dockerPassword)
