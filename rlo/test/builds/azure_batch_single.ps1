@@ -17,7 +17,7 @@ $POOL = "knossos-gpu-docker" # These have no startup task, but accept per-task c
 CreatePool $POOL
 
 log "CMD: $cmd"
-log Creating Job and Tasks
+log "Creating Job and Tasks"
 
 $BUILD = CreateJob $BUILD @{
   "poolInfo" = @{ "poolId" = $POOL }
@@ -45,8 +45,6 @@ if (-not $?) {
 }
 log "Download results: done"
 
-$ANY_FAILED = CheckTasksDisplayTime
-
 log STDOUT
 Get-Content .\results\$BUILD\stdout.txt | % { log "STDOUT: $_"}
 log STDOUT-END
@@ -54,9 +52,11 @@ log STDERR
 Get-Content .\results\$BUILD\stderr.txt | % { log "STDERR: $_"}
 log STDERR-END
 
+$ANY_FAILED = CheckTasksDisplayTime
+
 if ($ANY_FAILED) {
     log
-    log "There were errors; see STDERR above"
+    log "There were errors; see log above"
     exit 1
 }
 
