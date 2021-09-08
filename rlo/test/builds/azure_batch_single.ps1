@@ -57,12 +57,15 @@ if (-not $?) {
 }
 log "Download results: done"
 
-log STDOUT
-Get-Content .\results\$BUILD\stdout.txt | % { log "STDOUT: $_"}
-log STDOUT-END
-log STDERR
-Get-Content .\results\$BUILD\stderr.txt | % { log "STDERR: $_"}
-log STDERR-END
+function emitlog($name) {
+  log "$name"
+  Get-Content .\results\$BUILD\$name.txt | ForEach-Object { log "${name}: $_"}
+  lof "${name}-END"
+}
+emitlog STDOUT
+emitlog STDERR
+emitlog FILEUPLOADOUT
+emitlog FILEUPLOADERR
 
 $ANY_FAILED = CheckTasksDisplayTime
 
