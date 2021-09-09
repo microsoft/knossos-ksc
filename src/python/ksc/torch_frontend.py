@@ -511,7 +511,7 @@ def make_KscAutogradFunction(py_mod) -> KscAutogradFunction:
             "backward": staticmethod(backward),
             "adapt": staticmethod(lambda x: torch_to_ks(x)),
         },
-    )
+    )  # type: ignore
 
 
 def ksc_defs_to_module(
@@ -792,7 +792,7 @@ class KscStub:
         torch_extension_name = (
             "KscStub_"
             + ("CUDA_" if configuration.gpu else "")
-            + self.vectorization.str()
+            + str(self.vectorization)
             + "_"
             + ("lm_" if self.generate_lm else "")
             + self.module.__name__
