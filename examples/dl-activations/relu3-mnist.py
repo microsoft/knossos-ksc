@@ -116,4 +116,3 @@ model = nn.Sequential(
 
 # Run training
 train_model(model, trainloader)
-
