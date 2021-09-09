@@ -1,6 +1,6 @@
 
 Relu3 - An example kernel
-=========================
+-------------------------
 
 
 .. literalinclude:: ../../../examples/dl-activations/relu3.py

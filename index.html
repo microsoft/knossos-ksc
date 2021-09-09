@@ -38,7 +38,7 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="About Knossos" href="About.html" /> 
+    <link rel="next" title="Examples" href="Examples.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -87,13 +87,20 @@
             
             
               <p class="caption"><span class="caption-text">Contents:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Welcome to Knossos!</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#derivatives">Derivatives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#so-what-i-can-do-that-in-pytorch">So what? I can do that in PyTorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integrating-with-pytorch">Integrating with PyTorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/relu3.html">Relu3 - An example kernel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/sqrl.html">SQRL - An example non-elementwise kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Benchmarking.html">Benchmarking</a></li>
 <li class="toctree-l1"><a class="reference internal" href="MLIR.html">MLIR integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Glossary.html">Knossos Glossary</a></li>
 </ul>
 
@@ -162,9 +169,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="toctree-wrapper compound">
-</div>
-<div class="section" id="welcome-to-knossos">
+  <div class="section" id="welcome-to-knossos">
 <h1>Welcome to Knossos!<a class="headerlink" href="#welcome-to-knossos" title="Permalink to this headline">¶</a></h1>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -176,12 +181,17 @@ before even starting to play :)</p>
 <p>Knossos compiles (a subset of) PyTorch (and Julia, and F#) code into C++ (and MLIR and ONNX and other stuff).
 By which we mean actual C++, that you can deploy completely runtime-free if you like,
 or linking against ATen, MLAS, ONNX Runtime, whatever you have.</p>
-<p>But that’s not all – it also contains a source-to-source autodiff,
+<p>But that’s not all – it also contains a source-to-source automatic differentiation,
 so you can get gradients for free.</p>
 <p>The canonical use case is to write custom PyTorch extensions.
 Suppose you’ve invented a great new activation function, which you call <code class="docutils literal notranslate"><span class="pre">relu3</span></code>:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nd">@knossos</span><span class="o">.</span><span class="n">elementwise</span>
-<span class="k">def</span> <span class="nf">vrelu3</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 55%" />
+<col style="width: 45%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td rowspan="9"><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">relu3</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Like ReLu, but smoother</span>
 <span class="sd">    Like GeLu, but cheaper</span>
@@ -194,16 +204,90 @@ Suppose you’ve invented a great new activation function, which you call <code 
         <span class="k">return</span> <span class="n">x</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">3</span>
 </pre></div>
 </div>
-<p>It must be better, right?  Smoother than relu, cheaper than gelu sounds like an excellent idea.</p>
-<p>Well, let’s try it in an MNIST model.  First, however, we should make it work on tensors:</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">relu3</span><span class="p">)</span>
+<p>Defining a new kernel, taking a float and returning a float</p>
+</td>
+<td rowspan="9"><div class="figure align-default">
+<a class="reference internal image-reference" href="../../build/doc/relu3-plot.png"><img alt="A plot of relu3" src="../../build/doc/relu3-plot.png" /></a>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="p">[</span><span class="n">relu3</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">t</span><span class="p">],</span> <span class="s2">&quot;b&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Like in JAX, this takes a function defined on scalars, and “vectorizes” it to work on
-Tensors.  OK, it doesn’t actually work in PyTorch 1.9, because the <cite>if</cite> statement can’t
-be translated, but it could.  Even if it did work, you would probably expect it to be
-slow.  Those with pytorch experience will know that for speed, one needs to write code
-that is vectorized from the start, something like this.</p>
+</td>
+</tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+</tbody>
+</table>
+<p>It must be better, right?  Smoother than relu, cheaper than gelu.
+So we want to test it out.  Before diving into an MNIST example,
+let’s spend a little time looking at the function.</p>
+<p>The natural way to define this elementwise function is to just write the float-to-float
+version as above, but of course we probably want it to work over tensors too.
+As in <a class="reference external" href="https://jax.readthedocs.io/en/latest/notebooks/quickstart.html#auto-vectorization-with-vmap">JAX</a>
+(or <a class="reference external" href="https://jax.readthedocs.io/en/latest/notebooks/quickstart.html#auto-vectorization-with-vmap">functorch</a>),
+we provide <code class="docutils literal notranslate"><span class="pre">vmap</span></code>, so you can simply write:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">knossos</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">relu3</span><span class="p">)</span> <span class="c1"># Turn float-&gt;float into Tensor-&gt;Tensor</span>
+</pre></div>
+</div>
+<p>and then the plotting code above could just use <code class="docutils literal notranslate"><span class="pre">vrelu3</span></code> instead of the list comprehension:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">(</span><span class="n">t</span><span class="p">),</span> <span class="s2">&quot;b&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="section" id="compilation">
+<h2>Compilation<a class="headerlink" href="#compilation" title="Permalink to this headline">¶</a></h2>
+<p>So how is it different to PyTorch or JAX?  Well, as we said above, it’s compiled.
+The default option is to compile to C++ source, and one reason for that is simply to
+be able to inspect that source, to reassure ourselves that it’s good.
+Here’s the C++ for relu3 (slightly prettified, so <code class="docutils literal notranslate"><span class="pre">auto</span> <span class="pre">c2;</span></code> won’t
+compile, but look in <code class="docutils literal notranslate"><span class="pre">build/torch_extensions</span></code> to find the real code)</p>
+<p>So, this is not that different from TorchScript,
+but note that <code class="docutils literal notranslate"><span class="pre">ks::Float</span></code> is a real c++ <code class="docutils literal notranslate"><span class="pre">float</span></code>,
+rather than a wrapper.  And the <code class="docutils literal notranslate"><span class="pre">aten::*</span></code> calls are in fact to simple
+inlined C++ functions which you can inspect in the [prelude].
+The real difference from other systems comes when we take derivatives.</p>
+</div>
+<div class="section" id="derivatives">
+<h2>Derivatives<a class="headerlink" href="#derivatives" title="Permalink to this headline">¶</a></h2>
+<p>Before we use the function for deep learning, let’s just examine it a bit more.
+We said it’s smooth, meaning, in this case, that its derivative is continuous.
+Let’s check that  by plotting the derivative.  As <code class="docutils literal notranslate"><span class="pre">vrelu3</span></code> takes a
+vector to a vector, its Jacobian is a square matrix.
+And because it’s operating elementwise,
+i.e. independently on each element of the vector, the Jacobian is diagonal,
+and a vector-Jacobian product (vjp) with a vector of all ones
+will compute the derivative at each element.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfdt</span> <span class="o">=</span> <span class="n">vrelu3</span><span class="o">.</span><span class="n">vjp</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">t</span><span class="p">))</span> <span class="c1"># Vector-Jacobian product</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">dfdt</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="figure align-default">
+<a class="reference internal image-reference" href="../../build/doc/relu3-grad-plot.png"><img alt="A plot of relu3 and its gradient" src="../../build/doc/relu3-grad-plot.png" /></a>
+</div>
+</div>
+<div class="section" id="so-what-i-can-do-that-in-pytorch">
+<h2>So what? I can do that in PyTorch<a class="headerlink" href="#so-what-i-can-do-that-in-pytorch" title="Permalink to this headline">¶</a></h2>
+<dl class="simple">
+<dt>Not really, for a few reasons:</dt><dd><ul class="simple">
+<li><p>Knossos compiles your code directly to C++/CUDA.  You can literally look at the output.</p></li>
+<li><p>This means that Knossos can easily deal with control flow like <cite>if</cite> statements,
+internal function calls, etc.</p></li>
+<li><p>It also means it’s efficient for small float-&gt;float functions like this.
+The C++ code really deals in floats, not 1x1 tensors.</p></li>
+<li><p>And the derivative code is also C++, taking plain ol’ floats.</p></li>
+</ul>
+</dd>
+</dl>
+<p>So if you try the above example with vmap from functorch or JAX, it just won’t work.
+Now, if you’re an experienced PyTorch programmer, you know that the above is
+inefficient and you naturally code it “vectorized”.  So you write</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">vrelu3_pytorch</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
     <span class="n">mask1_inf</span> <span class="o">=</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="mf">1.0</span>
     <span class="n">mask0_1</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">mask1_inf</span>
@@ -213,50 +297,150 @@ that is vectorized from the start, something like this.</p>
     <span class="k">return</span> <span class="n">mask0_1</span> <span class="o">*</span> <span class="n">val_0_1</span> <span class="o">+</span> <span class="n">mask1_inf</span> <span class="o">*</span> <span class="n">val_1_inf</span>
 </pre></div>
 </div>
-<p>With Knossos, we argue that this is neither the most natural way to program, nor even
-the fastest.  For example, x^3 is computed for all inputs.  This allows for parallelism
+<p>We argue that while performant, this is not the most natural way to write this code.
+Let’s look at the two options side by side:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 52%" />
+<col style="width: 48%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td rowspan="8"><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nd">@knossos</span><span class="o">.</span><span class="n">vmap</span>
+<span class="k">def</span> <span class="nf">vrelu3_knossos</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">0.0</span>
+    <span class="k">elif</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">x</span> <span class="o">**</span> <span class="mi">3</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">x</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">3</span>
+</pre></div>
+</div>
+<p>Knossos: define the kernel, compile with vmap</p>
+</td>
+<td rowspan="8"><div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">vrelu3_pytorch</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="n">mask1_inf</span> <span class="o">=</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="mf">1.0</span>
+    <span class="n">mask0_1</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">mask1_inf</span>
+    <span class="n">val_0_1</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">x</span> <span class="o">**</span> <span class="mi">3</span>
+    <span class="n">val_1_inf</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">/</span> <span class="mi">3</span>
+
+    <span class="k">return</span> <span class="n">mask0_1</span> <span class="o">*</span> <span class="n">val_0_1</span> <span class="o">+</span> <span class="n">mask1_inf</span> <span class="o">*</span> <span class="n">val_1_inf</span>
+</pre></div>
+</div>
+<p>PyTorch: “Thinking in tensors”.  It’s fun for a while,
+but it gets old</p>
+</td>
+</tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+<tr class="row-odd"></tr>
+<tr class="row-even"></tr>
+</tbody>
+</table>
+<p>The vectorized method may not even be the most efficient.
+For example, x^3 is computed for all inputs.  This allows for parallelism
 on massively parallel hardware, but is wasteful on small power-constrained devices.
 Secondly, as written, the computation produces 10 temporary tensors, with a working set
 of up to 3x the optimal computation.</p>
-<p>Now if you know anything about PyTorch, you should be suspicious now: isn’t this going
-to be glacially slow?  Well, let’s see.
-We’ll make a simple DNN with <code class="docutils literal notranslate"><span class="pre">vrelu3</span></code> activations, as in [](<a class="reference external" href="https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa">https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa</a>)</p>
+</div>
+<div class="section" id="integrating-with-pytorch">
+<h2>Integrating with PyTorch<a class="headerlink" href="#integrating-with-pytorch" title="Permalink to this headline">¶</a></h2>
+<p>So, we have a kernel, taking Tensors to Tensors, let’s try it in a machine learning model.
+We’ll make a simple DNN with <code class="docutils literal notranslate"><span class="pre">vrelu3</span></code> activations, as in
+<a class="reference external" href="https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa">this</a>
+tutorial:</p>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize the model using nn.Sequential</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">([</span>
-                     <span class="p">(</span><span class="s1">&#39;fc1&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span> <span class="mi">256</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;activation1&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
-                     <span class="p">(</span><span class="s1">&#39;fc2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;bn2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">128</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;activation2&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
-                     <span class="p">(</span><span class="s1">&#39;dropout&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;fc3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;bn3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">64</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;activation3&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="p">),</span>
-                     <span class="p">(</span><span class="s1">&#39;logits&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">)),</span>
-                     <span class="p">(</span><span class="s1">&#39;logsoftmax&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">LogSoftmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))]))</span>
+             <span class="p">(</span><span class="s1">&#39;fc1&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">784</span><span class="p">,</span> <span class="mi">256</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;activation1&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="o">.</span><span class="n">nnModule</span><span class="p">),</span>
+             <span class="p">(</span><span class="s1">&#39;fc2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="mi">128</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;bn2&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">128</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;activation2&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="o">.</span><span class="n">nnModule</span><span class="p">),</span>
+             <span class="p">(</span><span class="s1">&#39;dropout&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;fc3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;bn3&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">num_features</span><span class="o">=</span><span class="mi">64</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;activation3&#39;</span><span class="p">,</span> <span class="n">vrelu3</span><span class="o">.</span><span class="n">nnModule</span><span class="p">),</span>
+             <span class="p">(</span><span class="s1">&#39;logits&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">)),</span>
+             <span class="p">(</span><span class="s1">&#39;logsoftmax&#39;</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">LogSoftmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))]))</span>
 
 <span class="c1"># Run training</span>
 <span class="n">train_model</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>And after a few hours, you can hit control C.  It was really slow.</p>
-<div class="section" id="compiling-with-knossos">
-<h2>Compiling with Knossos<a class="headerlink" href="#compiling-with-knossos" title="Permalink to this headline">¶</a></h2>
-<p>This is where Knossos comes to the rescue.</p>
-<div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="n">vrelu3</span> <span class="o">=</span> <span class="n">knossos</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">vrelu3</span><span class="p">)</span>
-</pre></div>
+<p>Yay, it just works.  In this case it’s about as fast as the vectorized PyTorch
+(and much much faster than a vmap version), but of course it’s easier to write and read,
+and easier to modify, and easier to deploy.</p>
 </div>
-<p>And run again, amazingly fast!</p>
-<p>So what’s happening?</p>
-</div>
-</div>
+<div class="section" id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p>So, it’s a general-purpose python compiler! How cool!</p>
+</div></blockquote>
+<p>No, it’s not.  It is intended to allow PyTorch programmers to write more complex models
+without falling off performance cliffs.
+As mentioned above, a lot of stuff won’t work, but here’s what we want to get working
+well:</p>
+<ul class="simple">
+<li><p>Float-to-float kernels as above</p></li>
+<li><p>Small tensor-to-tensor kernels (see <a class="reference external" href="examples/sqrl">sqrl</a>)</p></li>
+<li><p>Messy computer vision models like those in (see <a class="reference external" href="examples/sqrl">ADBench</a>)</p></li>
+<li><p>Simple concatenations of operators like LSTM</p></li>
+</ul>
+<p>And we want them all to be as fast as reasonable human-written C++</p>
 <div class="section" id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<h3>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Welcome to Knossos!</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#derivatives">Derivatives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#so-what-i-can-do-that-in-pytorch">So what? I can do that in PyTorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integrating-with-pytorch">Integrating with PyTorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Examples.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/relu3.html">Relu3 - An example kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/relu3-MNIST.html">Relu3 MNIST - Using Rrelu3 in a PyTorch model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/sqrl.html">Sqrl - An example tensor-to-tensor kernel</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="SYNTAX.html">Knossos IR</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#the-need-for-an-informal-syntax-and-semantics">The need for an informal syntax and semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-syntax">Basic Syntax</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#types">Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="SYNTAX.html#basic-constructs">Basic Constructs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="Benchmarking.html">Benchmarking</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#nightly-benchmark-runs">Nightly benchmark runs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#getting-existing-results">Getting existing results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Benchmarking.html#making-comparisons">Making comparisons</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="MLIR.html">MLIR integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="About.html">About Knossos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Glossary.html">Knossos Glossary</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#kinaufl-knossos-is-not-a-user-facing-language">KINAUFL: Knossos is not a user-facing language.</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#otp-one-theorem-prover">OTP: One theorem prover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#suf-single-use-form">SUF: Single use form</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#otos-optimized-for-time-or-space">OtOs: Optimized for time or space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#idtw-if-that-didn-t-work">IDTW: If that didn’t work</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Glossary.html#general-concepts-from-related-work">General concepts from related work</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+</div>
 </div>
 
 
@@ -265,7 +449,7 @@ We’ll make a simple DNN with <code class="docutils literal notranslate"><span 
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="About.html" class="btn btn-neutral float-right" title="About Knossos" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="Examples.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

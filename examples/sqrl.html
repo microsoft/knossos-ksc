@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>SQRL - An example non-elementwise kernel &mdash; Knossos 0.7 documentation</title>
+  <title>Sqrl - An example tensor-to-tensor kernel &mdash; Knossos 0.7 documentation</title>
   
 
   
@@ -38,8 +38,8 @@
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Benchmarking" href="../Benchmarking.html" />
-    <link rel="prev" title="Relu3 - An example kernel" href="relu3.html" /> 
+    <link rel="next" title="Knossos IR" href="../SYNTAX.html" />
+    <link rel="prev" title="Relu3 MNIST - Using Rrelu3 in a PyTorch model" href="relu3-MNIST.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -89,12 +89,24 @@
             
               <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../About.html">About Knossos</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Welcome to Knossos!</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../index.html#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#derivatives">Derivatives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#so-what-i-can-do-that-in-pytorch">So what? I can do that in PyTorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html#integrating-with-pytorch">Integrating with PyTorch</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html#limitations">Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="../Examples.html">Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="relu3.html">Relu3 - An example kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="relu3-MNIST.html">Relu3 MNIST - Using Rrelu3 in a PyTorch model</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Sqrl - An example tensor-to-tensor kernel</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../SYNTAX.html">Knossos IR</a></li>
-<li class="toctree-l1"><a class="reference internal" href="relu3.html">Relu3 - An example kernel</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">SQRL - An example non-elementwise kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../Benchmarking.html">Benchmarking</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../MLIR.html">MLIR integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../About.html">About Knossos</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../Glossary.html">Knossos Glossary</a></li>
 </ul>
 
@@ -144,9 +156,9 @@
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
         
-          <li><a href="../Examples.html">&lt;no title&gt;</a> &raquo;</li>
+          <li><a href="../Examples.html">Examples</a> &raquo;</li>
         
-      <li>SQRL - An example non-elementwise kernel</li>
+      <li>Sqrl - An example tensor-to-tensor kernel</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -165,8 +177,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="sqrl-an-example-non-elementwise-kernel">
-<h1>SQRL - An example non-elementwise kernel<a class="headerlink" href="#sqrl-an-example-non-elementwise-kernel" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="sqrl-an-example-tensor-to-tensor-kernel">
+<h1>Sqrl - An example tensor-to-tensor kernel<a class="headerlink" href="#sqrl-an-example-tensor-to-tensor-kernel" title="Permalink to this headline">¶</a></h1>
 <div class="highlight-Python notranslate"><div class="highlight"><pre><span></span><span class="nd">@knossos</span><span class="o">.</span><span class="n">register</span>
 <span class="k">def</span> <span class="nf">sqrl</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -191,8 +203,8 @@
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="../Benchmarking.html" class="btn btn-neutral float-right" title="Benchmarking" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="relu3.html" class="btn btn-neutral float-left" title="Relu3 - An example kernel" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../SYNTAX.html" class="btn btn-neutral float-right" title="Knossos IR" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="relu3-MNIST.html" class="btn btn-neutral float-left" title="Relu3 MNIST - Using Rrelu3 in a PyTorch model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
