@@ -1,3 +1,5 @@
+Write-host "============================== azure_batch_common.ps1 =============================="
+
 # Common functions, variables and setup for azure_batch builds.
 # Note many of these use global variables in the module; they have not been made fully reusable or parameterized.
 az batch account login --name knossosbuildpipeline --resource-group adobuilds --subscription Knossos
@@ -124,10 +126,11 @@ $env:AZURE_STORAGE_ACCOUNT="knossosbuildpipeline"
 az storage container create --name "sources" > $null
 $SRC_NAME="src_$($env:BUILD_SOURCEVERSION).zip"
 $SRC_SAS=GenerateSAS blob --name $SRC_NAME --container-name "sources" --permission "r"
+az storage blob upload --container-name "sources" --name $SRC_NAME --file "src.zip"
 
-az storage blob upload --container-name "sources" --name $SRC_NAME --file "src.zip" --sas-token $SRC_SAS
 Write-Host get url
 $SRC_URL=az storage blob url --container-name "sources" --name $SRC_NAME --sas-token $SRC_SAS | ConvertFrom-Json
+
 Write-Host src_url $SRC_URL
 $srcZipResource = @{
   "httpUrl" = $SRC_URL
@@ -288,3 +291,5 @@ function CheckTasksDisplayTime {
   PrintTotalTime $tasks
   return $ANY_FAILED
 }
+
+Write-host "============================== end azure_batch_common.ps1 =============================="
