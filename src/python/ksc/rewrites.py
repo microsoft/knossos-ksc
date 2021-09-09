@@ -187,6 +187,8 @@ class RuleSet(AbstractMatcher):
 
 @singleton
 class inline_var(RuleMatcher):
+    # Keeping this rule here rather than in rewrites_ast.py
+    # because the "env: Environment" is specifically designed to support it
     possible_filter_terms = frozenset([Var])
 
     def matches_for_possible_expr(
@@ -215,6 +217,8 @@ class inline_var(RuleMatcher):
 
 @singleton
 class inline_call(RuleMatcher):
+    # Keeping this rule here rather than in rewrites_ast.py
+    # because the "env: Environment" is specifically designed to support it
     possible_filter_terms: FrozenSet[typing.Type[Expr]] = frozenset()
     may_match_any_call = True
 
@@ -254,6 +258,7 @@ class inline_call(RuleMatcher):
         yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
+# TODO move to rewrites_ast.py
 @singleton
 class delete_let(RuleMatcher):
     possible_filter_terms = frozenset([Let])
@@ -276,6 +281,25 @@ class delete_let(RuleMatcher):
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
             yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
+
+
+class RuleFilter(RuleMatcher):
+    def __init__(
+        self, name: str, base_rule: RuleMatcher, filter: Callable[[Match], bool]
+    ):
+        super().__init__(name)
+        self._base_rule = base_rule
+        self._filter = filter
+        self.may_match_any_call = base_rule.may_match_any_call
+
+    @property
+    def possible_filter_terms(self):
+        return self._base_rule.possible_filter_terms
+
+    def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
+        for m in self._base_rule.matches_for_possible_expr(ewp, env):
+            if self._filter(m):
+                yield Match(ewp=m.ewp, rule=self, apply_rewrite=m.apply_rewrite)
 
 
 ###############################################################################
@@ -495,16 +519,18 @@ class SubstPattern(ExprTransformer):
 
     def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
+        rhs = self.visit(l.rhs, var_names_to_exprs)
+        # Update substitution for body
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.vars, var_names_to_exprs, [l.body]
         )
-        # Substitute bound var with target_var in children. It's fine to apply this substitution outside
-        # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
+        if target_var.type_.contains_any():
+            # Unfortunately we must set the type of target_var here, before recursing into the body,
+            # as said type depends on the binding here and can't be figured out from the body.
+            target_var.type_ = rhs.type_
+        # Substitute bound var with target_var in body.
         return Let(
-            target_var,
-            self.visit(l.rhs, var_names_to_exprs),
-            self.visit(l.body, var_names_to_exprs),
-            type=l.type_,
+            target_var, rhs, self.visit(l.body, var_names_to_exprs), type=l.type_,
         )
 
     def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:

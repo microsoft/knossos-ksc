@@ -207,11 +207,11 @@ def generate_cpp_entry_point(
 {cpp_function} {{
 """
 
-    # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
+    # auto ks_arg0 = convert_to_ks_viewing_tensordata<ks::tensor<Dim, Float>>(arg0);
     # ...
-    # auto ks_arg7 = convert_argument<ks::tensor<Dim, Float>>(arg7);
+    # auto ks_arg7 = convert_to_ks_viewing_tensordata<ks::tensor<Dim, Float>>(arg7);
     for i in range(num_args):
-        cpp += f"    auto ks_arg{i} = convert_argument<{ks_cpp_type(arg_types[i])}>(arg{i});\n"
+        cpp += f"    auto ks_arg{i} = convert_to_ks_viewing_tensordata<{ks_cpp_type(arg_types[i])}>(arg{i});\n"
 
     # auto ks_ret = ks::my_kernel(&g_alloc, ks_arg0, ..., ks_arg7);
     cpp += f"""
@@ -220,7 +220,7 @@ def generate_cpp_entry_point(
 
     # convert return value and return
     cpp += f"""
-    return convert_return_value<{cpp_return_type}>(ks_ret);
+    return convert_from_ks<{cpp_return_type}>(ks_ret);
 }}
 """
     return cpp_declaration, cpp
@@ -343,22 +343,23 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     int64_t n = arg0.size(0);
 """
 
-    # auto ks_arg0 = convert_argument<ks::tensor<2,float>>(arg0)
+    # auto ks_arg0 = convert_to_ks_viewing_tensordata<ks::tensor<2,float>>(arg0)
     # ...
-    # auto ks_arg7 = convert_argument<ks::tensor<1,int>>(arg7)
+    # auto ks_arg7 = convert_to_ks_viewing_tensordata<ks::tensor<1,int>>(arg7)
     for k in range(num_args):
         cpp += f"""
     KS_ASSERT(arg{k}.is_contiguous());
     KS_ASSERT(arg{k}.scalar_type() == scalar_type_of_Float);
     KS_ASSERT(arg{k}.size(0) == n);
 
-    auto ks_arg{k} = convert_argument<{ks_types[k]}>(arg{k});
+    auto ks_arg{k} = convert_to_ks_viewing_tensordata<{ks_types[k]}>(arg{k});
 """
 
     # Difficulty: depending on the rank of ks_ret, ks_ret[i] returns either
     #   Rank 1: a reference to the float at  index i
     #   Rank 2: an rvalue representing a view on subtensor i.
-    # inplace add must act differently on each, so we switch on the return dimension here
+    # TODO: consider unifying the code (https://github.com/microsoft/knossos-ksc/pull/1046/files#r700957531)
+    # When doing that, ensure no speed impact, which requires benchmarking support I don't have now.
 
     ks_return_type = add_vmap_dimension(decl.return_type)
     ks_return_dim = ks_return_type.tensor_rank
@@ -386,23 +387,23 @@ torch::Tensor {cpp_function_name}({join_args(lambda k: f'torch::Tensor arg{k}')}
     // Make the first call to determine output size
     auto ret0 = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[0]")});
 
-    // Create Torch return value
+    // Create empty Torch return value
     auto [{ks_sizes}] = ret0.size();
-    // TODO: use torch::empty here, and copydown below.
-    auto ret = torch::zeros({{n, {ks_sizes}}});
-    // And wrap it in ks - this is a view of the torch data, so convert_argument, not convert_return_value
-    auto ks_ret = convert_argument<ks::tensor<{ks_return_dim}, Float>>(ret);
+    auto ret = torch::empty({{n, {ks_sizes}}});
+    
+    // And wrap it in ks - this is a view of the torch data
+    auto ks_ret = convert_to_ks_viewing_tensordata<ks::tensor<{ks_return_dim}, Float>>(ret);
 
     // Place 0th value in the output
-    auto ks_ret0 = ks_ret[0];
-    inplace_add(&ks_ret0, ret0); // This would update a temporary in the 1D case
-
+    auto && ks_ret0 = ks_ret[0];
+    inplace_copy(&ks_ret0, ret0);
+    
     // And then place the rest
     KS_MARK(&g_alloc, mark);
     for (int i = 1; i != n; ++i) {{
         auto val = ks::{ks_name}(&g_alloc {concat_args(lambda k: f", ks_arg{k}[i]")});
         auto ks_ret_view = ks_ret[i];
-        inplace_add(&ks_ret_view, val);
+        inplace_copy(&ks_ret_view, val);
         // We have copied the return value, can reset allocator
         KS_RESET(&g_alloc, mark);
     }}

@@ -28,6 +28,7 @@ executable ksc
                  Ksc.SUF
                  Ksc.SUF.AD
                  Ksc.SUF.Rewrite
+                 Ksc.Test
                  Ksc.Traversal
   hs-source-dirs: src/ksc
   build-depends: base >= 4.9,

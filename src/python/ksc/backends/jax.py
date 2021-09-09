@@ -3,6 +3,9 @@ try:
     import jax.numpy as np
     import jax.experimental.stax as stax
 except ModuleNotFoundError:
+    import warnings
+
+    warnings.warn("ksc.backends.jax: Cannot find JAX!  This is expected on Windows.")
     import numpy as np
 
 # Use relative import to work around a python 3.6 issue

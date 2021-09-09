@@ -27,6 +27,7 @@ import Test.Hspec
 import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
 import Data.Foldable( toList )
+import Text.PrettyPrint ((<+>), text, parens, render, vcat)
 
 optTrace :: String -> a -> a
 optTrace _msg t = t

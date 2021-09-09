@@ -19,6 +19,7 @@ import GHC.Stack
 import Control.Monad( ap )
 import Data.List( intersperse )
 import qualified Text.EditDistance as E
+import Text.PrettyPrint (($$), (<+>), text,  hang,  empty, render, vcat, nest)
 
 configEditDistanceThreshold :: Int
 configEditDistanceThreshold = 5

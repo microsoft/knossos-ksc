@@ -351,7 +351,7 @@ def build_module_using_pytorch_from_ks(
 
     return build_module_using_pytorch_from_cpp_backend(
         [
-            ("ksc-main.cu" if gpu else "ks-main.cpp", cpp_definitions),
+            ("ksc-main.cu" if gpu else "ksc-main.cpp", cpp_definitions),
             ("ksc-pybind.cpp", cpp_pybind),
         ],
         torch_extension_name,

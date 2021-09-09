@@ -33,20 +33,6 @@
 ; LLVM:   ptrtoint double* %{{[0-9]+}} to i64
 ; LLVM:   call i8* @malloc(i64 %{{[0-9]+}})
 
-; Size direct from a build
-(def sizeBuild Integer ((x : Integer) (N : Integer))
-  (size (build N (lam (i : Integer) i))))
-; MLIR: func private @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
-; MLIR:   %c0 = constant 0 : index
-; MLIR:   %[[sz:[0-9]+]] = dim %{{.*}}, %c0 : memref<?xi64>
-; MLIR:   %[[ret:[0-9]+]] = index_cast %[[sz]] : index to i64
-; MLIR:   return %[[ret]] : i64
-
-
-; LLVM: define i64 @"sizeBuild$aii"(i64 %0, i64 %1) {
-; LLVM:   %[[size:[0-9]+]] = extractvalue { i64*, i64*, i64, [1 x i64], [1 x i64] } %{{.*}}, 3, 0
-; LLVM:   ret i64 %[[size]]
-
 ; Index direct from a build
 (def indexBuild Integer ((x : Integer) (N : Integer))
   (index x (build N (lam (i : Integer) i))))
@@ -67,26 +53,17 @@
 ; Creating a 10-element vector of integers, from 0 to 9
      (let (v (build 10 (lam (i : Integer) (add i argc)))) 
         (add (size v) (index 5 v)))
-; MLIR:   %c10{{.*}} = constant 10 : i64
-; MLIR:   %[[idxV:[0-9]+]] = index_cast %c10{{.*}} : i64 to index
-; MLIR:   %[[vec:[0-9]+]] = alloc(%[[idxV]]) : memref<?xi64>
-; MLIR:   %[[zero:[ci_0-9]+]] = constant 0 : i64
 ; MLIR:   %[[ten:[ci_0-9]+]] = constant 10 : i64
-; MLIR:   br ^[[headBB:bb[0-9]+]](%c0_i64 : i64)
-; MLIR: ^[[headBB]](%[[ivHead:[0-9]+]]: i64):	// 2 preds: ^bb0, ^[[bodyBB:bb[0-9]+]]
-; MLIR:   %[[cond:[0-9]+]] = cmpi slt, %[[ivHead]], %[[ten]] : i64
-; MLIR:   cond_br %[[cond]], ^[[bodyBB]](%[[ivHead]] : i64), ^[[tailBB:bb[0-9]+]]
-; MLIR: ^[[bodyBB]](%[[ivBody:[0-9]+]]: i64):	// pred: ^[[headBB]]
-; MLIR:   %[[expr:[0-9]+]] = addi %[[ivBody]], %c7_i64 : i64
-; MLIR:   %[[idxW:[0-9]+]] = index_cast %[[ivBody]] : i64 to index
-; MLIR:   store %[[expr]], %[[vec]][%[[idxW]]] : memref<?xi64>
-; MLIR:   %[[one:[ci_0-9]+]] = constant 1 : i64
-; MLIR:   %[[incr:[0-9]+]] = addi %[[ivBody]], %[[one]] : i64
-; MLIR:   br ^[[headBB]](%[[incr]] : i64)
-; MLIR: ^[[tailBB]]: // pred: ^[[headBB]]
+; MLIR:   %[[zero:[ci_0-9]+]] = constant 0 : index
+; MLIR:   %[[idxV:[0-9]+]] = index_cast %[[ten]] : i64 to index
+; MLIR:   %[[vec:[0-9]+]] = alloc(%[[idxV]]) : memref<?xi64>
+; MLIR:   scf.for %[[arg:[arg0-9]+]] = %[[zero]] to %[[idxV]] step %{{.*}} {
+; MLIR:   %[[i:[0-9]+]] = index_cast %[[arg]] : index to i64
+; MLIR:   %[[expr:[0-9]+]] = addi %[[i]], %c7_i64 : i64
+; MLIR:   store %[[expr]], %[[vec]][%[[arg]]] : memref<?xi64>
 ; MLIR-DAG:   %[[cast:[0-9]+]] = memref_cast %[[vec]] : memref<?xi64> to memref<?xi64>
-; MLIR-DAG:   %c0 = constant 0 : index
-; MLIR-DAG:   %[[dim:[0-9]+]] = dim %[[cast]], %c0 : memref<?xi64>
+; MLIR-DAG:   %[[zero0:[ci_0-9]+]] = constant 0 : index
+; MLIR-DAG:   %[[dim:[0-9]+]] = dim %[[cast]], %[[zero0]] : memref<?xi64>
 ; MLIR-DAG:   %[[dimcast:[0-9]+]] = index_cast %[[dim]] : index to i64
 ; MLIR-DAG:   %[[five:[ci_0-9]+]] = constant 5 : i64
 ; MLIR-DAG:   %[[idxR:[0-9]+]] = index_cast %c5_i64 : i64 to index
@@ -101,15 +78,14 @@
 ; LLVM:   %[[cond:[0-9]+]] = icmp slt i64 %[[headPHI]], 10
 ; LLVM:   br i1 %[[cond]], label %[[bodyBB]], label %[[tailBB:[0-9]+]]
 ; LLVM: [[bodyBB]]:                                               ; preds = %[[headBB]]
-; LLVM:   %[[bodyPHI:[0-9]+]] = phi i64 [ %[[headPHI]], %[[headBB]] ]
-; LLVM:   %[[expr:[0-9]+]] = add i64 %[[bodyPHI]], 7
-; LLVM:   %[[ptrW:[0-9]+]] = getelementptr i64
-; LLVM:   store i64 %[[expr]], i64* %[[ptrW]]
-; LLVM:   %[[incr]] = add i64 %[[bodyPHI]], 1
+; LLVM:   %[[expr:[0-9]+]] = add i64 %[[headPHI]], 7
+; LLVM:   %[[ptrW:[0-9]+]] = getelementptr i64, i64* %{{.*}}, i64 %[[headPHI]]
+; LLVM:   store i64 %[[expr]], i64* %[[ptrW]], align 4
+; LLVM:   %[[incr]] = add i64 %[[headPHI]], 1
 ; LLVM:   br label %[[headBB]]
 ; LLVM: [[tailBB]]:                                               ; preds = %[[headBB]]
 ; LLVM:   %[[ptrR:[0-9]+]] = getelementptr i64, i64* %{{.*}}, i64 5
-; LLVM:   %[[idx:[0-9]+]] = load i64, i64* %[[ptrR]]
+; LLVM:   %[[idx:[0-9]+]] = load i64, i64* %[[ptrR]], align 4
 ; LLVM:   %[[ret:[0-9]+]] = add i64 %{{.*}}, %[[idx]]
 ; LLVM:   ret i64 %[[ret]]
 

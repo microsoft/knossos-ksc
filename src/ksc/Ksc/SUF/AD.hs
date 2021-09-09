@@ -20,6 +20,8 @@ import qualified Data.Set as S
 import           Data.Maybe (mapMaybe)
 import           Data.Traversable (mapAccumL)
 
+import Text.PrettyPrint ((<+>), text)
+
 type SUFFwdRevPass =
   GblSymTab
   -- ^ Global symbol table, only used for looking up the

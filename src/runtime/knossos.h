@@ -1071,6 +1071,54 @@ namespace ks {
 		return make_zero_t<T>::ofShape(alloc, shape);
 	}
 
+	// ===============================  Inplace copy ==================================
+	template <class T>
+	struct inplace_copy_t {
+    // Default implementation for scalars
+		static KS_FUNCTION void go(T *t1, const T &t2) { *t1 = t2; }
+	};
+
+	template <class T>
+	KS_FUNCTION void inplace_copy(T* t1, T const& t2)
+	{
+		inplace_copy_t<T>::go(t1, t2);
+	}
+
+	template <>
+	struct inplace_copy_t<Tuple<>> {
+		static KS_FUNCTION void go(Tuple<> *t1, const Tuple<> &t2) { }
+	};
+
+	template <size_t i, class T, class... Ts>
+	KS_FUNCTION void inplace_copy_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
+	{
+		static constexpr size_t size_minus_1 = sizeof...(Ts);
+
+		inplace_copy(&ks::get<i>(*t1), ks::get<i>(t2));
+		if constexpr (i < size_minus_1)
+			inplace_copy_aux<i + 1>(t1, t2);
+	}
+
+	template <class T, class... Ts>
+	struct inplace_copy_t<Tuple<T, Ts...>> {
+		static KS_FUNCTION void go(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
+		{
+			inplace_copy_aux<0>(t1, t2);
+		}
+	};
+
+	template <size_t Dim, class T>
+	struct inplace_copy_t<tensor<Dim, T>> {
+		static KS_FUNCTION void go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
+		{
+			KS_ASSERT(t1->size() == t2.size());
+			T* t1data = t1->data();
+			const T* t2data = t2.data();
+			for (int i = 0, n = t1->num_elements(); i < n; ++i)
+				ks::inplace_copy_t<T>::go(&t1data[i], t2data[i]);
+		}
+	};
+
 	// ===============================  Inplace add ==================================
 	template <class T>
 	struct inplace_add_t {
@@ -1091,10 +1139,10 @@ namespace ks {
 	template <size_t i, class T, class... Ts>
 	KS_FUNCTION void inplace_add_aux(Tuple<T, Ts...> *t1, const Tuple<T, Ts...> &t2)
 	{
-		static constexpr size_t n = sizeof...(Ts);
+		static constexpr size_t size_minus_1 = sizeof...(Ts);
 
 		inplace_add(&ks::get<i>(*t1), ks::get<i>(t2));
-		if constexpr (i < n)
+		if constexpr (i < size_minus_1)
 			inplace_add_aux<i + 1>(t1, t2);
 	}
 

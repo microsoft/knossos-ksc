@@ -11,6 +11,7 @@ import Ksc.Lang
 import Ksc.OptLet( Subst, mkEmptySubst, substBndr, substVar )
 import Ksc.KMonad
 import Control.Monad( ap )
+import Text.PrettyPrint ((<+>), text, char)
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
 anfDefs :: Monad m => [TDef] -> KMT m [TDef]

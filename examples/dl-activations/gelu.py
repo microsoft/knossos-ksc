@@ -63,17 +63,17 @@ embedded_cpp_entry_points = """
 
 torch::Tensor entry(torch::Tensor t) {
     using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_t = convert_to_ks_viewing_tensordata<ks::tensor<1, ks::Float>>(t);
     auto ks_ret = ks::vgelu(&g_alloc, ks_t);
-    return convert_return_value<torch::Tensor>(ks_ret);
+    return convert_from_ks<torch::Tensor>(ks_ret);
 }
 
 torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
     using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
-    auto ks_dret = convert_argument<ks::tensor<1, ks::Float>>(dret);
+    auto ks_t = convert_to_ks_viewing_tensordata<ks::tensor<1, ks::Float>>(t);
+    auto ks_dret = convert_to_ks_viewing_tensordata<ks::tensor<1, ks::Float>>(dret);
     auto ks_ret = ks::sufrev_vgelu(&g_alloc, ks_t, ks_dret);
-    return convert_return_value<torch::Tensor>(ks_ret);
+    return convert_from_ks<torch::Tensor>(ks_ret);
 }
 """
 

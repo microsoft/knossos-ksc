@@ -3,16 +3,76 @@ from typing import Iterable, Iterator, Tuple, Type
 import functools
 
 from ksc.cav_subst import replace_subtree, replace_free_vars, make_nonfree_var
-from ksc.expr import Expr, Call, If, Rule, Var, Let, Const
-from ksc.path import ExprWithPath, PathElement
+from ksc.expr import Expr, Call, If, Rule, Var, Let, Const, Assert, Lam
+from ksc.parse_ks import parse_ks_file
+from ksc.path import ExprWithPath, PathElement, let_rhs, let_body, lam_body
 from ksc.rewrites import (
     RuleMatcher,
+    RuleFilter,
     ParsedRuleMatcher,
     Match,
     VariableSubstitution,
     parse_rule_str,
 )
+from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
+
+
+@singleton
+class raw_new_bind(ParsedRuleMatcher):
+    """ A version of the new_bind rule that matches almost anywhere
+        (anywhere except on Vars or Consts). """
+
+    def __init__(self):
+        rule = single_elem(
+            list(parse_ks_file('(rule "raw_new_bind" (e : Any) e (let (x e) x))'))
+        )
+        type_propagate(rule, {})
+        super().__init__(rule)
+
+    # ParsedRuleMatcher would think from our RHS that this rule matches only Vars
+    possible_filter_terms = frozenset([Let, Lam, If, Assert])
+    may_match_any_call = True
+
+
+# This version avoids introducing lets in places where they cannot help;
+# we expect this to generate all *useful* matches.
+new_bind = RuleFilter(
+    "new_bind",
+    raw_new_bind,
+    lambda m: (
+        len(m.ewp.path) > 0 and m.ewp.path[-1] not in [let_rhs, let_body, lam_body]
+    ),
+)
+
+
+@singleton
+class inline_let(RuleMatcher):
+    possible_filter_terms = frozenset([Let])
+
+    def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
+        assert isinstance(ewp.expr, Let)
+
+        def apply() -> Expr:
+            def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
+                assert const_zero == Const(0.0)  # Passed to replace_subtree below
+                assert let_node is ewp.expr
+                return replace_free_vars(
+                    let_node.body, {let_node.vars.name: let_node.rhs}
+                )
+
+            # The constant just has no free variables that we want to avoid being captured
+            return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
+
+        yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
+
+
+cse_bind = parse_rule_str(
+    """(rule "cse_bind" ((rhs : Any) (body : Any))
+             (let (x rhs) (let (y rhs) body))
+             (let (x rhs) (let (y x) body)))""",
+    {},
+)
 
 ###############################################################################
 # Lifting rules

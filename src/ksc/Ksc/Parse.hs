@@ -97,12 +97,13 @@ Notes:
 -}
 
 
-import Ksc.Lang hiding (parens, brackets)
+import Ksc.Lang
 import Ksc.Traversal ( over )
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
+import Text.PrettyPrint (render)
 
 import qualified Text.Parsec.Token as Tok
 
