@@ -23,7 +23,8 @@ class VecSpec:
      VMap: f is compiled to take rank 2 tensors, and mapped over the first dimension.
     """
 
-    pass
+    def str(self):
+        return "BASE_VecSpec"
 
 
 @dataclass

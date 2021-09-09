@@ -792,7 +792,7 @@ class KscStub:
         torch_extension_name = (
             "KscStub_"
             + ("CUDA_" if configuration.gpu else "")
-            + str(self.vectorization)
+            + self.vectorization.str()
             + "_"
             + ("lm_" if self.generate_lm else "")
             + self.module.__name__
