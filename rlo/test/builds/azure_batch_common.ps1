@@ -123,8 +123,10 @@ Write-Host Uploading src.zip to Blob Storage
 $env:AZURE_STORAGE_ACCOUNT="knossosbuildpipeline"
 az storage container create --name "sources" > $null
 $SRC_NAME="src_$($env:BUILD_SOURCEVERSION).zip"
-az storage blob upload --container-name "sources" --name $SRC_NAME --file "src.zip"
 $SRC_SAS=GenerateSAS blob --name $SRC_NAME --container-name "sources" --permission "r"
+
+az storage blob upload --container-name "sources" --name $SRC_NAME --file "src.zip" --sas-token $SRC_SAS
+Write-Host get url
 $SRC_URL=az storage blob url --container-name "sources" --name $SRC_NAME --sas-token $SRC_SAS | ConvertFrom-Json
 Write-Host src_url $SRC_URL
 $srcZipResource = @{
