@@ -463,7 +463,7 @@ def torch_to_ks(val):
 
         return val.contiguous()  # Get data, or copy if not already contiguous
 
-    raise NotImplementedError()
+    raise NotImplementedError(val)
 
 
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
@@ -490,10 +490,14 @@ def backward_template(py_mod, ctx, *args):
 
 
 class KscAutogradFunction(torch.autograd.Function):
+    """
+    An instance of torch.autograd.Function representing a Knossos compilation.
+    """
+
     pass
 
 
-def make_KscAutogradFunction(py_mod):
+def make_KscAutogradFunction(py_mod) -> KscAutogradFunction:
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
@@ -507,7 +511,7 @@ def make_KscAutogradFunction(py_mod):
             "backward": staticmethod(backward),
             "adapt": staticmethod(lambda x: torch_to_ks(x)),
         },
-    )
+    )  # type: ignore
 
 
 def ksc_defs_to_module(
@@ -598,7 +602,7 @@ def ksc_defs_to_autograd_function(
     vectorization=False,
     generate_lm=True,
     gpu=False,
-):
+) -> KscAutogradFunction:
     mod = ksc_defs_to_module(
         ksc_defs,
         entry_def,
@@ -616,7 +620,7 @@ def ksc_string_to_autograd_function(
     torch_extension_name,
     generate_lm=True,
     extra_cflags=default_cflags,
-):
+) -> KscAutogradFunction:
     mod = ksc_string_to_module(
         ks_str,
         entry_sn,
@@ -634,7 +638,7 @@ def cpp_string_to_autograd_function(
     entry_name="entry",
     entry_vjp_name="entry_vjp",
     extra_cflags=default_cflags,
-):
+) -> KscAutogradFunction:
     mod = cpp_string_to_module(
         cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags
     )
@@ -649,7 +653,7 @@ def _tsmod2ksmod(
     generate_lm=True,
     vectorization: VecSpec = VecSpec_None(),
     gpu=False,
-):
+) -> KscAutogradFunction:
     assert isinstance(example_inputs, tuple)
 
     # Transform example inputs to match vectorization
@@ -681,6 +685,21 @@ class CompileConfiguration:
     gpu: bool = False
 
 
+class Lambda(torch.nn.Module):
+    """
+    Input: A Function
+    Returns : A Module that can be used
+        inside nn.Sequential
+    """
+
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def forward(self, x):
+        return self.func(x)
+
+
 @dataclass
 class KscStub:
     raw_f: Callable
@@ -698,6 +717,19 @@ class KscStub:
         for use in the "forward/backward" pattern for gradient computation. 
         """
         return self.ensure_compiled(args).apply(*args)
+
+    def nnModule(self, example_input):
+        """
+        Return a torch.nn.Module
+        """
+        autogradfunction = self.ensure_compiled(example_input)
+        return Lambda(autogradfunction.apply)
+
+    def autogradFunction(self, *args):
+        """
+        Return a torch.autograd.Function
+        """
+        return self.ensure_compiled(args)
 
     def _reset_allocator(self, *args):
         self.ensure_compiled(args).py_mod.reset_allocator()
@@ -720,9 +752,25 @@ class KscStub:
         assert configuration in self.compiled  # TODO: infer call args from vjp args
         return self.compiled[configuration].py_mod.entry_vjp(*args)
 
+    def vjp(self, x, df):
+        """
+        Compute vector-Jacobian product
+        ``` 
+           vjp(x,df) = J(x)^T * df
+        ```
+        """
+        f = self.ensure_compiled(x)
+        x_ks = torch_to_ks(x)
+        df_ks = torch_to_ks(df)
+        f.py_mod.reset_allocator()
+        out_ks = f.py_mod.entry_vjp(x, df)
+        out = torch_from_ks(out_ks)
+        f.py_mod.reset_allocator()
+        return out
+
     def compile(
         self, example_inputs, torch_extension_name, configuration=CompileConfiguration()
-    ):
+    ) -> KscAutogradFunction:
         self.compiled[configuration] = _tsmod2ksmod(
             self.module,
             self.raw_f,
@@ -735,7 +783,7 @@ class KscStub:
 
         return self.compiled[configuration]
 
-    def ensure_compiled(self, example_inputs):
+    def ensure_compiled(self, example_inputs) -> KscAutogradFunction:
         configuration = CompileConfiguration(gpu=_input_is_gpu(example_inputs))
         compiled = self.compiled.get(configuration)
         if compiled is not None:
@@ -781,6 +829,7 @@ def _register_core(
 ) -> KscStub:
 
     if isinstance(f, KscStub):
+        # TODO: this should just add to the list of configurations required of the function
         # Copy the existing KscStub, setting new flags, and force recompilation
         return replace(
             f, generate_lm=generate_lm, vectorization=vectorization, compiled=dict(),
