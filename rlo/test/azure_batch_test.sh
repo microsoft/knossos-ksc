@@ -1,4 +1,5 @@
 #!/bin/bash
+exec 2>&1 # interleave stdout and stderr
 set -e
 set -x
 
