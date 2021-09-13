@@ -43,15 +43,14 @@ class CFlags:
         return CFlags(cl_flags=[], gcc_flags=gcc_flags)
 
 
-default_cflags = CFlags(
-    cl_flags=["/std:c++17", "/O2"],
-    gcc_flags=[
-        "-std=c++17",
-        "-g",
-        "-O3",
-        # "-DKS_BOUNDS_CHECK",
-    ],
-)
+cl_flags_opt = ["/std:c++17", "/O2"]
+cl_flags_debug = ["/std:c++17", "/Zi"]
+gcc_flags_debug = ["-std=c++17", "-g", "-DKS_BOUNDS_CHECK"]
+gcc_flags_opt = ["-std=c++17", "-g", "-O3"]
+
+cflags_opt = CFlags(cl_flags=cl_flags_opt, gcc_flags=gcc_flags_opt)
+cflags_debug = CFlags(cl_flags=cl_flags_debug, gcc_flags=gcc_flags_debug)
+default_cflags = cflags_opt
 
 
 def subprocess_run(cmd, env=None):
@@ -161,21 +160,21 @@ def build_py_module_from_cpp(cpp_str, profiling=False):
         [sys.executable, "-m", "pybind11", "--includes"],
         env={"PYTHONPATH": pybind11_path},
     )
+    cmd = (
+        f"g++ -I{ksc_runtime_dir} -I{pybind11_path}/include "
+        + python_includes
+        + " -Wall -Wno-unused-variable -Wno-unused-but-set-variable"
+        " -fmax-errors=1"
+        " -std=c++17"
+        " -fPIC"
+        " -g -O3 -DIN_BUILD_FROM_CPP_NOT_USING_CFLAGS"
+        + (" -pg" if profiling else "")
+        + " -shared"
+        + f" -DPYTHON_MODULE_NAME={module_name}"
+        f" -o {module_path} " + fcpp.name
+    )
+    print(cmd)
     try:
-        cmd = (
-            f"g++ -I{ksc_runtime_dir} -I{pybind11_path}/include "
-            + python_includes
-            + " -Wall -Wno-unused-variable -Wno-unused-but-set-variable"
-            " -fmax-errors=1"
-            " -std=c++17"
-            " -O3"
-            " -fPIC"
-            + (" -g -pg -O3" if profiling else "")
-            + " -shared"
-            + f" -DPYTHON_MODULE_NAME={module_name}"
-            f" -o {module_path} " + fcpp.name
-        )
-        print(cmd)
         subprocess.run(cmd, shell=True, capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"cpp_file={fcpp.name}")

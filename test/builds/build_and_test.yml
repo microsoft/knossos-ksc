@@ -88,184 +88,184 @@ jobs:
     displayName: 'Clean'
 
 
-- job: 'Windows'
-  workspace:
-    clean: all
-  pool:
-    vmImage: 'vs2017-win2016'
+# - job: 'Windows'
+#   workspace:
+#     clean: all
+#   pool:
+#     vmImage: 'vs2017-win2016'
 
-  steps:
-  - checkout: self
-    submodules: true
+#   steps:
+#   - checkout: self
+#     submodules: true
 
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.8'
-      architecture: 'x64'
+#   - task: UsePythonVersion@0
+#     inputs:
+#       versionSpec: '3.8'
+#       architecture: 'x64'
 
-  - task: UseDotNet@2
-    inputs:
-      version: 3.1.411
+#   - task: UseDotNet@2
+#     inputs:
+#       version: 3.1.411
 
-  - task: PowerShell@2
-    inputs:
-      targetType: 'filePath'
-      filePath: .\test\builds\mkdirs.ps1
-    displayName: 'Make directories [userInstall]'
+#   - task: PowerShell@2
+#     inputs:
+#       targetType: 'filePath'
+#       filePath: .\test\builds\mkdirs.ps1
+#     displayName: 'Make directories [userInstall]'
 
-  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj\test\out.ks .\test\f2k\test0.fs
-    env:
-      # v Otherwise it wastes a bunch of time caching
-      # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-    displayName: 'F# to KS [userTest]'
+#   - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj\test\out.ks .\test\f2k\test0.fs
+#     env:
+#       # v Otherwise it wastes a bunch of time caching
+#       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
+#       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+#     displayName: 'F# to KS [userTest]'
 
-  - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
-    displayName: 'Install dependencies [userInstall]'
+#   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
+#     displayName: 'Install dependencies [userInstall]'
 
-  - script: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
-    displayName: 'GHC compile src/ksc/Main.hs [userTest]'
+#   - script: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
+#     displayName: 'GHC compile src/ksc/Main.hs [userTest]'
 
-  - script: build\bin\ksc --test-windows --fs-test obj\test\out.ks
-    displayName: 'ksc test [userTest]'
+#   - script: build\bin\ksc --test-windows --fs-test obj\test\out.ks
+#     displayName: 'ksc test [userTest]'
 
-  - script: call ./test/builds/test_pytest.cmd
-    displayName: Testing ksc python package [userTest]
+#   - script: call ./test/builds/test_pytest.cmd
+#     displayName: Testing ksc python package [userTest]
 
-  - script: rm -rf *
-    displayName: 'Clean'
-
-
-- job: 'RLO_Ubuntu'
-  timeoutInMinutes: 120
-  workspace:
-    clean: all
-  pool:
-    vmImage: 'ubuntu-18.04'
-  strategy:
-    matrix:
-      Python38:
-        python.version: '3.8'
-    maxParallel: 4
-
-  steps:
-  - checkout: self
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '$(python.version)'
-      architecture: 'x64'
-
-  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
-    displayName: 'Install dependencies'
-    workingDirectory: rlo
-
-  - script: sh ./pylint.sh
-    displayName: pylint
-    workingDirectory: rlo
-
-  - bash: python -m mypy --version && python -m mypy ./
-    displayName: mypy
-    workingDirectory: rlo
-
-  - script: sh ./check_format.sh
-    displayName: check_format
-    workingDirectory: rlo
-
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml --durations=10
-    displayName: 'pytest_fast'
-    workingDirectory: rlo
-
-  # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
-  - task: AzureCLI@1
-    displayName: 'pytest with Azure CLI'
-    inputs:
-      workingDirectory: rlo
-      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
-      scriptLocation: 'inlineScript'
-      inlineScript: >
-        pytest --with-azurecli test/rlo/test_experiment_result.py --durations=5
-
-  # Try two-way parallelism, we don't have any GPUs but can run multithreaded on multiple CPUs
-  # Include test for determinism via seed_all_reps flag, although this does not test tensorflow-gpu.
-  - script: "python src/train_over_expressions.py fewer_simplify_rules --num_parallel 2 --run_id $(Build.BuildNumber) --seed_all_reps=1"
-    displayName: 'test_train_fewer_simplify_rules'
-    workingDirectory: rlo
-
-  - script: "python src/train_on_dataset.py binding_simplify_astar --dataset_path datasets/value_dataset.json --max_epochs=2 --repetition=0"
-    displayName: Test train_on_dataset.py
-    workingDirectory: rlo
-
-  - script: "python src/search_with_expert.py blas --test_on_exprs gemm --max_gnn_eval=10"
-    displayName: Test search_with_expert.py
-    workingDirectory: rlo
-
-  - script: bash ./test/determinism_test.sh --force_cpu
-    displayName: Test determinism
-    workingDirectory: rlo
-
-  - task: CopyFiles@2
-    displayName: 'Copy *.json to logs folder'
-    inputs:
-       contents: 'rlo/outputs/**/*.json'
-       targetFolder: logs
-
-  - task: CopyFiles@2
-    displayName: 'Copy *.html to logs folder'
-    inputs:
-       contents: 'rlo/outputs/**/*.html'
-       targetFolder: logs
-
-  - task: PublishPipelineArtifact@0
-    displayName: 'Publish logs'
-    inputs:
-      artifactName: 'Logs'
-      targetPath: logs
-
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/test-results*.xml'
-      testRunTitle: 'Python $(python.version)'
-    condition: succeededOrFailed()
-
-  - script: rm -rf *
-    displayName: 'Clean'
+#   - script: rm -rf *
+#     displayName: 'Clean'
 
 
-- job: 'RLO_Windows'
-  timeoutInMinutes: 120
-  workspace:
-    clean: all
-  pool:
-    vmImage: 'vs2017-win2016'
-  strategy:
-    matrix:
-      Python38:
-        python.version: '3.8'
-    maxParallel: 4
+# - job: 'RLO_Ubuntu'
+#   timeoutInMinutes: 120
+#   workspace:
+#     clean: all
+#   pool:
+#     vmImage: 'ubuntu-18.04'
+#   strategy:
+#     matrix:
+#       Python38:
+#         python.version: '3.8'
+#     maxParallel: 4
 
-  steps:
-  - checkout: self
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '$(python.version)'
-      architecture: 'x64'
+#   steps:
+#   - checkout: self
+#   - task: UsePythonVersion@0
+#     inputs:
+#       versionSpec: '$(python.version)'
+#       architecture: 'x64'
 
-  - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
-    displayName: 'Install dependencies'
-    workingDirectory: rlo
+#   - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+#     displayName: 'Install dependencies'
+#     workingDirectory: rlo
 
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml
-    displayName: 'pytest_fast'
-    workingDirectory: rlo
+#   - script: sh ./pylint.sh
+#     displayName: pylint
+#     workingDirectory: rlo
 
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFiles: '**/test-results*.xml'
-      testRunTitle: 'Python $(python.version)'
-    condition: succeededOrFailed()
+#   - bash: python -m mypy --version && python -m mypy ./
+#     displayName: mypy
+#     workingDirectory: rlo
 
-  - script: rm -rf *
-    displayName: 'Clean'
+#   - script: sh ./check_format.sh
+#     displayName: check_format
+#     workingDirectory: rlo
+
+#   - script: pytest test/rlo --quick  --junitxml=junit/test-results_fast.xml --durations=10
+#     displayName: 'pytest_fast'
+#     workingDirectory: rlo
+
+#   # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
+#   - task: AzureCLI@1
+#     displayName: 'pytest with Azure CLI'
+#     inputs:
+#       workingDirectory: rlo
+#       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+#       scriptLocation: 'inlineScript'
+#       inlineScript: >
+#         pytest --with-azurecli test/rlo/test_experiment_result.py --durations=5
+
+#   # Try two-way parallelism, we don't have any GPUs but can run multithreaded on multiple CPUs
+#   # Include test for determinism via seed_all_reps flag, although this does not test tensorflow-gpu.
+#   - script: "python src/train_over_expressions.py fewer_simplify_rules --num_parallel 2 --run_id $(Build.BuildNumber) --seed_all_reps=1"
+#     displayName: 'test_train_fewer_simplify_rules'
+#     workingDirectory: rlo
+
+#   - script: "python src/train_on_dataset.py binding_simplify_astar --dataset_path datasets/value_dataset.json --max_epochs=2 --repetition=0"
+#     displayName: Test train_on_dataset.py
+#     workingDirectory: rlo
+
+#   - script: "python src/search_with_expert.py blas --test_on_exprs gemm --max_gnn_eval=10"
+#     displayName: Test search_with_expert.py
+#     workingDirectory: rlo
+
+#   - script: bash ./test/determinism_test.sh --force_cpu
+#     displayName: Test determinism
+#     workingDirectory: rlo
+
+#   - task: CopyFiles@2
+#     displayName: 'Copy *.json to logs folder'
+#     inputs:
+#        contents: 'rlo/outputs/**/*.json'
+#        targetFolder: logs
+
+#   - task: CopyFiles@2
+#     displayName: 'Copy *.html to logs folder'
+#     inputs:
+#        contents: 'rlo/outputs/**/*.html'
+#        targetFolder: logs
+
+#   - task: PublishPipelineArtifact@0
+#     displayName: 'Publish logs'
+#     inputs:
+#       artifactName: 'Logs'
+#       targetPath: logs
+
+#   - task: PublishTestResults@2
+#     inputs:
+#       testResultsFiles: '**/test-results*.xml'
+#       testRunTitle: 'Python $(python.version)'
+#     condition: succeededOrFailed()
+
+#   - script: rm -rf *
+#     displayName: 'Clean'
+
+
+# - job: 'RLO_Windows'
+#   timeoutInMinutes: 120
+#   workspace:
+#     clean: all
+#   pool:
+#     vmImage: 'vs2017-win2016'
+#   strategy:
+#     matrix:
+#       Python38:
+#         python.version: '3.8'
+#     maxParallel: 4
+
+#   steps:
+#   - checkout: self
+#   - task: UsePythonVersion@0
+#     inputs:
+#       versionSpec: '$(python.version)'
+#       architecture: 'x64'
+
+#   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
+#     displayName: 'Install dependencies'
+#     workingDirectory: rlo
+
+#   - script: pytest test/rlo --quick  --junitxml=junit/test-results_fast.xml
+#     displayName: 'pytest_fast'
+#     workingDirectory: rlo
+
+#   - task: PublishTestResults@2
+#     inputs:
+#       testResultsFiles: '**/test-results*.xml'
+#       testRunTitle: 'Python $(python.version)'
+#     condition: succeededOrFailed()
+
+#   - script: rm -rf *
+#     displayName: 'Clean'
 
 - job: 'RLO_AzureBatch'
   timeoutInMinutes: 0
@@ -310,33 +310,33 @@ jobs:
   - script: rm -rf *
     displayName: 'Clean'
 
-- job: 'RLO_AzureML'
-  workspace:
-    clean: all
-  pool:
-    vmImage: 'ubuntu-18.04'
+# - job: 'RLO_AzureML'
+#   workspace:
+#     clean: all
+#   pool:
+#     vmImage: 'ubuntu-18.04'
 
-  steps:
+#   steps:
 
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.8'
-      architecture: 'x64'
-  - task: Bash@3
-    inputs:
-      workingDirectory: rlo
-      targetType: 'inline'
-      script: |
-        sh ./test/builds/install_linux.sh
-        python --version
-    displayName: 'Install dependencies'
-  - task: AzureCLI@1
-    displayName: 'Submit Azure ML'
-    inputs:
-      workingDirectory: rlo
-      azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
-      scriptLocation: 'inlineScript'
-      inlineScript: >
-        python scripts/azureml_submit.py fewer_simplify_rules \
-          --num_repetitions 2 --compute_cluster cpucluster \
-          --wait_for_completion
+#   - task: UsePythonVersion@0
+#     inputs:
+#       versionSpec: '3.8'
+#       architecture: 'x64'
+#   - task: Bash@3
+#     inputs:
+#       workingDirectory: rlo
+#       targetType: 'inline'
+#       script: |
+#         sh ./test/builds/install_linux.sh
+#         python --version
+#     displayName: 'Install dependencies'
+#   - task: AzureCLI@1
+#     displayName: 'Submit Azure ML'
+#     inputs:
+#       workingDirectory: rlo
+#       azureSubscription: 'Knossos(0f64a630-b912-4501-ad57-262a9e12637c)'
+#       scriptLocation: 'inlineScript'
+#       inlineScript: >
+#         python scripts/azureml_submit.py fewer_simplify_rules \
+#           --num_repetitions 2 --compute_cluster cpucluster \
+#           --wait_for_completion

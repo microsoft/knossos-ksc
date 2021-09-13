@@ -32,7 +32,7 @@
 			]
 		},
 		{
-			"name": "(gdb) pytest",
+			"name": "(gdb) pytest src/bench sqrl",
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "/anaconda/envs/knossos/bin/python",
@@ -94,7 +94,26 @@
 			"type": "python",
 			"request": "launch",
 			"program": "src/bench/run-bench.py",
+			"justMyCode": false,
 			"args": ["examples/dl-capsule/sqrl", "sqrl"],
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python: run-pytest-bench sqrl",
+			"type": "python",
+			"request": "launch",
+			"environment": [
+				{"name":"PYTHONPATH", "value":"./src/python"}
+			],
+			"justMyCode": false,
+			"module": "pytest",
+			"cwd": "${workspaceFolder}",
+			"args": [				
+        "src/bench/",
+				"--modulepath=examples/dl-capsule/sqrl",
+				"--benchmarkname=sqrl",
+        "-v"
+      ],
 			"console": "integratedTerminal"
 		},
 		{
