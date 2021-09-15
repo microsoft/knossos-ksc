@@ -40,8 +40,8 @@ jobs:
   - script: sh ./check_format.sh
     displayName: check_format
 
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml --durations=10
-    displayName: 'pytest_fast'
+  - script: pytest test/rlo --quick --junitxml=junit/test-results_fast.xml --durations=10
+    displayName: 'rlo_pytest_fast'
 
   # Wrap pytest in Azure CLI so that it can authenticate with Azure resources
   - task: AzureCLI@1
@@ -116,8 +116,8 @@ jobs:
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
     displayName: 'Install dependencies'
 
-  - script: pytest test/rlo --junitxml=junit/test-results_fast.xml
-    displayName: 'pytest_fast'
+  - script: pytest --quick test/rlo --junitxml=junit/test-results_fast.xml
+    displayName: 'rlo_pytest_fast'
 
   - task: PublishTestResults@2
     inputs:

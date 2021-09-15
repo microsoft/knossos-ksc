@@ -1,16 +1,20 @@
 # set up for global PyTest
 from dataclasses import dataclass, field
+import os
+import sys
 import pytest
+
 import importlib
 import inspect
 import torch
-import os
 import re
 
 from pathlib import Path
 from collections import namedtuple
 from contextlib import contextmanager
 from typing import Callable
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/python"))
 
 from ksc.torch_frontend import KscStub, CompileConfiguration
 from ksc.compile import VecSpec_Elementwise
