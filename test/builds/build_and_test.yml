@@ -80,9 +80,9 @@ jobs:
     displayName: 'Twine Authenticate'
     inputs:
       artifactFeed: Knossos/Knossos # <Project Name>/<Feed Name>
-  - script: |
-      python -m twine upload -r "Knossos" --skip-existing --config-file $(PYPIRC_PATH) ./src/python/dist/*.whl --verbose
-    displayName: Publishing ksc python package
+# - script: |
+#     python -m twine upload -r "Knossos" --skip-existing --config-file $(PYPIRC_PATH) ./src/python/dist/*.whl --verbose
+#   displayName: Publishing ksc python package
 
   - script: rm -rf *
     displayName: 'Clean'
