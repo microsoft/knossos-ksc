@@ -56,10 +56,20 @@ import typing
 
 warnings.filterwarnings("always")
 
+
+def warn(msg):
+    warnings.warn(f"knossos: {msg}")
+
+
 # Background reading
 # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
 # https://pytorch.org/docs/master/jit.html#interpreting-graphs
 # https://github.com/pytorch/pytorch/blob/8fe2a5e91b79e3f9b6f6c632fdf7f39ec3bf4fca/torch/csrc/jit/ir/ir.h
+
+# https://lernapparat.de/jit-optimization-intro/
+
+# And of course:
+# https://github.com/pytorch/pytorch/blob/67bd2a31b52b01b83a72bb0c8d1c2ef4d95d103b/torch/csrc/jit/serialization/python_print.cpp#L1301
 
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
@@ -104,7 +114,7 @@ def from_torch_type(t):
     type_lookup = str(t)
 
     if "Optional" in type_lookup:
-        print("WARNING: Optional argument treated as required:" + type_lookup)
+        warn(f" Optional argument treated as required:" + type_lookup)
 
     assert False
 
@@ -323,6 +333,7 @@ class TorchScriptVisitor:
         lookups: typing.Dict[str, Callable] = {
             "prim::Constant": self.make_constant,
             "prim::ListConstruct": self.make_list,
+            "prim::ListUnpack": self.make_list,
             "prim::TupleConstruct": self.make_tuple,
             "prim::Return": self.make_return,
             "prim::CallFunction": self.make_callfunction,
@@ -339,7 +350,7 @@ class TorchScriptVisitor:
         if kind.startswith("aten::") or kind in primfuns:
             return self.make_aten_function(node, node.outputsAt(0), kind)
 
-        print("WARNING, unimplmented node kind: " + node.kind())
+        warn("unimplmented node kind: " + node.kind())
         return Var("ERR"), Var(node.kind())
 
     def make_binds(self, nodes) -> List[Tuple[Var, Expr]]:
@@ -363,16 +374,14 @@ class TorchScriptVisitor:
         # need to think about interaction between imperative Python and pure Knossos
         if all_nodes[-1].kind() == "prim::Print":
             if print_count > 1:
-                print(
-                    "WARNING: multiple print statements used, only final one currently translated"
+                warn(
+                    f" multiple print statements used, only final one currently translated"
                 )
             op = self.translate_node(all_nodes[-1])
             return_type = Type.Integer
         else:
             if print_count > 0:
-                print(
-                    "WARNING: print statement currently only supported as final operation"
-                )
+                warn(f" print statement currently only supported as final operation")
             return_node = graph.return_node()
             op = self.translate_node(return_node)
             return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
@@ -409,8 +418,11 @@ class TorchScriptVisitor:
                 self.mark_function_as_done(todo)
 
                 ts_fn = torch.jit.script(todo_fn)
+                print(ts_fn.code)
+                # See ts_fn.schema.arguments
+                # See ts_fn.schema.returns
                 ts_graph = ts_fn.graph
-                ksc_def = self.generate_def(todo_fn.__name__, ts_graph, example_inputs)
+                ksc_def = self.generate_def(todo_fn.name, ts_graph, example_inputs)
                 yield ksc_def
 
         return list(ksc_defs())[::-1]
@@ -795,13 +807,28 @@ class KscStub:
             + self.vectorization.str()
             + "_"
             + ("lm_" if self.generate_lm else "")
-            + self.module.__name__
+            + self._module_to_name()
             + "_"
             + self.raw_f.__name__
         )
         if self.generate_lm:
             torch_extension_name += "__generate_lm"
         return self.compile(example_inputs, torch_extension_name, configuration)
+
+    def _module_to_name(self):
+        print("knossos: module=", self.module)
+        if self.module:
+            return self.module.__name__
+        else:
+            print("knossos: no module, just returning None")
+            # I don't have a module (e.g. in a notebook), so return a fixed string
+            # This might mean two functions land in the same directory, and then
+            # recompilation is triggered a lot, but that would need something like
+            # two notebooks on the same machine calling same-named-but-different
+            # functions at the same time.
+            # If that happens in a real use-case, we could use other per-session
+            # uniquifiers
+            return "NoMod"
 
 
 def _input_is_gpu(example_inputs):
@@ -858,22 +885,29 @@ def register_direct(func: Callable, generate_lm=False, elementwise=False, vmap=F
     )
 
 
-def optional_arg_decorator(register):
+def optional_arg_decorator(register_func):
     # https://stackoverflow.com/a/20966822
-    def wrapped_decorator(*args, **kwargs):
-        # Grab the caller's module here, as wrapped_decorator may be 1 or 2 deeper
+    def register_decorator(func_eg_sqrl=None, **kwargs):
+        # So this is the actual decorator.  It's called either as:
+        #  @register_decorator        # no args, will be passed a function like "sqrl"
+        #  @register_decorator(args)  # will return a 1-arg function which will be called as above
+
+        # First, grab the caller's module, that will be needed
         module = inspect.getmodule(inspect.currentframe().f_back)
+        print(f"Module={module}")
 
-        if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
-            return register(args[0], module)
+        # If I was called "bare", my first call will be with an actual function to decorate
+        # If I was called with args, func will be none, because we have kwargs only
 
-        # we have optional args
-        def real_decorator(f):
-            return register(f, module, *args, **kwargs)
+        # Now was I called "bare", so I should actually do the registering now
+        if func_eg_sqrl:
+            return register_func(func_eg_sqrl, module=module)
+        else:
+            # Or I am being called with args, so I need to return a decorator
+            return lambda f: register_func(f, module=module, **kwargs)
 
-        return real_decorator
-
-    return wrapped_decorator
+    # This is the return from optional_arg_decorator
+    return register_decorator
 
 
 @optional_arg_decorator
