@@ -2,8 +2,11 @@
 
 #### Compile a lisp-like IR with automatic differentiation and user-defined rewrites.
 
-This project is a functional compiler and code-gen tool that will
-accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level languages, and can be linked to a variety of backends to generate code.
+This project is a compiler and code-gen tool that will
+accelerate writing AI algorithms as well as making them easier.   
+The core is a [purely functional](https://en.wikipedia.org/wiki/Purely_functional_programming) 
+lisp-like IR that can be translated from high-level languages, 
+and can be linked to a variety of backends to generate code.
 
 Currently implemented frontends are
  * TorchScript: ts2k
@@ -32,9 +35,16 @@ There's a VS Code syntax highlighter extension in etc/ks-vscode.
 The AST has just a few concepts: Lambda, Call, Let binding, Conditionals, Constants, Assert, 
 Top-level function definitions, and Rewrite rules.
 
-It's also strongly typed, using a bare set of types: Tensor, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR or TorchScript, these are composable, so e.g. we can have a `(Tensor 1 (Tuple Float (Tensor 2 Float)))`.  Tensors are annotated with their "rank" or number of dimensions.
+It's also strongly typed, using a bare set of types: `Tensor`, `Tuple`, 
+and Values (`Float`, `Integer`, `String`).  
+However, unlike say MLIR or TorchScript, these are composable, so e.g. we can have a 
+`(Tensor 1 (Tuple Float (Tensor 2 Float)))`.
+Tensors are annotated with their "rank" or number of dimensions.
 
-The IR is pure functional, so functions may be called more than once or not at all depending on the use of their outputs.  Values are passed and returned "as if" by value, although the optimizer reserves the right implement this using refcounting/copy/move, as long as the semantics are preserved.
+The IR is pure functional, so functions may be called more than once or not at all 
+depending on the use of their outputs.  Values are passed and returned "as if" by value,
+although the optimizer reserves the right implement this using refcounting/copy/move,
+as long as the same computation is performed.
 
 The lisp-like IR is extremely simple -- all the language builtins are in this code:
 ```clojure
@@ -89,38 +99,6 @@ available when writing `.ks` files.
 
 
 ## INSTALLATION/BUILDING
-
-### If you experience any difficulty getting started
-
-Knossos will only be a successful project if the onboarding experience
-is straightforward.  We consider any difficulty getting started whilst
-following these instructions to be a critical issue that we should fix
-urgently.  Therefore if you experience any difficulty getting started
-please follow these steps:
-
-1. [File an
-issue](https://github.com/microsoft/knossos-ksc/issues/new) with the
-title "Difficulty onboarding" that explains as much as possible about
-the difficulty you are having.
-
-2. Email knossos@service.microsoft.com with the subject "Urgent:
-difficulty onboarding to knossos-ksc" with a link to the new issue you
-just filed.
-
-We will respond to you as a matter of top priority.
-
-### Please report your experience onboarding
-
-Please report your experience of onboarding, regardless of whether it
-was good or bad.  It is hard to test onboarding automatically and so
-we rely on new users to tell us about their experience.  After
-following this guide, whether you were successful or not, please
-
-* [File an issue](https://github.com/microsoft/knossos-ksc/issues/new)
-  with the title "Experience report: new user onboarding" describing
-  how you found your onboarding experience.
-
-Many thanks, the Knossos team.
 
 ### Installation
 
