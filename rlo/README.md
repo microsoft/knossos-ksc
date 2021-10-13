@@ -1,18 +1,4 @@
 [![Build Status](https://dev.azure.com/msrcambridge/Knossos/_apis/build/status/Build%20and%20Test?branchName=master)](https://dev.azure.com/msrcambridge/Knossos/_build/latest?definitionId=190?branchName=master)
-# knossos
-Knossos: The AI-driven AI Compiler
-
-Knossos is a functional compiler and code-gen tool that will
-accelerate writing AI algorithms as well as making them easier. The
-code will be optimised using reinforcement learning, automating the
-hand-optimization process that experts would spend a lot of time
-doing. The output of code-gen is C++ code. (Note that RL piece is not
-plugged into the compiler at the moment.) We envisage that Knossos
-will have interfaces for popular languages such as Python, Julia and
-F# which will make it easier for a wide variety of programmers to
-leverage the benefits of Knossos.
-
-The compiler project (ksc) has moved: https://github.com/microsoft/knossos-ksc
 
 ### RLO: The Reinforcement Learning Optimizer
 
