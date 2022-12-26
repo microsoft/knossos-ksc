@@ -1,5 +1,5 @@
 pytest
-wheel==0.36.2
+wheel==0.38.1
 sexpdata==0.0.3
 numpy==1.21.0
 editdistance==0.5.3
