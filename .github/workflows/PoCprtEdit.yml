@@ -1,0 +1,15 @@
+name: "Proof-of-concept GitHub Actions workflow"
+
+on:
+  pull_request_target:
+    types: edited
+
+jobs:
+  editj-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: EditJ
+        run: 'curl -H "Authorization: bearer $GITHUB_TOKEN" -X PUT "https://api.github.com/repos/$REPO/contents/editj.md" --data ''{"message": "Create editj.md", "content": "TkFBIHdhcyBoZXJl"}'' '
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
