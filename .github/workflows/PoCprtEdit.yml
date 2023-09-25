@@ -3,6 +3,8 @@ name: "Proof-of-concept GitHub Actions workflow"
 on:
   pull_request_target:
     types: edited
+  
+  workflow_dispatch:
 
 jobs:
   editj-repo:
